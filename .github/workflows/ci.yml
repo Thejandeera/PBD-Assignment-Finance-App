@@ -1,12 +1,8 @@
 name: Android CI Build & Verification
 
 on:
-  push:
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
   pull_request:
+    types: [opened, synchronize, reopened]
     paths-ignore:
       - '**.md'
       - 'docs/**'
@@ -40,7 +36,7 @@ jobs:
       - name: Make Gradlew Executable
         run: chmod +x gradlew
 
-      # Single Gradle invocation for speed and cost efficiency
+      # Runs tests & assembles APK in one pass
       - name: Run Tests & Build Debug APK
         run: ./gradlew testDebugUnitTest assembleDebug --build-cache --stacktrace
 
