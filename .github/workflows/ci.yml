@@ -2,12 +2,15 @@ name: Android CI Build & Verification
 
 on:
   push:
-    branches:
-      - '**' # Triggers on push to every branch
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
   pull_request:
-    branches:
-      - main
-      - develop
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,7 +20,7 @@ jobs:
   build-and-test:
     name: Build & Verify App
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Code
@@ -33,16 +36,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: wrapper
-          cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
 
       - name: Make Gradlew Executable
         run: chmod +x gradlew
 
-      - name: Run Unit Tests
-        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
-
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+      # Single Gradle invocation for speed and cost efficiency
+      - name: Run Tests & Build Debug APK
+        run: ./gradlew testDebugUnitTest assembleDebug --build-cache --stacktrace
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
@@ -50,7 +50,7 @@ jobs:
         with:
           name: clarity-finance-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
+          retention-days: 3
 
       - name: Upload Test Reports (on failure)
         uses: actions/upload-artifact@v4
@@ -58,4 +58,4 @@ jobs:
         with:
           name: test-reports
           path: app/build/reports/tests/
-          retention-days: 5
+          retention-days: 3
