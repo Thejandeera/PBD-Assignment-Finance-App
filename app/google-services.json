@@ -1,26 +1,60 @@
 {
   "project_info": {
-    "project_number": "123456789012",
-    "project_id": "clarity-finance",
-    "storage_bucket": "clarity-finance.appspot.com"
+    "project_number": "922737104349",
+    "project_id": "clarity-finance-16a22",
+    "storage_bucket": "clarity-finance-16a22.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:123456789012:android:0123456789abcdef",
+        "mobilesdk_app_id": "1:922737104349:android:fe3797b9d3880ffcd71234",
         "android_client_info": {
           "package_name": "com.clarity.finance"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "922737104349-6191kq1cdo55sbuhb37aib1pi1i05ttg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.clarity.finance",
+            "certificate_hash": "373300cf7f681123b83cf913e009637e81894919"
+          }
+        },
+        {
+          "client_id": "922737104349-b138n306114906v5u80t0qbnp33flquv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.clarity.finance",
+            "certificate_hash": "0703360ec3a5631a292e07806d6f1331405caee3"
+          }
+        },
+        {
+          "client_id": "922737104349-shdimqdloeuv68lc3tlh167qcvmftj46.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.clarity.finance",
+            "certificate_hash": "f48ec4009fd08e8690b2dac8f8b23618f6c31bd0"
+          }
+        },
+        {
+          "client_id": "922737104349-14ova6d44jv9d5s97gdmfo05etqtvq8h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "placeholder_api_key_until_member_a_configures_firebase"
+          "current_key": "AIzaSyCtZOeaYuuW1_YcUASiJAgLO7mzgNw_x_k"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "922737104349-14ova6d44jv9d5s97gdmfo05etqtvq8h.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
