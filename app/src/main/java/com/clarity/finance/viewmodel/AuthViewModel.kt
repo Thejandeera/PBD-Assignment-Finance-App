@@ -36,7 +36,7 @@ class AuthViewModel @Inject constructor(
     val canUseBiometrics: StateFlow<Boolean> = _canUseBiometrics.asStateFlow()
 
     val savedUserEmail: String?
-        get() = userPreferencesRepository.lastUserEmail
+        get() = userPreferencesRepository.getSavedEmail()
 
     val currentUserFlow: StateFlow<AuthUser?> = authRepository.currentUserFlow
         .stateIn(
@@ -71,9 +71,8 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.signIn(trimmedEmail, password)
                 .onSuccess { user ->
-                    // First login successful -> Enable biometrics for future logins
-                    userPreferencesRepository.isBiometricEnabled = true
-                    userPreferencesRepository.lastUserEmail = trimmedEmail
+                    // First login successful -> Save credentials securely for biometric sign-in
+                    userPreferencesRepository.saveCredentials(trimmedEmail, password)
                     _canUseBiometrics.value = userPreferencesRepository.canUseBiometrics()
                     _uiState.value = AuthUiState.Success(user)
                 }
@@ -114,7 +113,6 @@ class AuthViewModel @Inject constructor(
                 .onSuccess {
                     // Sign out immediately so user must perform their first login on LoginScreen
                     authRepository.signOut()
-                    userPreferencesRepository.lastUserEmail = trimmedEmail
                     _uiState.value = AuthUiState.RegisteredSuccess(
                         "Account created successfully! Please log in for the first time."
                     )
@@ -125,18 +123,28 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun onBiometricAuthSuccess() {
-        val user = authRepository.currentUser
-        if (user != null) {
-            _uiState.value = AuthUiState.Success(user)
-        } else {
-            val email = userPreferencesRepository.lastUserEmail ?: "user@clarity.finance"
-            val fallbackUser = AuthUser(
-                uid = "biometric_session",
-                email = email,
-                displayName = email.substringBefore("@")
-            )
-            _uiState.value = AuthUiState.Success(fallbackUser)
+    /**
+     * Authenticates with real Firebase servers using saved credentials
+     * after biometric hardware verification succeeds.
+     */
+    fun signInWithBiometrics() {
+        val email = userPreferencesRepository.getSavedEmail()
+        val password = userPreferencesRepository.getSavedPassword()
+
+        if (email.isNullOrBlank() || password.isNullOrBlank()) {
+            _uiState.value = AuthUiState.Error("No biometric credentials saved. Please log in with password first.")
+            return
+        }
+
+        _uiState.value = AuthUiState.Loading
+        viewModelScope.launch {
+            authRepository.signIn(email, password)
+                .onSuccess { user ->
+                    _uiState.value = AuthUiState.Success(user)
+                }
+                .onFailure { error ->
+                    _uiState.value = AuthUiState.Error(mapFirebaseError(error))
+                }
         }
     }
 

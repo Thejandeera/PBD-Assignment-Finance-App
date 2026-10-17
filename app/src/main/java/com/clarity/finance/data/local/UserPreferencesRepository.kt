@@ -1,8 +1,10 @@
 package com.clarity.finance.data.local
 
 import android.content.Context
+import android.util.Base64
 import androidx.biometric.BiometricManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.nio.charset.StandardCharsets
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,16 +16,41 @@ class UserPreferencesRepository @Inject constructor(
 
     companion object {
         private const val KEY_BIOMETRIC_ENABLED = "key_biometric_enabled"
-        private const val KEY_LAST_USER_EMAIL = "key_last_user_email"
+        private const val KEY_SAVED_EMAIL = "key_saved_email"
+        private const val KEY_SAVED_TOKEN = "key_saved_token"
     }
 
     var isBiometricEnabled: Boolean
         get() = prefs.getBoolean(KEY_BIOMETRIC_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_BIOMETRIC_ENABLED, value).apply()
 
-    var lastUserEmail: String?
-        get() = prefs.getString(KEY_LAST_USER_EMAIL, null)
-        set(value) = prefs.edit().putString(KEY_LAST_USER_EMAIL, value).apply()
+    fun saveCredentials(email: String, password: String) {
+        val encodedPass = Base64.encodeToString(password.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)
+        prefs.edit()
+            .putString(KEY_SAVED_EMAIL, email.trim())
+            .putString(KEY_SAVED_TOKEN, encodedPass)
+            .putBoolean(KEY_BIOMETRIC_ENABLED, true)
+            .apply()
+    }
+
+    fun getSavedEmail(): String? = prefs.getString(KEY_SAVED_EMAIL, null)
+
+    fun getSavedPassword(): String? {
+        val encoded = prefs.getString(KEY_SAVED_TOKEN, null) ?: return null
+        return try {
+            String(Base64.decode(encoded, Base64.NO_WRAP), StandardCharsets.UTF_8)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun clearSavedCredentials() {
+        prefs.edit()
+            .remove(KEY_SAVED_EMAIL)
+            .remove(KEY_SAVED_TOKEN)
+            .putBoolean(KEY_BIOMETRIC_ENABLED, false)
+            .apply()
+    }
 
     fun isDeviceBiometricAvailable(): Boolean {
         val biometricManager = BiometricManager.from(context)
@@ -34,6 +61,9 @@ class UserPreferencesRepository @Inject constructor(
     }
 
     fun canUseBiometrics(): Boolean {
-        return isBiometricEnabled && isDeviceBiometricAvailable() && !lastUserEmail.isNullOrBlank()
+        return isBiometricEnabled &&
+                isDeviceBiometricAvailable() &&
+                !getSavedEmail().isNullOrBlank() &&
+                !getSavedPassword().isNullOrBlank()
     }
 }

@@ -138,21 +138,39 @@ fun DashboardScreen(
                     )
                 }
 
-                // Profile Badge / Sign Out Trigger
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .border(BorderStroke(1.dp, ClarityBorder), CircleShape)
-                        .clickable { showSignOutDialog = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "[P]",
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = ClarityTextPrimary
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { showSignOutDialog = true },
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(1.dp, ClarityBorder),
+                        modifier = Modifier.height(36.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+                    ) {
+                        Text(
+                            text = "LOGOUT",
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = ClarityTextPrimary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    // Profile Badge
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .border(BorderStroke(1.dp, ClarityBorder), CircleShape)
+                            .clickable { showSignOutDialog = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "[P]",
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = ClarityTextPrimary
+                        )
+                    }
                 }
             }
 
