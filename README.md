@@ -32,8 +32,10 @@ Previous solutions (spreadsheets, generic budgeting apps, note dumps, bank summa
   - **Cryptocurrency Position (Binance)**: Running net balance and realized gains/losses across USDT, ETH, and altcoins.
 - **True Monthly Income Calculation**: Aggregates variable streams into an accurate, predictable monthly earning figure.
 
-### 3.  Frictionless Expense Management
+### 3. 💳 Frictionless Expense Management
 - **Rapid Expense Entry**: Optimized for minimal taps to record cash, card, and ride-hailing (PickMe, UberEats) transactions immediately.
+- **Default & User-Defined Custom Categories**: Smart pre-configured defaults (Rent, Food & Coffee, Utilities, Subscriptions, Gym, Transport, Shopping, Delivery) plus the ability for users to add and manage their own custom categories.
+- **Optional Contextual Notes**: Every expense includes an optional, nullable `note` field (e.g. for free-form descriptions like "Java Lounge meeting") without adding mandatory friction.
 - **Committed vs. Discretionary Categorization**: Automatically highlights fixed living costs (rent, utilities, subscriptions) versus impulsive lifestyle spending.
 - **Recurring Expense Engine**: Automatic generation of predictable monthly debits (gym memberships, cloud subscriptions).
 
