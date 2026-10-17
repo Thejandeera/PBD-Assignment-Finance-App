@@ -206,7 +206,7 @@ fun LoginScreen(
                                 BiometricPromptHelper.showBiometricPrompt(
                                     activity = activity,
                                     onSuccess = {
-                                        authViewModel.onBiometricAuthSuccess()
+                                        authViewModel.signInWithBiometrics()
                                     },
                                     onError = { errorMsg ->
                                         coroutineScope.launch {
