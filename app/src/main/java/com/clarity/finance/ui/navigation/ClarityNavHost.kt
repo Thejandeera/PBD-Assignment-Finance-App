@@ -1,0 +1,77 @@
+package com.clarity.finance.ui.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.clarity.finance.ui.screens.DashboardScreen
+import com.clarity.finance.ui.screens.LoginScreen
+import com.clarity.finance.ui.screens.RegisterScreen
+import com.clarity.finance.viewmodel.AuthViewModel
+
+sealed class Screen(val route: String) {
+    data object Login : Screen("login")
+    data object Register : Screen("register")
+    data object Dashboard : Screen("dashboard")
+}
+
+@Composable
+fun ClarityNavHost(
+    modifier: Modifier = Modifier,
+    navController: NavHostController = rememberNavController(),
+    authViewModel: AuthViewModel = hiltViewModel()
+) {
+    val startDestination = if (authViewModel.isUserLoggedIn) {
+        Screen.Dashboard.route
+    } else {
+        Screen.Login.route
+    }
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        modifier = modifier
+    ) {
+        composable(Screen.Login.route) {
+            LoginScreen(
+                authViewModel = authViewModel,
+                onNavigateToRegister = {
+                    navController.navigate(Screen.Register.route)
+                },
+                onLoginSuccess = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Register.route) {
+            RegisterScreen(
+                authViewModel = authViewModel,
+                onNavigateToLogin = {
+                    navController.popBackStack()
+                },
+                onRegisterSuccess = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Dashboard.route) {
+            DashboardScreen(
+                authViewModel = authViewModel,
+                onSignOutSuccess = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Dashboard.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+    }
+}
