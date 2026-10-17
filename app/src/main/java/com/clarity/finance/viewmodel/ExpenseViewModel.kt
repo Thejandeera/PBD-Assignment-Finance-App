@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -246,6 +247,9 @@ class ExpenseViewModel @Inject constructor(
                 metrics = metrics
             )
         }
+        .catch { error ->
+            emit(ExpenseHistoryUiState(isLoading = false, errorMessage = error.message))
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -263,6 +267,7 @@ class ExpenseViewModel @Inject constructor(
     // =========================================================================
 
     val categories: StateFlow<List<CategoryItem>> = expenseRepository.observeCategories()
+        .catch { emit(getDefaultCategories()) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
