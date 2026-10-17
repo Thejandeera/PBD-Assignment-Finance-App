@@ -3,6 +3,7 @@ package com.clarity.finance.viewmodel
 import android.util.Patterns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clarity.finance.data.local.UserPreferencesRepository
 import com.clarity.finance.data.repository.AuthRepository
 import com.clarity.finance.model.AuthUser
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,16 +19,24 @@ sealed interface AuthUiState {
     data object Idle : AuthUiState
     data object Loading : AuthUiState
     data class Success(val user: AuthUser) : AuthUiState
+    data class RegisteredSuccess(val message: String) : AuthUiState
     data class Error(val message: String) : AuthUiState
 }
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
+
+    private val _canUseBiometrics = MutableStateFlow(userPreferencesRepository.canUseBiometrics())
+    val canUseBiometrics: StateFlow<Boolean> = _canUseBiometrics.asStateFlow()
+
+    val savedUserEmail: String?
+        get() = userPreferencesRepository.lastUserEmail
 
     val currentUserFlow: StateFlow<AuthUser?> = authRepository.currentUserFlow
         .stateIn(
@@ -38,6 +47,10 @@ class AuthViewModel @Inject constructor(
 
     val isUserLoggedIn: Boolean
         get() = authRepository.currentUser != null
+
+    fun checkBiometricStatus() {
+        _canUseBiometrics.value = userPreferencesRepository.canUseBiometrics()
+    }
 
     fun signIn(email: String, password: String) {
         val trimmedEmail = email.trim()
@@ -58,6 +71,10 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.signIn(trimmedEmail, password)
                 .onSuccess { user ->
+                    // First login successful -> Enable biometrics for future logins
+                    userPreferencesRepository.isBiometricEnabled = true
+                    userPreferencesRepository.lastUserEmail = trimmedEmail
+                    _canUseBiometrics.value = userPreferencesRepository.canUseBiometrics()
                     _uiState.value = AuthUiState.Success(user)
                 }
                 .onFailure { error ->
@@ -94,8 +111,13 @@ class AuthViewModel @Inject constructor(
         _uiState.value = AuthUiState.Loading
         viewModelScope.launch {
             authRepository.signUp(trimmedName, trimmedEmail, password)
-                .onSuccess { user ->
-                    _uiState.value = AuthUiState.Success(user)
+                .onSuccess {
+                    // Sign out immediately so user must perform their first login on LoginScreen
+                    authRepository.signOut()
+                    userPreferencesRepository.lastUserEmail = trimmedEmail
+                    _uiState.value = AuthUiState.RegisteredSuccess(
+                        "Account created successfully! Please log in for the first time."
+                    )
                 }
                 .onFailure { error ->
                     _uiState.value = AuthUiState.Error(mapFirebaseError(error))
@@ -103,9 +125,25 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun onBiometricAuthSuccess() {
+        val user = authRepository.currentUser
+        if (user != null) {
+            _uiState.value = AuthUiState.Success(user)
+        } else {
+            val email = userPreferencesRepository.lastUserEmail ?: "user@clarity.finance"
+            val fallbackUser = AuthUser(
+                uid = "biometric_session",
+                email = email,
+                displayName = email.substringBefore("@")
+            )
+            _uiState.value = AuthUiState.Success(fallbackUser)
+        }
+    }
+
     fun signOut() {
         authRepository.signOut()
         _uiState.value = AuthUiState.Idle
+        checkBiometricStatus()
     }
 
     fun resetState() {

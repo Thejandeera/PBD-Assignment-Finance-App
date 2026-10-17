@@ -1,6 +1,10 @@
 package com.clarity.finance.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
@@ -24,6 +28,8 @@ fun ClarityNavHost(
     navController: NavHostController = rememberNavController(),
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
+    var loginNoticeMessage by remember { mutableStateOf<String?>(null) }
+
     val startDestination = if (authViewModel.isUserLoggedIn) {
         Screen.Dashboard.route
     } else {
@@ -38,10 +44,13 @@ fun ClarityNavHost(
         composable(Screen.Login.route) {
             LoginScreen(
                 authViewModel = authViewModel,
+                initialMessage = loginNoticeMessage,
                 onNavigateToRegister = {
+                    loginNoticeMessage = null
                     navController.navigate(Screen.Register.route)
                 },
                 onLoginSuccess = {
+                    loginNoticeMessage = null
                     navController.navigate(Screen.Dashboard.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
@@ -55,8 +64,11 @@ fun ClarityNavHost(
                 onNavigateToLogin = {
                     navController.popBackStack()
                 },
-                onRegisterSuccess = {
-                    navController.navigate(Screen.Dashboard.route) {
+                onRegisterSuccess = { successMessage ->
+                    // Set notice message and redirect to login screen
+                    loginNoticeMessage = successMessage
+                    authViewModel.resetState()
+                    navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
