@@ -15,9 +15,11 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import android.util.Log
 import java.time.YearMonth
 import java.util.UUID
 import javax.inject.Inject
@@ -51,6 +53,9 @@ class FirestoreExpenseRepository @Inject constructor(
 
         return query.asFlow { snapshot ->
             snapshot.documents.mapNotNull { it.toExpense() }
+        }.catch { error ->
+            Log.e("FirestoreExpenseRepo", "Expenses stream error: ${error.message}", error)
+            emit(emptyList())
         }
     }
 
@@ -103,6 +108,9 @@ class FirestoreExpenseRepository @Inject constructor(
 
         return query.asFlow { snapshot ->
             snapshot.documents.mapNotNull { it.toRecurringExpense() }
+        }.catch { error ->
+            Log.e("FirestoreExpenseRepo", "Recurring stream error: ${error.message}", error)
+            emit(emptyList())
         }
     }
 
@@ -210,6 +218,9 @@ class FirestoreExpenseRepository @Inject constructor(
         return query.asFlow { snapshot ->
             val custom: List<CategoryItem> = snapshot.documents.mapNotNull { it.toCategoryItem() }
             getDefaultCategories() + custom
+        }.catch { error ->
+            Log.w("FirestoreExpenseRepo", "Custom categories read failed (${error.message}); falling back to default categories.")
+            emit(getDefaultCategories())
         }
     }
 
