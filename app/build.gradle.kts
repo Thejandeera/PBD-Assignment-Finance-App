@@ -71,6 +71,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
     implementation("androidx.activity:activity-compose:1.9.0")
+    implementation("androidx.biometric:biometric:1.2.0-alpha05")
 
     // Hilt Dependency Injection
     implementation("com.google.dagger:hilt-android:2.51.1")
