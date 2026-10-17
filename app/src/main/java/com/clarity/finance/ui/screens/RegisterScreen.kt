@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.ui.components.ClarityTextField
 import com.clarity.finance.ui.components.DashedInfoBox
+import com.clarity.finance.ui.components.DemoModeCallout
 import com.clarity.finance.ui.components.PrimaryButton
 import com.clarity.finance.ui.theme.ClarityBorder
 import com.clarity.finance.ui.theme.ClarityTextMuted
@@ -110,8 +111,20 @@ fun RegisterScreen(
                     color = ClarityTextSecondary
                 )
             }
+            Spacer(modifier = Modifier.height(20.dp))
 
-            Spacer(modifier = Modifier.height(28.dp))
+            // Demo mode notice
+            DemoModeCallout(
+                text = "Demo mode: Tap to pre-fill registration",
+                onClick = {
+                    fullName = "Kavindu Silva"
+                    email = "kavindu.dev@example.lk"
+                    password = "Password123!"
+                    confirmPassword = "Password123!"
+                }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Full Name
             ClarityTextField(
