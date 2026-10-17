@@ -1,0 +1,93 @@
+rules_version = '2';
+
+// Clarity Finance - Firestore security rules
+// Principle: a signed-in user can read and write only documents under users/{their own uid}.
+// Anything not matched below is denied by default.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // "2026-10-16"
+    function isDate(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    // "2026-10"
+    function isMonth(value) {
+      return value is string && value.matches('^[0-9]{4}-[0-9]{2}$');
+    }
+
+    // Profile: name, email, baseCurrency, rates, createdAt
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      // Income entries (Member A)
+      match /incomes/{incomeId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidIncome(request.resource.data);
+      }
+
+      // Expense entries (Member B)
+      match /expenses/{expenseId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidExpense(request.resource.data);
+      }
+
+      // Recurring expenses, goals and goal savings: owner only.
+      // Listed by name on purpose - a catch-all {document=**} here would also match
+      // incomes and expenses and let invalid data bypass the checks above.
+      match /recurring/{recurringId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /goals/{goalId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /savings/{savingId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    function isValidIncome(data) {
+      return data.keys().hasAll(['source', 'amount', 'currency', 'exchangeRate',
+                                 'amountLKR', 'status', 'date', 'month'])
+        && data.keys().hasOnly(['source', 'amount', 'currency', 'exchangeRate',
+                                'amountLKR', 'status', 'date', 'month',
+                                'projectName', 'note', 'createdAt'])
+        && data.source in ['SALARY', 'FREELANCE', 'ADSENSE', 'CRYPTO']
+        && data.currency in ['LKR', 'USD', 'USDT']
+        && data.status in ['RECEIVED', 'PENDING']
+        && data.amount is number
+        && data.exchangeRate is number
+        && data.amountLKR is number
+        // Only crypto can be negative (a trading loss); nothing can be zero.
+        && (data.amount > 0 || (data.source == 'CRYPTO' && data.amount < 0))
+        // LKR uses rate 1; USD / USDT need a positive rate snapshot.
+        && ((data.currency == 'LKR' && data.exchangeRate == 1)
+            || (data.currency != 'LKR' && data.exchangeRate > 0))
+        // The stored LKR value must match amount x rate (small rounding tolerance).
+        && math.abs(data.amountLKR - data.amount * data.exchangeRate) < 0.01
+        // Only freelance invoices can be waiting for payment.
+        && (data.status == 'RECEIVED' || data.source == 'FREELANCE')
+        // month is the denormalised "YYYY-MM" part of date.
+        && isDate(data.date)
+        && isMonth(data.month)
+        && data.date.matches(data.month + '-[0-9]{2}');
+    }
+
+    function isValidExpense(data) {
+      return data.amount is number
+        && data.amount > 0
+        && data.type in ['COMMITTED', 'DISCRETIONARY']
+        && data.paymentMethod in ['CARD', 'CASH', 'SECONDARY'];
+    }
+  }
+}
