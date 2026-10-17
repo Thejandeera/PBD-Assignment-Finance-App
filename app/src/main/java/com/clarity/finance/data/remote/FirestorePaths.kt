@@ -11,6 +11,7 @@ object FirestorePaths {
     const val RECURRING = "recurring"
     const val GOALS = "goals"
     const val SAVINGS = "savings"
+    const val CATEGORIES = "categories"
 
     const val PRIMARY_GOAL_ID = "primary_goal"
 }

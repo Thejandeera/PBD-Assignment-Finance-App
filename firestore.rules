@@ -54,6 +54,10 @@ service cloud.firestore {
       match /savings/{savingId} {
         allow read, write: if isOwner(uid);
       }
+
+      match /categories/{categoryId} {
+        allow read, write: if isOwner(uid);
+      }
     }
 
     function isValidIncome(data) {
