@@ -1,6 +1,7 @@
 package com.clarity.finance.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,7 +39,20 @@ fun ClarityNavHost(
 ) {
     var loginNoticeMessage by remember { mutableStateOf<String?>(null) }
 
-    val startDestination = if (authViewModel.isUserLoggedIn) {
+    // 1-Hour Session Expiry Check
+    LaunchedEffect(Unit) {
+        if (authViewModel.isUserLoggedIn && authViewModel.isSessionExpired()) {
+            authViewModel.signOut()
+            loginNoticeMessage = "Session expired due to inactivity. Please log in again."
+            navController.navigate(Screen.Login.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        } else if (authViewModel.isUserLoggedIn) {
+            authViewModel.updateSessionActivity()
+        }
+    }
+
+    val startDestination = if (authViewModel.isUserLoggedIn && !authViewModel.isSessionExpired()) {
         Screen.Dashboard.route
     } else {
         Screen.Login.route

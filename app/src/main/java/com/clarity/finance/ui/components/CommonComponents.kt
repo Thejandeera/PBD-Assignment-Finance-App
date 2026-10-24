@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -27,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
@@ -35,12 +35,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.clarity.finance.ui.theme.ClarityBlack
-import com.clarity.finance.ui.theme.ClarityBorder
-import com.clarity.finance.ui.theme.ClarityGrayBackground
-import com.clarity.finance.ui.theme.ClarityTextPrimary
-import com.clarity.finance.ui.theme.ClarityTextSecondary
-import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.theme.ClarityGreen
+import com.clarity.finance.ui.theme.ClarityRed
 
 @Composable
 fun ClarityTextField(
@@ -58,13 +54,15 @@ fun ClarityTextField(
     errorMessage: String? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            fontSize = 13.sp,
-            fontFamily = FontFamily.Monospace,
-            color = ClarityTextPrimary,
-            modifier = Modifier.padding(bottom = 6.dp)
-        )
+        if (label.isNotEmpty()) {
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+        }
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
@@ -72,7 +70,7 @@ fun ClarityTextField(
                 if (placeholder.isNotEmpty()) {
                     Text(
                         text = placeholder,
-                        color = ClarityTextSecondary.copy(alpha = 0.6f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         fontSize = 14.sp
                     )
                 }
@@ -82,11 +80,13 @@ fun ClarityTextField(
             visualTransformation = visualTransformation,
             shape = RoundedCornerShape(8.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = ClarityBlack,
-                unfocusedBorderColor = ClarityBorder,
-                focusedTextColor = ClarityTextPrimary,
-                unfocusedTextColor = ClarityTextPrimary,
-                cursorColor = ClarityBlack
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                cursorColor = MaterialTheme.colorScheme.primary,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface
             ),
             trailingIcon = if (trailingText != null) {
                 {
@@ -95,7 +95,7 @@ fun ClarityTextField(
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Medium,
-                        color = ClarityTextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .clickable(enabled = onTrailingTextClick != null) {
                                 onTrailingTextClick?.invoke()
@@ -111,7 +111,7 @@ fun ClarityTextField(
         if (isError && !errorMessage.isNullOrEmpty()) {
             Text(
                 text = errorMessage,
-                color = Color.Red,
+                color = ClarityRed,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 4.dp, start = 4.dp)
             )
@@ -135,16 +135,16 @@ fun PrimaryButton(
             .height(52.dp),
         shape = RoundedCornerShape(8.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = ClarityBlack,
-            contentColor = ClarityWhite,
-            disabledContainerColor = ClarityBlack.copy(alpha = 0.5f),
-            disabledContentColor = ClarityWhite.copy(alpha = 0.7f)
+            containerColor = ClarityGreen,
+            contentColor = androidx.compose.ui.graphics.Color.White,
+            disabledContainerColor = ClarityGreen.copy(alpha = 0.5f),
+            disabledContentColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f)
         )
     ) {
         if (isLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(20.dp),
-                color = ClarityWhite,
+                color = androidx.compose.ui.graphics.Color.White,
                 strokeWidth = 2.dp
             )
         } else {
@@ -164,6 +164,7 @@ fun DashedInfoBox(
     modifier: Modifier = Modifier,
     prefix: String = "[i]"
 ) {
+    val borderColor = MaterialTheme.colorScheme.outline
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -173,7 +174,7 @@ fun DashedInfoBox(
                     pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f)
                 )
                 drawRoundRect(
-                    color = ClarityBorder,
+                    color = borderColor,
                     cornerRadius = CornerRadius(8.dp.toPx()),
                     style = stroke
                 )
@@ -186,14 +187,14 @@ fun DashedInfoBox(
                 fontSize = 13.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = ClarityTextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = text,
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
-                color = ClarityTextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 16.sp
             )
         }
@@ -209,8 +210,8 @@ fun DemoModeCallout(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(ClarityGrayBackground, RoundedCornerShape(8.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
@@ -218,14 +219,14 @@ fun DemoModeCallout(
             Text(
                 text = "ⓘ",
                 fontSize = 14.sp,
-                color = ClarityTextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = text,
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
-                color = ClarityTextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }

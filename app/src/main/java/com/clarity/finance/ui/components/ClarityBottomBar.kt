@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
@@ -31,22 +30,25 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.clarity.finance.ui.theme.ClarityBlack
 import com.clarity.finance.ui.theme.ClarityBorder
+import com.clarity.finance.ui.theme.ClarityGreen
+import com.clarity.finance.ui.theme.ClarityGreenBright
 import com.clarity.finance.ui.theme.ClarityTextMuted
-import com.clarity.finance.ui.theme.ClarityTextPrimary
 import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.theme.LocalIsDarkTheme
 
 enum class ClarityNavTab {
     HOME,
@@ -62,6 +64,10 @@ fun ClarityBottomBar(
     onAddClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val barBackground = if (isDark) Color(0xFF000000) else Color(0xFFFFFFFF)
+    val barBorder = if (isDark) Color(0xFF333333) else ClarityBorder
+
     // Total container height accommodates raised FAB and curved notch
     Box(
         modifier = modifier
@@ -74,8 +80,8 @@ fun ClarityBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(58.dp)
-                .background(ClarityWhite)
-                .border(BorderStroke(1.dp, ClarityBorder))
+                .background(barBackground)
+                .border(BorderStroke(1.dp, barBorder))
                 .padding(horizontal = 16.dp)
         ) {
             Row(
@@ -135,8 +141,8 @@ fun ClarityBottomBar(
                 .offset(y = 2.dp)
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(ClarityWhite)
-                .border(BorderStroke(1.dp, ClarityBorder), CircleShape),
+                .background(barBackground)
+                .border(BorderStroke(1.dp, barBorder), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             // Fill bottom portion to merge seamlessly with navbar background
@@ -145,7 +151,7 @@ fun ClarityBottomBar(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .height(28.dp)
-                    .background(ClarityWhite)
+                    .background(barBackground)
             )
         }
 
@@ -157,9 +163,9 @@ fun ClarityBottomBar(
                 .offset(y = 6.dp)
                 .size(46.dp),
             shape = CircleShape,
-            containerColor = ClarityBlack,
+            containerColor = ClarityGreenBright,
             contentColor = ClarityWhite,
-            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp, pressedElevation = 4.dp)
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp, pressedElevation = 6.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
@@ -180,6 +186,12 @@ private fun ClarityBottomNavItem(
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val isDark = LocalIsDarkTheme.current
+    val itemColor = if (isSelected) {
+        ClarityGreenBright
+    } else {
+        if (isDark) Color(0xFFFFFFFF) else ClarityTextMuted
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -194,7 +206,7 @@ private fun ClarityBottomNavItem(
         Icon(
             imageVector = if (isSelected) selectedIcon else unselectedIcon,
             contentDescription = label,
-            tint = if (isSelected) ClarityTextPrimary else ClarityTextMuted,
+            tint = itemColor,
             modifier = Modifier.size(20.dp)
         )
 
@@ -205,7 +217,7 @@ private fun ClarityBottomNavItem(
             fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) ClarityTextPrimary else ClarityTextMuted
+            color = itemColor
         )
     }
 }

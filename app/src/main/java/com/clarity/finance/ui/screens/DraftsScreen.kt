@@ -27,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.Button
@@ -37,6 +36,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -60,29 +60,27 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.clarity.finance.model.CategoryItem
 import com.clarity.finance.model.DraftTransaction
 import com.clarity.finance.model.DraftTransactionType
 import com.clarity.finance.model.getDefaultCategories
-import com.clarity.finance.ui.theme.ClarityBlack
-import com.clarity.finance.ui.theme.ClarityBorder
-import com.clarity.finance.ui.theme.ClarityGrayBackground
-import com.clarity.finance.ui.theme.ClarityTextMuted
-import com.clarity.finance.ui.theme.ClarityTextPrimary
-import com.clarity.finance.ui.theme.ClarityTextSecondary
+import com.clarity.finance.ui.theme.ClarityGreen
+import com.clarity.finance.ui.theme.ClarityRed
 import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.util.CurrencyFormatter
+import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.DraftViewModel
-import java.text.NumberFormat
-import java.util.Locale
 
 @Composable
 fun DraftsScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
-    draftViewModel: DraftViewModel = hiltViewModel()
+    draftViewModel: DraftViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val uiState by draftViewModel.uiState.collectAsStateWithLifecycle()
+    val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
+    val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val smsPermissionLauncher = rememberLauncherForActivityResult(
@@ -102,12 +100,14 @@ fun DraftsScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = ClarityWhite,
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -115,7 +115,7 @@ fun DraftsScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = ClarityTextPrimary
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
@@ -124,20 +124,20 @@ fun DraftsScreen(
                         text = "TRANSACTION INBOX",
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextMuted
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "Bank SMS Drafts",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
                 if (uiState.drafts.isNotEmpty()) {
                     Box(
                         modifier = Modifier
-                            .background(ClarityBlack, RoundedCornerShape(12.dp))
+                            .background(ClarityGreen, RoundedCornerShape(12.dp))
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(
@@ -179,14 +179,14 @@ fun DraftsScreen(
                     },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(6.dp),
-                    border = BorderStroke(1.dp, ClarityBorder),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     enabled = !uiState.isScanning
                 ) {
                     Icon(
                         imageVector = Icons.Default.Sms,
                         contentDescription = "Scan SMS",
                         modifier = Modifier.size(14.dp),
-                        tint = ClarityTextPrimary
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
@@ -194,7 +194,7 @@ fun DraftsScreen(
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
@@ -203,14 +203,14 @@ fun DraftsScreen(
                     onClick = { draftViewModel.loadSampleSmsDrafts() },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(6.dp),
-                    border = BorderStroke(1.dp, ClarityBorder),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     enabled = !uiState.isScanning
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Demo SMS",
                         modifier = Modifier.size(14.dp),
-                        tint = ClarityTextPrimary
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
@@ -218,7 +218,7 @@ fun DraftsScreen(
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -234,7 +234,7 @@ fun DraftsScreen(
                         text = "TAP 'APPROVE' TO COMMIT TO EXPENSES",
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextMuted
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -243,7 +243,7 @@ fun DraftsScreen(
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityBlack,
+                            color = ClarityGreen,
                             modifier = Modifier
                                 .clickable { draftViewModel.approveAll() }
                                 .padding(4.dp)
@@ -252,7 +252,7 @@ fun DraftsScreen(
                             text = "CLEAR",
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = Color.Red,
+                            color = ClarityRed,
                             modifier = Modifier
                                 .clickable { draftViewModel.clearAll() }
                                 .padding(4.dp)
@@ -271,12 +271,15 @@ fun DraftsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = ClarityBlack, modifier = Modifier.size(32.dp))
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(32.dp)
+                        )
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = "Scanning SMS messages...",
                             fontSize = 13.sp,
-                            color = ClarityTextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -296,13 +299,13 @@ fun DraftsScreen(
                             modifier = Modifier
                                 .size(64.dp)
                                 .clip(CircleShape)
-                                .background(ClarityGrayBackground),
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Sms,
                                 contentDescription = "Empty Drafts",
-                                tint = ClarityTextSecondary,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(32.dp)
                             )
                         }
@@ -311,13 +314,13 @@ fun DraftsScreen(
                             text = "No Pending Drafts",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Tap 'SCAN SMS' to scan incoming bank messages or 'DEMO SMS' to load sample BOC and COMBANK transactions.",
                             fontSize = 12.sp,
-                            color = ClarityTextMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }
@@ -331,6 +334,8 @@ fun DraftsScreen(
                     items(uiState.drafts, key = { it.id }) { draft ->
                         DraftCard(
                             draft = draft,
+                            currentCurrency = currentCurrency,
+                            exchangeRate = exchangeRate,
                             onApprove = { catId, catName ->
                                 draftViewModel.approveDraft(
                                     draft = draft,
@@ -350,6 +355,8 @@ fun DraftsScreen(
 @Composable
 private fun DraftCard(
     draft: DraftTransaction,
+    currentCurrency: String,
+    exchangeRate: Double,
     onApprove: (selectedCategoryId: String, selectedCategoryName: String) -> Unit,
     onDiscard: () -> Unit
 ) {
@@ -361,15 +368,13 @@ private fun DraftCard(
     }
     var showCategoryMenu by remember { mutableStateOf(false) }
 
-    val formattedAmount = remember(draft.amount) {
-        NumberFormat.getNumberInstance(Locale.US).format(draft.amount)
-    }
+    val formattedAmount = CurrencyFormatter.format(draft.amount, currentCurrency, exchangeRate)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ClarityWhite, RoundedCornerShape(8.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
             .padding(14.dp)
     ) {
         Column {
@@ -384,7 +389,7 @@ private fun DraftCard(
                     Box(
                         modifier = Modifier
                             .background(
-                                if (isIncome) Color(0xFF2E7D32) else ClarityBlack,
+                                if (isIncome) ClarityGreen else ClarityRed,
                                 RoundedCornerShape(4.dp)
                             )
                             .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -400,7 +405,7 @@ private fun DraftCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
-                            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(4.dp))
+                            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(4.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
@@ -408,7 +413,7 @@ private fun DraftCard(
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -417,7 +422,7 @@ private fun DraftCard(
                     text = "${draft.date} ${draft.time.orEmpty()}",
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -434,23 +439,24 @@ private fun DraftCard(
                         text = draft.merchantOrTitle,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     if (!draft.accountNumber.isNullOrBlank()) {
                         Text(
                             text = draft.accountNumber,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
                 Text(
-                    text = "LKR $formattedAmount",
+                    text = formattedAmount,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    fontFamily = FontFamily.Monospace,
+                    color = if (draft.type == DraftTransactionType.INCOME) ClarityGreen else ClarityRed
                 )
             }
 
@@ -466,8 +472,8 @@ private fun DraftCard(
                     Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(ClarityGrayBackground)
-                            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(6.dp))
                             .clickable { showCategoryMenu = true }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -478,7 +484,7 @@ private fun DraftCard(
                             text = "${selectedCategory.name} ▼",
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
@@ -503,14 +509,14 @@ private fun DraftCard(
                     OutlinedButton(
                         onClick = onDiscard,
                         shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, ClarityBorder),
+                        border = BorderStroke(1.dp, ClarityRed),
                         modifier = Modifier.height(34.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Discard",
-                            tint = Color.Red,
+                            tint = ClarityRed,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -518,14 +524,14 @@ private fun DraftCard(
                             text = "DISCARD",
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = Color.Red
+                            color = ClarityRed
                         )
                     }
 
                     Button(
                         onClick = { onApprove(selectedCategory.id, selectedCategory.name) },
                         shape = RoundedCornerShape(6.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ClarityBlack),
+                        colors = ButtonDefaults.buttonColors(containerColor = ClarityGreen),
                         modifier = Modifier.height(34.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                     ) {

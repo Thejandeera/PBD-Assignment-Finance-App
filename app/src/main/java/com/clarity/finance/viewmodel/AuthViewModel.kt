@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clarity.finance.data.local.UserPreferencesRepository
 import com.clarity.finance.data.repository.AuthRepository
+import com.clarity.finance.data.repository.ExchangeRateRepository
 import com.clarity.finance.model.AuthUser
+import com.clarity.finance.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -29,7 +31,8 @@ sealed interface AuthUiState {
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val profileImageManager: ProfileImageManager
+    private val profileImageManager: ProfileImageManager,
+    private val exchangeRateRepository: ExchangeRateRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
@@ -37,6 +40,10 @@ class AuthViewModel @Inject constructor(
 
     private val _canUseBiometrics = MutableStateFlow(userPreferencesRepository.canUseBiometrics())
     val canUseBiometrics: StateFlow<Boolean> = _canUseBiometrics.asStateFlow()
+
+    /** Live LKR-per-USD exchange rate. Starts at fallback (330) and updates async. */
+    private val _exchangeRate = MutableStateFlow(CurrencyFormatter.FALLBACK_LKR_PER_USD)
+    val exchangeRateFlow: StateFlow<Double> = _exchangeRate.asStateFlow()
 
     val savedUserEmail: String?
         get() = userPreferencesRepository.getSavedEmail()
@@ -50,6 +57,17 @@ class AuthViewModel @Inject constructor(
 
     val isUserLoggedIn: Boolean
         get() = authRepository.currentUser != null
+
+    init {
+        fetchLiveExchangeRate()
+    }
+
+    private fun fetchLiveExchangeRate() {
+        viewModelScope.launch {
+            val rate = exchangeRateRepository.getLkrPerUsdRate()
+            _exchangeRate.value = rate
+        }
+    }
 
     fun checkBiometricStatus() {
         _canUseBiometrics.value = userPreferencesRepository.canUseBiometrics()
@@ -152,8 +170,38 @@ class AuthViewModel @Inject constructor(
     val themeMode: String
         get() = userPreferencesRepository.themeMode
 
+    val themeModeFlow: StateFlow<String> = userPreferencesRepository.themeModeFlow
+
     fun setThemeMode(mode: String) {
         userPreferencesRepository.themeMode = mode
+    }
+
+    val currency: String
+        get() = userPreferencesRepository.currency
+
+    val currencyFlow: StateFlow<String> = userPreferencesRepository.currencyFlow
+
+    fun setCurrency(newCurrency: String) {
+        userPreferencesRepository.currency = newCurrency
+        // Refresh exchange rate whenever currency changes
+        fetchLiveExchangeRate()
+    }
+
+    val monthlyIncomeFlow: StateFlow<Double> = userPreferencesRepository.monthlyIncomeFlow
+
+    fun setMonthlyIncome(amount: Double) {
+        userPreferencesRepository.monthlyIncome = amount
+    }
+
+    fun updateSessionActivity() {
+        userPreferencesRepository.lastActiveTimestamp = System.currentTimeMillis()
+    }
+
+    fun isSessionExpired(): Boolean {
+        val last = userPreferencesRepository.lastActiveTimestamp
+        if (last == 0L) return false
+        // 1 hour = 3600_000 ms
+        return (System.currentTimeMillis() - last) > 3_600_000L
     }
 
     val isSmsScanEnabled: Boolean

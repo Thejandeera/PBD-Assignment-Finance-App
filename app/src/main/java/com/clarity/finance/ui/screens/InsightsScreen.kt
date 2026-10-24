@@ -17,16 +17,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,25 +46,26 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.CategorySpending
 import com.clarity.finance.model.PaymentChannelSpending
-import com.clarity.finance.model.PaymentMethod
 import com.clarity.finance.model.SpendingLeakAlert
 import com.clarity.finance.model.SpendingType
 import com.clarity.finance.model.VelocityMetrics
 import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.ClarityBottomBar
 import com.clarity.finance.ui.components.ClarityNavTab
-import com.clarity.finance.ui.theme.ClarityBlack
-import com.clarity.finance.ui.theme.ClarityBorder
-import com.clarity.finance.ui.theme.ClarityBorderDark
-import com.clarity.finance.ui.theme.ClarityGrayBackground
+import com.clarity.finance.ui.theme.ClarityAmber
+import com.clarity.finance.ui.theme.ClarityAmberLight
+import com.clarity.finance.ui.theme.ClarityBlue
+import com.clarity.finance.ui.theme.ClarityBlueLight
+import com.clarity.finance.ui.theme.ClarityGreen
+import com.clarity.finance.ui.theme.ClarityGreenBright
 import com.clarity.finance.ui.theme.ClarityRed
-import com.clarity.finance.ui.theme.ClarityTextMuted
-import com.clarity.finance.ui.theme.ClarityTextPrimary
-import com.clarity.finance.ui.theme.ClarityTextSecondary
+import com.clarity.finance.ui.theme.ClarityRedLight
 import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.theme.LocalIsDarkTheme
+import com.clarity.finance.util.CurrencyFormatter
+import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.ExpenseViewModel
 import com.clarity.finance.viewmodel.InsightsViewModel
-import java.text.NumberFormat
 import java.util.Locale
 
 @Composable
@@ -73,10 +73,12 @@ fun InsightsScreen(
     onNavigateToDashboard: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: InsightsViewModel = hiltViewModel(),
-    expenseViewModel: ExpenseViewModel = hiltViewModel()
+    expenseViewModel: ExpenseViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val numberFormat = remember { NumberFormat.getNumberInstance(Locale.US) }
+    val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
+    val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
     var showAddExpenseSheet by remember { mutableStateOf(false) }
 
     if (showAddExpenseSheet) {
@@ -88,12 +90,13 @@ fun InsightsScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = ClarityWhite,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ClarityWhite)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline))
                     .padding(horizontal = 20.dp, vertical = 16.dp)
             ) {
                 Text(
@@ -101,7 +104,7 @@ fun InsightsScreen(
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         },
@@ -133,8 +136,8 @@ fun InsightsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ClarityGrayBackground, RoundedCornerShape(8.dp))
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -146,7 +149,7 @@ fun InsightsScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                         contentDescription = "Previous Month",
-                        tint = ClarityTextPrimary
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
@@ -155,7 +158,7 @@ fun InsightsScreen(
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 IconButton(
@@ -166,7 +169,7 @@ fun InsightsScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = "Next Month",
-                        tint = if (state.canGoForward) ClarityTextPrimary else ClarityBorderDark
+                        tint = if (state.canGoForward) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
                     )
                 }
             }
@@ -181,7 +184,7 @@ fun InsightsScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
-                        color = ClarityBlack,
+                        color = MaterialTheme.colorScheme.primary,
                         strokeWidth = 2.dp,
                         modifier = Modifier.size(32.dp)
                     )
@@ -190,8 +193,8 @@ fun InsightsScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(ClarityGrayBackground, RoundedCornerShape(12.dp))
-                        .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(12.dp))
                         .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -201,21 +204,21 @@ fun InsightsScreen(
                             fontSize = 22.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "No expenses recorded for ${state.displayMonthHeader}.",
                             fontSize = 13.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Log transactions via the '+' button on Dashboard to see visual spending patterns.",
                             fontSize = 11.sp,
-                            color = ClarityTextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -230,23 +233,32 @@ fun InsightsScreen(
                     committedPercentage = state.committedPercentage,
                     discretionaryAmount = state.discretionaryAmount,
                     discretionaryPercentage = state.discretionaryPercentage,
-                    numberFormat = numberFormat
+                    currentCurrency = currentCurrency,
+                    exchangeRate = exchangeRate
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // =============================================================
-                // 3. Top Spending Leak & MacBook Pro M4 Goal Link
+                // 3. Top Spending Leak & Goal Link
                 // =============================================================
                 state.spendingLeak?.let { leak ->
-                    SpendingLeakCard(leak = leak, numberFormat = numberFormat)
+                    SpendingLeakCard(
+                        leak = leak,
+                        currentCurrency = currentCurrency,
+                        exchangeRate = exchangeRate
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 // =============================================================
                 // 4. Burn Rate Velocity & Month-End Projection
                 // =============================================================
-                BurnRateCard(velocity = state.velocity, numberFormat = numberFormat)
+                BurnRateCard(
+                    velocity = state.velocity,
+                    currentCurrency = currentCurrency,
+                    exchangeRate = exchangeRate
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -255,7 +267,8 @@ fun InsightsScreen(
                 // =============================================================
                 CategoryBreakdownSection(
                     categories = state.topCategories,
-                    numberFormat = numberFormat
+                    currentCurrency = currentCurrency,
+                    exchangeRate = exchangeRate
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -265,7 +278,8 @@ fun InsightsScreen(
                 // =============================================================
                 PaymentChannelSection(
                     channels = state.channelBreakdown,
-                    numberFormat = numberFormat
+                    currentCurrency = currentCurrency,
+                    exchangeRate = exchangeRate
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -281,13 +295,18 @@ private fun CommittedVsDiscretionaryCard(
     committedPercentage: Int,
     discretionaryAmount: Double,
     discretionaryPercentage: Int,
-    numberFormat: NumberFormat
+    currentCurrency: String,
+    exchangeRate: Double
 ) {
+    val totalFormatted = CurrencyFormatter.format(totalOutflow, currentCurrency, exchangeRate)
+    val committedFormatted = CurrencyFormatter.format(committedAmount, currentCurrency, exchangeRate)
+    val discretionaryFormatted = CurrencyFormatter.format(discretionaryAmount, currentCurrency, exchangeRate)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ClarityWhite, RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.2.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -296,15 +315,15 @@ private fun CommittedVsDiscretionaryCard(
                 fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = ClarityTextMuted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "LKR ${numberFormat.format(totalOutflow)}",
+                text = totalFormatted,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
-                color = ClarityTextPrimary
+                color = ClarityRed
             )
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -313,10 +332,10 @@ private fun CommittedVsDiscretionaryCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(14.dp)
-                    .clip(RoundedCornerShape(7.dp))
-                    .background(ClarityGrayBackground)
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(7.dp))
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
             ) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     if (committedPercentage > 0) {
@@ -324,7 +343,7 @@ private fun CommittedVsDiscretionaryCard(
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .weight((committedPercentage.coerceAtLeast(1)).toFloat())
-                                .background(ClarityBlack)
+                                .background(ClarityBlue)
                         )
                     }
                     if (discretionaryPercentage > 0) {
@@ -332,7 +351,7 @@ private fun CommittedVsDiscretionaryCard(
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .weight((discretionaryPercentage.coerceAtLeast(1)).toFloat())
-                                .background(ClarityBorderDark)
+                                .background(ClarityRed)
                         )
                     }
                 }
@@ -350,7 +369,7 @@ private fun CommittedVsDiscretionaryCard(
                     Box(
                         modifier = Modifier
                             .size(10.dp)
-                            .background(ClarityBlack, RoundedCornerShape(2.dp))
+                            .background(ClarityBlue, RoundedCornerShape(2.dp))
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Column {
@@ -359,13 +378,13 @@ private fun CommittedVsDiscretionaryCard(
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = ClarityBlue
                         )
                         Text(
-                            text = "LKR ${numberFormat.format(committedAmount)}",
+                            text = committedFormatted,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -375,7 +394,7 @@ private fun CommittedVsDiscretionaryCard(
                     Box(
                         modifier = Modifier
                             .size(10.dp)
-                            .background(ClarityBorderDark, RoundedCornerShape(2.dp))
+                            .background(ClarityRed, RoundedCornerShape(2.dp))
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Column(horizontalAlignment = Alignment.End) {
@@ -384,13 +403,13 @@ private fun CommittedVsDiscretionaryCard(
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = ClarityRed
                         )
                         Text(
-                            text = "LKR ${numberFormat.format(discretionaryAmount)}",
+                            text = discretionaryFormatted,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -402,13 +421,18 @@ private fun CommittedVsDiscretionaryCard(
 @Composable
 private fun SpendingLeakCard(
     leak: SpendingLeakAlert,
-    numberFormat: NumberFormat
+    currentCurrency: String,
+    exchangeRate: Double
 ) {
+    val formattedLeakAmount = CurrencyFormatter.format(leak.amount, currentCurrency, exchangeRate)
+    val isDark = LocalIsDarkTheme.current
+    val cardBg = if (isDark) Color(0xFF000000) else ClarityAmberLight
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ClarityGrayBackground, RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.5.dp, ClarityBlack), RoundedCornerShape(12.dp))
+            .background(cardBg, RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.2.dp, ClarityAmber), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -418,17 +442,17 @@ private fun SpendingLeakCard(
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = ClarityAmber
                 )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "${leak.categoryIcon} ${leak.categoryName} accounts for ${leak.percentageOfDiscretionary}% of your discretionary spending (LKR ${numberFormat.format(leak.amount)}).",
+                text = "${leak.categoryIcon} ${leak.categoryName} accounts for ${leak.percentageOfDiscretionary}% of your discretionary spending ($formattedLeakAmount).",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = ClarityTextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(6.dp))
@@ -437,7 +461,7 @@ private fun SpendingLeakCard(
                 text = leak.recommendationText,
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
-                color = ClarityTextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 16.sp
             )
         }
@@ -447,13 +471,17 @@ private fun SpendingLeakCard(
 @Composable
 private fun BurnRateCard(
     velocity: VelocityMetrics,
-    numberFormat: NumberFormat
+    currentCurrency: String,
+    exchangeRate: Double
 ) {
+    val dailyBurn = CurrencyFormatter.format(velocity.dailyAverage, currentCurrency, exchangeRate)
+    val projectedBurn = CurrencyFormatter.format(velocity.projectedMonthEnd, currentCurrency, exchangeRate)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ClarityWhite, RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(12.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -467,21 +495,21 @@ private fun BurnRateCard(
                     fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "LKR ${numberFormat.format(velocity.dailyAverage.toInt())} / day",
+                    text = "$dailyBurn / day",
                     fontSize = 14.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = ClarityRed
                 )
                 Text(
                     text = "Over ${velocity.daysElapsed} days elapsed",
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -492,21 +520,21 @@ private fun BurnRateCard(
                     fontSize = 9.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "LKR ${numberFormat.format(velocity.projectedMonthEnd.toInt())}",
+                    text = projectedBurn,
                     fontSize = 14.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "At current burn velocity",
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -516,26 +544,35 @@ private fun BurnRateCard(
 @Composable
 private fun CategoryBreakdownSection(
     categories: List<CategorySpending>,
-    numberFormat: NumberFormat
+    currentCurrency: String,
+    exchangeRate: Double
 ) {
+    val isDark = LocalIsDarkTheme.current
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = "SPENDING BY CATEGORY",
             fontSize = 12.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
-            color = ClarityTextPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(10.dp))
 
         categories.forEach { category ->
+            val isCommitted = category.type == SpendingType.COMMITTED
+            val badgeColor = if (isCommitted) ClarityBlue else ClarityRed
+            val badgeBg = if (isDark) Color(0xFF000000) else if (isCommitted) ClarityBlueLight else ClarityRedLight
+            val badgeBorder = if (isDark) BorderStroke(1.dp, badgeColor) else BorderStroke(1.dp, badgeColor.copy(alpha = 0.3f))
+            val barColor = if (isCommitted) ClarityBlue else ClarityGreenBright
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
-                    .background(ClarityWhite, RoundedCornerShape(8.dp))
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+                    .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+                    .border(BorderStroke(1.dp, if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
                     .padding(12.dp)
             ) {
                 Column {
@@ -551,34 +588,31 @@ private fun CategoryBreakdownSection(
                                 text = category.categoryName,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = ClarityTextPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Box(
                                 modifier = Modifier
-                                    .background(
-                                        if (category.type == SpendingType.COMMITTED) ClarityBlack.copy(alpha = 0.08f)
-                                        else ClarityGrayBackground,
-                                        RoundedCornerShape(3.dp)
-                                    )
+                                    .background(badgeBg, RoundedCornerShape(3.dp))
+                                    .border(badgeBorder, RoundedCornerShape(3.dp))
                                     .padding(horizontal = 4.dp, vertical = 1.dp)
                             ) {
                                 Text(
-                                    text = if (category.type == SpendingType.COMMITTED) "COMMITTED" else "DISCRETIONARY",
+                                    text = if (isCommitted) "COMMITTED" else "DISCRETIONARY",
                                     fontSize = 8.sp,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (category.type == SpendingType.COMMITTED) ClarityTextPrimary else ClarityTextSecondary
+                                    color = if (isDark) Color(0xFFFFFFFF) else badgeColor
                                 )
                             }
                         }
 
                         Text(
-                            text = "-LKR ${numberFormat.format(category.amount)}",
+                            text = "-${CurrencyFormatter.format(category.amount, currentCurrency, exchangeRate)}",
                             fontSize = 13.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = ClarityRed
                         )
                     }
 
@@ -594,13 +628,13 @@ private fun CategoryBreakdownSection(
                                 .weight(1f)
                                 .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(ClarityGrayBackground)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .fillMaxWidth((category.percentageOfTotal / 100f).coerceIn(0.01f, 1f))
-                                    .background(ClarityBlack)
+                                    .background(barColor)
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
@@ -608,7 +642,7 @@ private fun CategoryBreakdownSection(
                             text = "${category.percentageOfTotal}%",
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextMuted
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -620,7 +654,8 @@ private fun CategoryBreakdownSection(
 @Composable
 private fun PaymentChannelSection(
     channels: List<PaymentChannelSpending>,
-    numberFormat: NumberFormat
+    currentCurrency: String,
+    exchangeRate: Double
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -628,7 +663,7 @@ private fun PaymentChannelSection(
             fontSize = 12.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
-            color = ClarityTextPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -641,8 +676,8 @@ private fun PaymentChannelSection(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .background(ClarityWhite, RoundedCornerShape(8.dp))
-                        .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
                         .padding(10.dp)
                 ) {
                     Column {
@@ -651,21 +686,21 @@ private fun PaymentChannelSection(
                             fontSize = 9.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "LKR ${numberFormat.format(channel.amount)}",
+                            text = CurrencyFormatter.format(channel.amount, currentCurrency, exchangeRate),
                             fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "${channel.percentageOfTotal}% of total",
                             fontSize = 9.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextMuted
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

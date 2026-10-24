@@ -29,7 +29,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
@@ -38,6 +37,7 @@ import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -47,7 +47,6 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,7 +55,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -69,13 +67,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.ui.components.ClarityTextField
 import com.clarity.finance.ui.components.DashedInfoBox
 import com.clarity.finance.ui.components.PrimaryButton
-import com.clarity.finance.ui.theme.ClarityBlack
-import com.clarity.finance.ui.theme.ClarityBorder
-import com.clarity.finance.ui.theme.ClarityGrayBackground
-import com.clarity.finance.ui.theme.ClarityTextMuted
-import com.clarity.finance.ui.theme.ClarityTextPrimary
-import com.clarity.finance.ui.theme.ClarityTextSecondary
-import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.theme.ClarityBlue
+import com.clarity.finance.ui.theme.ClarityGreen
+import com.clarity.finance.ui.theme.ClarityRed
 import com.clarity.finance.util.ProfileImageManager
 import com.clarity.finance.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
@@ -95,9 +89,11 @@ fun SettingsScreen(
     var displayName by remember(currentUser) { mutableStateOf(currentUser?.displayName.orEmpty()) }
     var selectedNewPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var showSignOutDialog by remember { mutableStateOf(false) }
+    var isSavingProfile by remember { mutableStateOf(false) }
 
     // Settings States
-    var themeMode by remember { mutableStateOf(authViewModel.themeMode) }
+    val themeMode by authViewModel.themeModeFlow.collectAsStateWithLifecycle()
+    val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
     var isSmsEnabled by remember { mutableStateOf(authViewModel.isSmsScanEnabled) }
     var isDailyReminderEnabled by remember { mutableStateOf(authViewModel.isDailyReminderEnabled) }
     val canUseBiometrics by authViewModel.canUseBiometrics.collectAsStateWithLifecycle()
@@ -131,13 +127,13 @@ fun SettingsScreen(
                 Text(
                     text = "Sign Out",
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             },
             text = {
                 Text(
                     text = "Are you sure you want to sign out from Clarity Finance?",
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
@@ -148,27 +144,28 @@ fun SettingsScreen(
                         onSignOutSuccess()
                     }
                 ) {
-                    Text(text = "Sign Out", color = Color.Red, fontWeight = FontWeight.Bold)
+                    Text(text = "Sign Out", color = ClarityRed, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutDialog = false }) {
-                    Text(text = "Cancel", color = ClarityTextPrimary)
+                    Text(text = "Cancel", color = MaterialTheme.colorScheme.onSurface)
                 }
             },
-            containerColor = ClarityWhite,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(12.dp)
         )
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = ClarityWhite,
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -176,7 +173,7 @@ fun SettingsScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = ClarityTextPrimary
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
@@ -185,13 +182,13 @@ fun SettingsScreen(
                         text = "CONFIGURATION",
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextMuted
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "Settings & Preferences",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -212,15 +209,15 @@ fun SettingsScreen(
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = ClarityTextMuted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(10.dp))
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ClarityWhite, RoundedCornerShape(8.dp))
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
                     .padding(16.dp)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
@@ -229,8 +226,8 @@ fun SettingsScreen(
                         modifier = Modifier
                             .size(80.dp)
                             .clip(CircleShape)
-                            .background(ClarityGrayBackground)
-                            .border(BorderStroke(1.5.dp, ClarityBorder), CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .border(BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline), CircleShape)
                             .clickable { photoPickerLauncher.launch("image/*") },
                         contentAlignment = Alignment.Center
                     ) {
@@ -260,7 +257,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = "Default Avatar",
-                                tint = ClarityTextSecondary,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(36.dp)
                             )
                         }
@@ -271,13 +268,13 @@ fun SettingsScreen(
                                 .align(Alignment.BottomEnd)
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(ClarityBlack),
+                                .background(ClarityGreen),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CameraAlt,
                                 contentDescription = "Change Picture",
-                                tint = ClarityWhite,
+                                tint = androidx.compose.ui.graphics.Color.White,
                                 modifier = Modifier.size(14.dp)
                             )
                         }
@@ -287,7 +284,7 @@ fun SettingsScreen(
                     Text(
                         text = "Tap photo to change",
                         fontSize = 11.sp,
-                        color = ClarityTextMuted
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -307,7 +304,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = "Locked",
-                                tint = ClarityTextMuted,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(12.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
@@ -315,22 +312,22 @@ fun SettingsScreen(
                                 text = "EMAIL ADDRESS (FIXED)",
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
-                                color = ClarityTextMuted
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(ClarityGrayBackground, RoundedCornerShape(6.dp))
-                                .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(6.dp))
                                 .padding(horizontal = 14.dp, vertical = 12.dp)
                         ) {
                             Text(
                                 text = currentUser?.email.orEmpty(),
                                 fontSize = 14.sp,
                                 fontFamily = FontFamily.Monospace,
-                                color = ClarityTextSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -338,9 +335,13 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     PrimaryButton(
-                        text = "SAVE PROFILE CHANGES",
+                        text = if (isSavingProfile) "SAVING CHANGES..." else "SAVE PROFILE CHANGES",
+                        isLoading = isSavingProfile,
+                        enabled = !isSavingProfile,
                         onClick = {
+                            isSavingProfile = true
                             authViewModel.updateProfile(displayName, selectedNewPhotoUri) { success ->
+                                isSavingProfile = false
                                 scope.launch {
                                     if (success) {
                                         snackbarHostState.showSnackbar("Profile updated successfully!")
@@ -357,22 +358,22 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // =========================================================================
-            // Section 2: Appearance & Theme
+            // Section 2: Appearance, Theme & Currency
             // =========================================================================
             Text(
-                text = "APPEARANCE & THEME",
+                text = "APPEARANCE & CURRENCY",
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = ClarityTextMuted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(10.dp))
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ClarityWhite, RoundedCornerShape(8.dp))
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
                     .padding(14.dp)
             ) {
                 Column {
@@ -380,13 +381,13 @@ fun SettingsScreen(
                         text = "App Theme Mode",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = ClarityTextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Select visual style for Clarity Finance interface",
                         fontSize = 11.sp,
-                        color = ClarityTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -401,15 +402,14 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .background(
-                                        if (isSelected) ClarityBlack else ClarityWhite,
+                                        if (isSelected) ClarityGreen else MaterialTheme.colorScheme.surfaceVariant,
                                         RoundedCornerShape(6.dp)
                                     )
                                     .border(
-                                        BorderStroke(1.dp, if (isSelected) ClarityBlack else ClarityBorder),
+                                        BorderStroke(1.dp, if (isSelected) ClarityGreen else MaterialTheme.colorScheme.outline),
                                         RoundedCornerShape(6.dp)
                                     )
                                     .clickable {
-                                        themeMode = mode
                                         authViewModel.setThemeMode(mode)
                                     }
                                     .padding(vertical = 10.dp),
@@ -420,7 +420,58 @@ fun SettingsScreen(
                                     fontSize = 11.sp,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) ClarityWhite else ClarityTextPrimary
+                                    color = if (isSelected) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    Text(
+                        text = "Default Currency",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Switch default currency between LKR and USD (\$)",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("LKR" to "LKR (Rs.)", "USD" to "USD (\$)").forEach { (code, label) ->
+                            val isSelected = currentCurrency.equals(code, ignoreCase = true)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(
+                                        if (isSelected) ClarityBlue else MaterialTheme.colorScheme.surfaceVariant,
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .border(
+                                        BorderStroke(1.dp, if (isSelected) ClarityBlue else MaterialTheme.colorScheme.outline),
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .clickable {
+                                        authViewModel.setCurrency(code)
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -431,22 +482,22 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // =========================================================================
-            // Section 3: Smart Automations & Permissions
+            // Section 3: Permissions & Automation
             // =========================================================================
             Text(
                 text = "PERMISSIONS & AUTOMATION",
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = ClarityTextMuted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(10.dp))
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ClarityWhite, RoundedCornerShape(8.dp))
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
                     .padding(14.dp)
             ) {
                 Column {
@@ -461,7 +512,7 @@ fun SettingsScreen(
                                 Icon(
                                     imageVector = Icons.Default.Sms,
                                     contentDescription = "SMS",
-                                    tint = ClarityTextPrimary,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -469,14 +520,14 @@ fun SettingsScreen(
                                     text = "Bank SMS Auto-Drafting",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = ClarityTextPrimary
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Detect BOC & COMBANK debit/credit messages",
                                 fontSize = 11.sp,
-                                color = ClarityTextSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -491,8 +542,8 @@ fun SettingsScreen(
                                 }
                             },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = ClarityWhite,
-                                checkedTrackColor = ClarityBlack
+                                checkedThumbColor = androidx.compose.ui.graphics.Color.White,
+                                checkedTrackColor = ClarityGreen
                             )
                         )
                     }
@@ -502,13 +553,13 @@ fun SettingsScreen(
                         Text(
                             text = "SMS Permission required to read messages. Tap below to grant:",
                             fontSize = 11.sp,
-                            color = Color.Red
+                            color = ClarityRed
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         OutlinedButton(
                             onClick = { smsPermissionLauncher.launch(Manifest.permission.READ_SMS) },
                             shape = RoundedCornerShape(6.dp),
-                            border = BorderStroke(1.dp, ClarityBorder),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier.height(34.dp)
                         ) {
                             Text(
@@ -516,7 +567,7 @@ fun SettingsScreen(
                                 fontSize = 11.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                color = ClarityTextPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -534,7 +585,7 @@ fun SettingsScreen(
                                 Icon(
                                     imageVector = Icons.Default.Notifications,
                                     contentDescription = "Notifications",
-                                    tint = ClarityTextPrimary,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -542,14 +593,14 @@ fun SettingsScreen(
                                     text = "Daily Expense Reminder",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = ClarityTextPrimary
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Gentle alert if no expenses logged for the day",
                                 fontSize = 11.sp,
-                                color = ClarityTextSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -560,8 +611,8 @@ fun SettingsScreen(
                                 authViewModel.setDailyReminderEnabled(checked)
                             },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = ClarityWhite,
-                                checkedTrackColor = ClarityBlack
+                                checkedThumbColor = androidx.compose.ui.graphics.Color.White,
+                                checkedTrackColor = ClarityGreen
                             )
                         )
                     }
@@ -579,7 +630,7 @@ fun SettingsScreen(
                                 Icon(
                                     imageVector = Icons.Default.Fingerprint,
                                     contentDescription = "Fingerprint",
-                                    tint = ClarityTextPrimary,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -587,14 +638,14 @@ fun SettingsScreen(
                                     text = "Biometric Fingerprint Login",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = ClarityTextPrimary
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (canUseBiometrics) "Hardware sensor verified & active" else "Available after password login",
                                 fontSize = 11.sp,
-                                color = ClarityTextSecondary
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -604,8 +655,8 @@ fun SettingsScreen(
                                 authViewModel.setBiometricEnabled(checked)
                             },
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = ClarityWhite,
-                                checkedTrackColor = ClarityBlack
+                                checkedThumbColor = androidx.compose.ui.graphics.Color.White,
+                                checkedTrackColor = ClarityGreen
                             )
                         )
                     }
@@ -615,7 +666,7 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(30.dp))
 
             // =========================================================================
-            // Section 5: Session Management (Bottom Log Out)
+            // Section 4: Session Management (Bottom Log Out)
             // =========================================================================
             OutlinedButton(
                 onClick = { showSignOutDialog = true },
@@ -623,14 +674,14 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .height(48.dp),
                 shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.5.dp, Color(0xFFD32F2F))
+                border = BorderStroke(1.5.dp, ClarityRed)
             ) {
                 Text(
                     text = "LOG OUT OF CLARITY",
                     fontSize = 13.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFD32F2F)
+                    color = ClarityRed
                 )
             }
 
@@ -640,7 +691,7 @@ fun SettingsScreen(
                 text = "Clarity Finance v1.0 • SE3092 Platform Based Development",
                 fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace,
-                color = ClarityTextMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
 
