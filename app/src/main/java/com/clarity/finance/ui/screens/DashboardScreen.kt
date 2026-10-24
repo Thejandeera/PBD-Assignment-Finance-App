@@ -52,17 +52,35 @@ import com.clarity.finance.ui.theme.ClarityTextPrimary
 import com.clarity.finance.ui.theme.ClarityTextSecondary
 import com.clarity.finance.ui.theme.ClarityWhite
 import com.clarity.finance.viewmodel.AuthViewModel
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.clarity.finance.model.Expense
+import com.clarity.finance.model.SpendingType
+import com.clarity.finance.ui.components.AddExpenseSheet
+import com.clarity.finance.viewmodel.ExpenseViewModel
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
 fun DashboardScreen(
     authViewModel: AuthViewModel,
     onSignOutSuccess: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    expenseViewModel: ExpenseViewModel = hiltViewModel(),
+    onNavigateToExpensesHistory: () -> Unit = {}
 ) {
     val currentUser by authViewModel.currentUserFlow.collectAsStateWithLifecycle()
+    val historyState by expenseViewModel.historyState.collectAsStateWithLifecycle()
     var showSignOutDialog by remember { mutableStateOf(false) }
+    var showAddExpenseSheet by remember { mutableStateOf(false) }
 
     val displayName = currentUser?.displayName?.ifBlank { "Kavindu" } ?: "Kavindu"
+
+    if (showAddExpenseSheet) {
+        AddExpenseSheet(
+            viewModel = expenseViewModel,
+            onDismiss = { showAddExpenseSheet = false }
+        )
+    }
 
     if (showSignOutDialog) {
         AlertDialog(
@@ -105,7 +123,7 @@ fun DashboardScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = ClarityWhite,
         bottomBar = {
-            DashboardBottomBar()
+            DashboardBottomBar(onAddClick = { showAddExpenseSheet = true })
         }
     ) { innerPadding ->
         Column(
@@ -220,7 +238,10 @@ fun DashboardScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             // Recent Transactions
-            RecentTransactionsSection()
+            RecentTransactionsSection(
+                expenses = historyState.expenses,
+                onSeeAllClick = onNavigateToExpensesHistory
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
         }
@@ -510,7 +531,12 @@ private fun SpendingOverviewCard() {
 }
 
 @Composable
-private fun RecentTransactionsSection() {
+private fun RecentTransactionsSection(
+    expenses: List<Expense>,
+    onSeeAllClick: () -> Unit
+) {
+    val numberFormat = remember { NumberFormat.getNumberInstance(Locale.US) }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -528,32 +554,43 @@ private fun RecentTransactionsSection() {
                 text = "See all",
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
-                color = ClarityTextSecondary
+                color = ClarityTextSecondary,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable { onSeeAllClick() }
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
             )
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        TransactionItem(
-            iconTag = "[F]",
-            title = "Uber Eats (Food)",
-            subtitle = "Yesterday • Discretionary",
-            amount = "-2,450 LKR"
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        TransactionItem(
-            iconTag = "[U]",
-            title = "Dialog Broadband",
-            subtitle = "24 Oct • Committed",
-            amount = "-5,800 LKR"
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        TransactionItem(
-            iconTag = "[T]",
-            title = "PickMe Commute",
-            subtitle = "23 Oct • Committed",
-            amount = "-1,120 LKR"
-        )
+        if (expenses.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ClarityGrayBackground, RoundedCornerShape(8.dp))
+                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No expenses recorded yet. Tap + to add one.",
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = ClarityTextSecondary
+                )
+            }
+        } else {
+            expenses.take(4).forEach { expense ->
+                TransactionItem(
+                    iconTag = expense.categoryIcon.ifBlank { "🏷️" },
+                    title = expense.categoryName,
+                    subtitle = "${expense.date} • ${if (expense.type == SpendingType.COMMITTED) "Committed" else "Discretionary"}",
+                    amount = "-${numberFormat.format(expense.amount)} LKR"
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
     }
 }
 
@@ -618,7 +655,9 @@ private fun TransactionItem(
 }
 
 @Composable
-private fun DashboardBottomBar() {
+private fun DashboardBottomBar(
+    onAddClick: () -> Unit = {}
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -636,7 +675,7 @@ private fun DashboardBottomBar() {
 
             // Centre Floating Action Button "+"
             FloatingActionButton(
-                onClick = { /* Add action */ },
+                onClick = onAddClick,
                 modifier = Modifier.size(42.dp),
                 shape = CircleShape,
                 containerColor = ClarityBlack,
