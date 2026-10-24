@@ -66,7 +66,8 @@ fun DashboardScreen(
     onSignOutSuccess: () -> Unit,
     modifier: Modifier = Modifier,
     expenseViewModel: ExpenseViewModel = hiltViewModel(),
-    onNavigateToExpensesHistory: () -> Unit = {}
+    onNavigateToExpensesHistory: () -> Unit = {},
+    onNavigateToInsights: () -> Unit = {}
 ) {
     val currentUser by authViewModel.currentUserFlow.collectAsStateWithLifecycle()
     val historyState by expenseViewModel.historyState.collectAsStateWithLifecycle()
@@ -123,7 +124,10 @@ fun DashboardScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = ClarityWhite,
         bottomBar = {
-            DashboardBottomBar(onAddClick = { showAddExpenseSheet = true })
+            DashboardBottomBar(
+                onAddClick = { showAddExpenseSheet = true },
+                onInsightsClick = onNavigateToInsights
+            )
         }
     ) { innerPadding ->
         Column(
@@ -656,7 +660,8 @@ private fun TransactionItem(
 
 @Composable
 private fun DashboardBottomBar(
-    onAddClick: () -> Unit = {}
+    onAddClick: () -> Unit = {},
+    onInsightsClick: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -689,7 +694,11 @@ private fun DashboardBottomBar(
                 )
             }
 
-            BottomNavItem(label = "INSIGHTS", isSelected = false)
+            BottomNavItem(
+                label = "INSIGHTS",
+                isSelected = false,
+                onClick = onInsightsClick
+            )
             BottomNavItem(label = "GOAL", isSelected = false)
         }
     }
@@ -698,11 +707,12 @@ private fun DashboardBottomBar(
 @Composable
 private fun BottomNavItem(
     label: String,
-    isSelected: Boolean
+    isSelected: Boolean,
+    onClick: () -> Unit = {}
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { /* Select nav tab */ }
+        modifier = Modifier.clickable { onClick() }
     ) {
         Box(
             modifier = Modifier
