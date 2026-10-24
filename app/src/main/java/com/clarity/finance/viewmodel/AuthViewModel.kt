@@ -152,8 +152,30 @@ class AuthViewModel @Inject constructor(
     val themeMode: String
         get() = userPreferencesRepository.themeMode
 
+    val themeModeFlow: StateFlow<String> = userPreferencesRepository.themeModeFlow
+
     fun setThemeMode(mode: String) {
         userPreferencesRepository.themeMode = mode
+    }
+
+    val currency: String
+        get() = userPreferencesRepository.currency
+
+    val currencyFlow: StateFlow<String> = userPreferencesRepository.currencyFlow
+
+    fun setCurrency(newCurrency: String) {
+        userPreferencesRepository.currency = newCurrency
+    }
+
+    fun updateSessionActivity() {
+        userPreferencesRepository.lastActiveTimestamp = System.currentTimeMillis()
+    }
+
+    fun isSessionExpired(): Boolean {
+        val last = userPreferencesRepository.lastActiveTimestamp
+        if (last == 0L) return false
+        // 1 hour = 3600_000 ms
+        return (System.currentTimeMillis() - last) > 3_600_000L
     }
 
     val isSmsScanEnabled: Boolean
