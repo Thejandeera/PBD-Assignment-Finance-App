@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -45,11 +46,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.ui.components.ClarityTextField
 import com.clarity.finance.ui.components.PrimaryButton
-import com.clarity.finance.ui.theme.ClarityBlack
-import com.clarity.finance.ui.theme.ClarityTextMuted
-import com.clarity.finance.ui.theme.ClarityTextPrimary
-import com.clarity.finance.ui.theme.ClarityTextSecondary
-import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.theme.ClarityGreen
 import com.clarity.finance.util.BiometricPromptHelper
 import com.clarity.finance.viewmodel.AuthUiState
 import com.clarity.finance.viewmodel.AuthViewModel
@@ -95,7 +92,7 @@ fun LoginScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(ClarityWhite)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -104,23 +101,23 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header: Title & Subtitle (No placeholder logo box)
+            // Header: Title & Subtitle
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Finance App",
-                    fontSize = 24.sp,
+                    text = "Clarity Finance",
+                    fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "Simple Personal Finance",
+                    text = "Smart Financial Clarity & Tracking",
                     fontSize = 13.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -130,13 +127,13 @@ fun LoginScreen(
                         text = "Welcome Back",
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextPrimary
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Enter your credentials to access your ledger",
                         fontSize = 14.sp,
-                        color = ClarityTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -163,14 +160,14 @@ fun LoginScreen(
                         text = "Password",
                         fontSize = 13.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextPrimary,
+                        color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.weight(1f)
                     )
                     Text(
                         text = "Forgot password?",
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -196,7 +193,7 @@ fun LoginScreen(
                     isLoading = isLoading
                 )
 
-                // Biometric Login Button (Available after first successful login)
+                // Biometric Login Button
                 if (canUseBiometrics) {
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedButton(
@@ -220,12 +217,12 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .height(50.dp),
                         shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, ClarityBlack)
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Fingerprint,
                             contentDescription = "Biometric Login",
-                            tint = ClarityBlack,
+                            tint = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -233,14 +230,14 @@ fun LoginScreen(
                             text = "SIGN IN WITH BIOMETRICS",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityBlack,
+                            color = MaterialTheme.colorScheme.onBackground,
                             letterSpacing = 0.5.sp
                         )
                     }
                 }
             }
 
-            // Footer: Register link (No wireframe component text)
+            // Footer: Register link
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -249,20 +246,20 @@ fun LoginScreen(
                     text = "OR",
                     fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "New here? ",
                         fontSize = 14.sp,
-                        color = ClarityTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "Create Account",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextPrimary,
+                        color = ClarityGreen,
                         modifier = Modifier.clickable {
                             authViewModel.resetState()
                             onNavigateToRegister()

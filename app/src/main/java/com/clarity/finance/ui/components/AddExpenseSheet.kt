@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -52,14 +53,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.CategoryItem
 import com.clarity.finance.model.PaymentMethod
 import com.clarity.finance.model.SpendingType
-import com.clarity.finance.ui.theme.ClarityBlack
-import com.clarity.finance.ui.theme.ClarityBorder
-import com.clarity.finance.ui.theme.ClarityBorderDark
-import com.clarity.finance.ui.theme.ClarityGrayBackground
+import com.clarity.finance.ui.theme.ClarityAmber
+import com.clarity.finance.ui.theme.ClarityBlue
+import com.clarity.finance.ui.theme.ClarityGreen
 import com.clarity.finance.ui.theme.ClarityRed
-import com.clarity.finance.ui.theme.ClarityTextMuted
-import com.clarity.finance.ui.theme.ClarityTextPrimary
-import com.clarity.finance.ui.theme.ClarityTextSecondary
 import com.clarity.finance.ui.theme.ClarityWhite
 import com.clarity.finance.viewmodel.ExpenseViewModel
 
@@ -81,7 +78,7 @@ fun AddExpenseSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = ClarityWhite,
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         dragHandle = null,
         modifier = modifier
@@ -93,7 +90,7 @@ fun AddExpenseSheet(
                 .padding(horizontal = 20.dp, vertical = 18.dp)
         ) {
             // =================================================================
-            // Top Bar: Mode Toggle & Cancel (Wireframes 1 & 2)
+            // Top Bar: Mode Toggle & Cancel
             // =================================================================
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -106,13 +103,13 @@ fun AddExpenseSheet(
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(4.dp))
+                            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(4.dp))
                             .clickable { viewModel.setQuickMode(!formState.isQuickMode) }
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
@@ -121,7 +118,7 @@ fun AddExpenseSheet(
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.SemiBold,
-                            color = ClarityTextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -131,7 +128,7 @@ fun AddExpenseSheet(
                     fontSize = 13.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Medium,
-                    color = ClarityTextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.clickable { onDismiss() }
                 )
             }
@@ -143,8 +140,8 @@ fun AddExpenseSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(6.dp))
-                        .background(ClarityGrayBackground)
-                        .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(BorderStroke(1.dp, ClarityAmber), RoundedCornerShape(6.dp))
                         .clickable { onNavigateToDrafts() }
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
@@ -158,14 +155,14 @@ fun AddExpenseSheet(
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "REVIEW →",
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityBlack
+                            color = ClarityAmber
                         )
                     }
                 }
@@ -174,12 +171,19 @@ fun AddExpenseSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             // =================================================================
-            // Outflow Amount Box with Quick Increments (Wireframe 1 & 2)
+            // Outflow Amount Box with Quick Increments
             // =================================================================
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(BorderStroke(1.5.dp, if (formState.amountError != null) ClarityRed else ClarityBlack), RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+                    .border(
+                        BorderStroke(
+                            1.5.dp,
+                            if (formState.amountError != null) ClarityRed else MaterialTheme.colorScheme.outline
+                        ),
+                        RoundedCornerShape(8.dp)
+                    )
                     .padding(vertical = 14.dp, horizontal = 16.dp)
             ) {
                 Column(
@@ -191,7 +195,7 @@ fun AddExpenseSheet(
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -204,7 +208,7 @@ fun AddExpenseSheet(
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         BasicTextField(
                             value = formState.amountInput,
@@ -213,12 +217,12 @@ fun AddExpenseSheet(
                                 fontSize = 28.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                color = ClarityTextPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 textAlign = TextAlign.Start
                             ),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
-                            cursorBrush = SolidColor(ClarityBlack),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             decorationBox = { innerTextField ->
                                 if (formState.amountInput.isEmpty()) {
                                     Text(
@@ -226,7 +230,7 @@ fun AddExpenseSheet(
                                         fontSize = 28.sp,
                                         fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace,
-                                        color = ClarityTextMuted
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                     )
                                 }
                                 innerTextField()
@@ -264,7 +268,6 @@ fun AddExpenseSheet(
             // Category Selection (Standard Chips vs Quick 3x3 Grid)
             // =================================================================
             if (formState.isQuickMode) {
-                // Wireframe 2: 3x3 Grid
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -275,13 +278,13 @@ fun AddExpenseSheet(
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "9 Core Buckets",
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextMuted
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -302,8 +305,14 @@ fun AddExpenseSheet(
                                         .weight(1f)
                                         .height(42.dp)
                                         .clip(RoundedCornerShape(6.dp))
-                                        .background(if (isSelected) ClarityBlack else ClarityWhite)
-                                        .border(BorderStroke(1.dp, if (isSelected) ClarityBlack else ClarityBorder), RoundedCornerShape(6.dp))
+                                        .background(if (isSelected) ClarityGreen else MaterialTheme.colorScheme.surfaceVariant)
+                                        .border(
+                                            BorderStroke(
+                                                1.dp,
+                                                if (isSelected) ClarityGreen else MaterialTheme.colorScheme.outline
+                                            ),
+                                            RoundedCornerShape(6.dp)
+                                        )
                                         .clickable { viewModel.onCategorySelected(cat) },
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -312,7 +321,7 @@ fun AddExpenseSheet(
                                         fontSize = 12.sp,
                                         fontFamily = FontFamily.Monospace,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) ClarityWhite else ClarityTextPrimary
+                                        color = if (isSelected) ClarityWhite else MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -320,7 +329,6 @@ fun AddExpenseSheet(
                     }
                 }
             } else {
-                // Wireframe 1: Horizontal Chips
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -331,14 +339,14 @@ fun AddExpenseSheet(
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "+ Custom",
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityBlack,
+                        color = ClarityGreen,
                         modifier = Modifier.clickable { showAddCategoryDialog = true }
                     )
                 }
@@ -356,8 +364,14 @@ fun AddExpenseSheet(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) ClarityBlack else ClarityWhite)
-                                .border(BorderStroke(1.dp, if (isSelected) ClarityBlack else ClarityBorder), RoundedCornerShape(6.dp))
+                                .background(if (isSelected) ClarityGreen else MaterialTheme.colorScheme.surfaceVariant)
+                                .border(
+                                    BorderStroke(
+                                        1.dp,
+                                        if (isSelected) ClarityGreen else MaterialTheme.colorScheme.outline
+                                    ),
+                                    RoundedCornerShape(6.dp)
+                                )
                                 .clickable { viewModel.onCategorySelected(cat) }
                                 .padding(horizontal = 14.dp, vertical = 9.dp)
                         ) {
@@ -366,7 +380,7 @@ fun AddExpenseSheet(
                                 fontSize = 12.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) ClarityWhite else ClarityTextPrimary
+                                color = if (isSelected) ClarityWhite else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -383,7 +397,7 @@ fun AddExpenseSheet(
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = ClarityTextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -397,8 +411,14 @@ fun AddExpenseSheet(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(ClarityWhite)
-                        .border(BorderStroke(if (isCommitted) 2.dp else 1.dp, if (isCommitted) ClarityBlack else ClarityBorder), RoundedCornerShape(8.dp))
+                        .background(if (isCommitted) ClarityBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant)
+                        .border(
+                            BorderStroke(
+                                if (isCommitted) 2.dp else 1.dp,
+                                if (isCommitted) ClarityBlue else MaterialTheme.colorScheme.outline
+                            ),
+                            RoundedCornerShape(8.dp)
+                        )
                         .clickable { viewModel.onSpendingTypeSelected(SpendingType.COMMITTED) }
                         .padding(vertical = 10.dp, horizontal = 12.dp)
                 ) {
@@ -408,14 +428,14 @@ fun AddExpenseSheet(
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextPrimary
+                            color = if (isCommitted) ClarityBlue else MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Fixed Obligation",
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -425,8 +445,14 @@ fun AddExpenseSheet(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(ClarityWhite)
-                        .border(BorderStroke(if (isDiscretionary) 2.dp else 1.dp, if (isDiscretionary) ClarityBlack else ClarityBorder), RoundedCornerShape(8.dp))
+                        .background(if (isDiscretionary) ClarityRed.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant)
+                        .border(
+                            BorderStroke(
+                                if (isDiscretionary) 2.dp else 1.dp,
+                                if (isDiscretionary) ClarityRed else MaterialTheme.colorScheme.outline
+                            ),
+                            RoundedCornerShape(8.dp)
+                        )
                         .clickable { viewModel.onSpendingTypeSelected(SpendingType.DISCRETIONARY) }
                         .padding(vertical = 10.dp, horizontal = 12.dp)
                 ) {
@@ -436,14 +462,14 @@ fun AddExpenseSheet(
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextPrimary
+                            color = if (isDiscretionary) ClarityRed else MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "Flexible / Leisure",
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -459,7 +485,7 @@ fun AddExpenseSheet(
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = ClarityTextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -496,14 +522,14 @@ fun AddExpenseSheet(
             Spacer(modifier = Modifier.height(16.dp))
 
             // =================================================================
-            // Date & Optional Note (Wireframe 1)
+            // Date & Optional Note
             // =================================================================
             if (!formState.isQuickMode) {
-                // Date Display Box
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
+                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(6.dp))
                         .padding(horizontal = 14.dp, vertical = 11.dp)
                 ) {
                     Row(
@@ -515,27 +541,26 @@ fun AddExpenseSheet(
                             text = "Date:",
                             fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = formState.formattedDateDisplay,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Optional Note
                 Text(
                     text = "OPTIONAL NOTE",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
@@ -545,7 +570,7 @@ fun AddExpenseSheet(
                     placeholder = {
                         Text(
                             text = "e.g. Lunch at Bambalapitiya",
-                            color = ClarityTextMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             fontSize = 13.sp,
                             fontFamily = FontFamily.Monospace
                         )
@@ -554,10 +579,12 @@ fun AddExpenseSheet(
                     singleLine = true,
                     shape = RoundedCornerShape(6.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ClarityBlack,
-                        unfocusedBorderColor = ClarityBorder,
-                        focusedTextColor = ClarityTextPrimary,
-                        unfocusedTextColor = ClarityTextPrimary
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
                     )
                 )
             } else {
@@ -570,14 +597,14 @@ fun AddExpenseSheet(
                         text = "Date: Today (Auto)",
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = "▸ More details",
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityBlack,
+                        color = ClarityGreen,
                         modifier = Modifier.clickable { viewModel.setQuickMode(false) }
                     )
                 }
@@ -608,9 +635,9 @@ fun AddExpenseSheet(
                 enabled = !formState.isSubmitting,
                 shape = RoundedCornerShape(6.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = ClarityBlack,
+                    containerColor = ClarityGreen,
                     contentColor = ClarityWhite,
-                    disabledContainerColor = ClarityBorderDark
+                    disabledContainerColor = ClarityGreen.copy(alpha = 0.5f)
                 )
             ) {
                 if (formState.isSubmitting) {
@@ -647,7 +674,8 @@ fun AddExpenseSheet(
                     text = "Add Custom Category",
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 16.sp
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             },
             text = {
@@ -658,6 +686,12 @@ fun AddExpenseSheet(
                         label = { Text("Category Name", fontFamily = FontFamily.Monospace, fontSize = 12.sp) },
                         placeholder = { Text("e.g. Doctor, Books", fontFamily = FontFamily.Monospace, fontSize = 12.sp) },
                         singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -670,10 +704,11 @@ fun AddExpenseSheet(
                             text = if (isCommittedCategory) "Type: Committed" else "Type: Discretionary",
                             fontFamily = FontFamily.Monospace,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         TextButton(onClick = { isCommittedCategory = !isCommittedCategory }) {
-                            Text(text = "Toggle", fontFamily = FontFamily.Monospace)
+                            Text(text = "Toggle", fontFamily = FontFamily.Monospace, color = ClarityGreen)
                         }
                     }
                 }
@@ -689,17 +724,17 @@ fun AddExpenseSheet(
                             )
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = ClarityBlack)
+                    colors = ButtonDefaults.buttonColors(containerColor = ClarityGreen)
                 ) {
-                    Text("Add", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Text("Add", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = ClarityWhite)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAddCategoryDialog = false }) {
-                    Text("Cancel", fontFamily = FontFamily.Monospace, color = ClarityTextSecondary)
+                    Text("Cancel", fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
-            containerColor = ClarityWhite,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(12.dp)
         )
     }
@@ -713,8 +748,8 @@ private fun QuickIncrementChip(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
-            .background(ClarityGrayBackground)
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(4.dp))
             .clickable { onClick() }
             .padding(horizontal = 10.dp, vertical = 4.dp)
     ) {
@@ -723,7 +758,7 @@ private fun QuickIncrementChip(
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.SemiBold,
-            color = ClarityTextPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -739,8 +774,14 @@ private fun PaymentMethodTab(
         modifier = modifier
             .height(38.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(if (isSelected) ClarityBlack else ClarityWhite)
-            .border(BorderStroke(1.dp, if (isSelected) ClarityBlack else ClarityBorder), RoundedCornerShape(6.dp))
+            .background(if (isSelected) ClarityGreen else MaterialTheme.colorScheme.surfaceVariant)
+            .border(
+                BorderStroke(
+                    1.dp,
+                    if (isSelected) ClarityGreen else MaterialTheme.colorScheme.outline
+                ),
+                RoundedCornerShape(6.dp)
+            )
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -749,7 +790,7 @@ private fun PaymentMethodTab(
             fontSize = 12.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = if (isSelected) ClarityWhite else ClarityTextPrimary
+            color = if (isSelected) ClarityWhite else MaterialTheme.colorScheme.onSurface
         )
     }
 }
