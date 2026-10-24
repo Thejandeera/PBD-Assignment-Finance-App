@@ -37,13 +37,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.clarity.finance.ui.theme.ClarityBorder
 import com.clarity.finance.ui.theme.ClarityGreen
+import com.clarity.finance.ui.theme.ClarityGreenBright
+import com.clarity.finance.ui.theme.ClarityTextMuted
 import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.theme.LocalIsDarkTheme
 
 enum class ClarityNavTab {
     HOME,
@@ -59,8 +64,9 @@ fun ClarityBottomBar(
     onAddClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val barBackground = MaterialTheme.colorScheme.surface
-    val barBorder = MaterialTheme.colorScheme.outline
+    val isDark = LocalIsDarkTheme.current
+    val barBackground = if (isDark) Color(0xFF000000) else Color(0xFFFFFFFF)
+    val barBorder = if (isDark) Color(0xFF333333) else ClarityBorder
 
     // Total container height accommodates raised FAB and curved notch
     Box(
@@ -157,7 +163,7 @@ fun ClarityBottomBar(
                 .offset(y = 6.dp)
                 .size(46.dp),
             shape = CircleShape,
-            containerColor = ClarityGreen,
+            containerColor = ClarityGreenBright,
             contentColor = ClarityWhite,
             elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp, pressedElevation = 6.dp)
         ) {
@@ -180,7 +186,12 @@ private fun ClarityBottomNavItem(
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val isDark = LocalIsDarkTheme.current
+    val itemColor = if (isSelected) {
+        ClarityGreenBright
+    } else {
+        if (isDark) Color(0xFFFFFFFF) else ClarityTextMuted
+    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -195,7 +206,7 @@ private fun ClarityBottomNavItem(
         Icon(
             imageVector = if (isSelected) selectedIcon else unselectedIcon,
             contentDescription = label,
-            tint = if (isSelected) ClarityGreen else unselectedColor,
+            tint = itemColor,
             modifier = Modifier.size(20.dp)
         )
 
@@ -206,7 +217,7 @@ private fun ClarityBottomNavItem(
             fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) ClarityGreen else unselectedColor
+            color = itemColor
         )
     }
 }

@@ -32,11 +32,11 @@ val ClarityAmber = Color(0xFFD97706)
 val ClarityAmberLight = Color(0xFFFEF3C7)
 val ClarityAmberDark = Color(0xFF92400E)
 
-// Dark Theme Surfaces — pure black background per Material Design dark spec
+// Dark Theme Surfaces — pure black background and surfaces per user spec
 val ClarityDarkBackground = Color(0xFF000000)   // pure black
-val ClarityDarkSurface = Color(0xFF121212)       // Google Material dark surface
-val ClarityDarkSurfaceVariant = Color(0xFF1E1E1E)
-val ClarityDarkBorder = Color(0xFF2C2C2C)
+val ClarityDarkSurface = Color(0xFF000000)       // pure black
+val ClarityDarkSurfaceVariant = Color(0xFF000000) // pure black
+val ClarityDarkBorder = Color(0xFF333333)       // crisp subtle dark border
 val ClarityDarkTextPrimary = Color(0xFFFFFFFF)  // pure white
-val ClarityDarkTextSecondary = Color(0xFFB0B0B0)
-val ClarityDarkTextMuted = Color(0xFF757575)
+val ClarityDarkTextSecondary = Color(0xFFFFFFFF) // pure white
+val ClarityDarkTextMuted = Color(0xFFFFFFFF)     // pure white
