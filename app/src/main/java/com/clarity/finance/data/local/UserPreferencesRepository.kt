@@ -18,7 +18,27 @@ class UserPreferencesRepository @Inject constructor(
         private const val KEY_BIOMETRIC_ENABLED = "key_biometric_enabled"
         private const val KEY_SAVED_EMAIL = "key_saved_email"
         private const val KEY_SAVED_TOKEN = "key_saved_token"
+        private const val KEY_PROFILE_PHOTO_PATH = "key_profile_photo_path"
+        private const val KEY_THEME_MODE = "key_theme_mode"
+        private const val KEY_SMS_SCAN_ENABLED = "key_sms_scan_enabled"
+        private const val KEY_DAILY_REMINDER = "key_daily_reminder"
     }
+
+    var profilePhotoPath: String?
+        get() = prefs.getString(KEY_PROFILE_PHOTO_PATH, null)
+        set(value) = prefs.edit().putString(KEY_PROFILE_PHOTO_PATH, value).apply()
+
+    var themeMode: String
+        get() = prefs.getString(KEY_THEME_MODE, "SYSTEM") ?: "SYSTEM"
+        set(value) = prefs.edit().putString(KEY_THEME_MODE, value).apply()
+
+    var isSmsScanEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SMS_SCAN_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_SMS_SCAN_ENABLED, value).apply()
+
+    var isDailyReminderEnabled: Boolean
+        get() = prefs.getBoolean(KEY_DAILY_REMINDER, true)
+        set(value) = prefs.edit().putBoolean(KEY_DAILY_REMINDER, value).apply()
 
     var isBiometricEnabled: Boolean
         get() = prefs.getBoolean(KEY_BIOMETRIC_ENABLED, false)

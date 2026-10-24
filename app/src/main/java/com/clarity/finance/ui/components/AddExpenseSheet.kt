@@ -68,7 +68,9 @@ import com.clarity.finance.viewmodel.ExpenseViewModel
 fun AddExpenseSheet(
     viewModel: ExpenseViewModel,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNavigateToDrafts: (() -> Unit)? = null,
+    pendingDraftCount: Int = 0
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val formState by viewModel.formState.collectAsStateWithLifecycle()
@@ -132,6 +134,41 @@ fun AddExpenseSheet(
                     color = ClarityTextSecondary,
                     modifier = Modifier.clickable { onDismiss() }
                 )
+            }
+
+            // Drafts shortcut banner if pending drafts exist
+            if (pendingDraftCount > 0 && onNavigateToDrafts != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(ClarityGrayBackground)
+                        .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(6.dp))
+                        .clickable { onNavigateToDrafts() }
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "⚡ $pendingDraftCount SMS Drafts Waiting",
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = ClarityTextPrimary
+                        )
+                        Text(
+                            text = "REVIEW →",
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = ClarityBlack
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

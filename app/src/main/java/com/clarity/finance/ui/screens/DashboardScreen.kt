@@ -62,17 +62,26 @@ import com.clarity.finance.viewmodel.ExpenseViewModel
 import java.text.NumberFormat
 import java.util.Locale
 
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.filled.Settings
+import com.clarity.finance.util.ProfileImageManager
+import com.clarity.finance.viewmodel.DraftViewModel
+
 @Composable
 fun DashboardScreen(
     authViewModel: AuthViewModel,
     onSignOutSuccess: () -> Unit,
     modifier: Modifier = Modifier,
     expenseViewModel: ExpenseViewModel = hiltViewModel(),
+    draftViewModel: DraftViewModel = hiltViewModel(),
     onNavigateToExpensesHistory: () -> Unit = {},
-    onNavigateToInsights: () -> Unit = {}
+    onNavigateToInsights: () -> Unit = {},
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToDrafts: () -> Unit = {}
 ) {
     val currentUser by authViewModel.currentUserFlow.collectAsStateWithLifecycle()
     val historyState by expenseViewModel.historyState.collectAsStateWithLifecycle()
+    val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showAddExpenseSheet by remember { mutableStateOf(false) }
 
@@ -81,7 +90,12 @@ fun DashboardScreen(
     if (showAddExpenseSheet) {
         AddExpenseSheet(
             viewModel = expenseViewModel,
-            onDismiss = { showAddExpenseSheet = false }
+            onDismiss = { showAddExpenseSheet = false },
+            onNavigateToDrafts = {
+                showAddExpenseSheet = false
+                onNavigateToDrafts()
+            },
+            pendingDraftCount = draftCount
         )
     }
 
@@ -147,7 +161,7 @@ fun DashboardScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
-            // Header: Month & User
+            // Header: Month & User & Settings Icon
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -170,43 +184,87 @@ fun DashboardScreen(
                     )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.OutlinedButton(
-                        onClick = { showSignOutDialog = true },
-                        shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, ClarityBorder),
-                        modifier = Modifier.height(36.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Text(
-                            text = "LOGOUT",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                // Settings & Profile Avatar button
+                val photoPath = authViewModel.profilePhotoPath
+                val avatarBitmap = remember(photoPath) {
+                    ProfileImageManager.loadBitmap(photoPath)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(ClarityGrayBackground)
+                        .border(BorderStroke(1.2.dp, ClarityBorder), CircleShape)
+                        .clickable { onNavigateToSettings() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (avatarBitmap != null) {
+                        Image(
+                            bitmap = avatarBitmap,
+                            contentDescription = "Settings & Profile",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
                         )
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    // Profile Badge
-                    Box(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .border(BorderStroke(1.dp, ClarityBorder), CircleShape)
-                            .clickable { showSignOutDialog = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "[P]",
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = ClarityTextPrimary,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Bank SMS Drafts notification banner if pending drafts exist
+            if (draftCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ClarityGrayBackground)
+                        .border(BorderStroke(1.dp, ClarityBlack), RoundedCornerShape(8.dp))
+                        .clickable { onNavigateToDrafts() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "⚡", fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "$draftCount Bank SMS Transactions Drafted",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ClarityTextPrimary
+                                )
+                                Text(
+                                    text = "Tap to review & approve into expenses",
+                                    fontSize = 10.sp,
+                                    color = ClarityTextMuted
+                                )
+                            }
+                        }
+                        Text(
+                            text = "REVIEW →",
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = ClarityBlack
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
 
             // Summary Cards Row
             Row(

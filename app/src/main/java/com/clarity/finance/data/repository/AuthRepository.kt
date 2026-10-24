@@ -10,7 +10,8 @@ interface AuthRepository {
     /** Synchronous snapshot, used to pick the start screen (Login or Dashboard). */
     val currentUser: AuthUser?
 
-    suspend fun signUp(name: String, email: String, password: String): Result<AuthUser>
+    suspend fun signUp(name: String, email: String, password: String, photoPath: String? = null): Result<AuthUser>
     suspend fun signIn(email: String, password: String): Result<AuthUser>
+    suspend fun updateProfile(name: String, photoPath: String?): Result<Unit>
     fun signOut()
 }
