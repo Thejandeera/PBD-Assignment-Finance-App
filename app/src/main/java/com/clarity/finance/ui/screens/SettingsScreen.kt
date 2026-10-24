@@ -72,6 +72,9 @@ import com.clarity.finance.ui.components.PrimaryButton
 import com.clarity.finance.ui.theme.ClarityBlack
 import com.clarity.finance.ui.theme.ClarityBorder
 import com.clarity.finance.ui.theme.ClarityGrayBackground
+import com.clarity.finance.ui.theme.ClarityBlue
+import com.clarity.finance.ui.theme.ClarityGreen
+import com.clarity.finance.ui.theme.ClarityGreenLight
 import com.clarity.finance.ui.theme.ClarityTextMuted
 import com.clarity.finance.ui.theme.ClarityTextPrimary
 import com.clarity.finance.ui.theme.ClarityTextSecondary
@@ -95,9 +98,11 @@ fun SettingsScreen(
     var displayName by remember(currentUser) { mutableStateOf(currentUser?.displayName.orEmpty()) }
     var selectedNewPhotoUri by remember { mutableStateOf<Uri?>(null) }
     var showSignOutDialog by remember { mutableStateOf(false) }
+    var isSavingProfile by remember { mutableStateOf(false) }
 
     // Settings States
-    var themeMode by remember { mutableStateOf(authViewModel.themeMode) }
+    val themeMode by authViewModel.themeModeFlow.collectAsStateWithLifecycle()
+    val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
     var isSmsEnabled by remember { mutableStateOf(authViewModel.isSmsScanEnabled) }
     var isDailyReminderEnabled by remember { mutableStateOf(authViewModel.isDailyReminderEnabled) }
     val canUseBiometrics by authViewModel.canUseBiometrics.collectAsStateWithLifecycle()
@@ -338,9 +343,13 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     PrimaryButton(
-                        text = "SAVE PROFILE CHANGES",
+                        text = if (isSavingProfile) "SAVING CHANGES..." else "SAVE PROFILE CHANGES",
+                        isLoading = isSavingProfile,
+                        enabled = !isSavingProfile,
                         onClick = {
+                            isSavingProfile = true
                             authViewModel.updateProfile(displayName, selectedNewPhotoUri) { success ->
+                                isSavingProfile = false
                                 scope.launch {
                                     if (success) {
                                         snackbarHostState.showSnackbar("Profile updated successfully!")
@@ -357,10 +366,10 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // =========================================================================
-            // Section 2: Appearance & Theme
+            // Section 2: Appearance, Theme & Currency
             // =========================================================================
             Text(
-                text = "APPEARANCE & THEME",
+                text = "APPEARANCE & CURRENCY",
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
@@ -401,15 +410,14 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .background(
-                                        if (isSelected) ClarityBlack else ClarityWhite,
+                                        if (isSelected) ClarityGreen else ClarityWhite,
                                         RoundedCornerShape(6.dp)
                                     )
                                     .border(
-                                        BorderStroke(1.dp, if (isSelected) ClarityBlack else ClarityBorder),
+                                        BorderStroke(1.dp, if (isSelected) ClarityGreen else ClarityBorder),
                                         RoundedCornerShape(6.dp)
                                     )
                                     .clickable {
-                                        themeMode = mode
                                         authViewModel.setThemeMode(mode)
                                     }
                                     .padding(vertical = 10.dp),
@@ -418,6 +426,57 @@ fun SettingsScreen(
                                 Text(
                                     text = mode,
                                     fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) ClarityWhite else ClarityTextPrimary
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    Text(
+                        text = "Default Currency",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ClarityTextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Switch default currency between LKR and USD ($)",
+                        fontSize = 11.sp,
+                        color = ClarityTextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("LKR" to "LKR (Rs.)", "USD" to "USD ($)").forEach { (code, label) ->
+                            val isSelected = currentCurrency.equals(code, ignoreCase = true)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(
+                                        if (isSelected) ClarityBlue else ClarityWhite,
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .border(
+                                        BorderStroke(1.dp, if (isSelected) ClarityBlue else ClarityBorder),
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .clickable {
+                                        authViewModel.setCurrency(code)
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 12.sp,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isSelected) ClarityWhite else ClarityTextPrimary
