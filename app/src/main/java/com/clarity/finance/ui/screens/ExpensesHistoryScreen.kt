@@ -58,16 +58,19 @@ import com.clarity.finance.ui.theme.ClarityBlack
 import com.clarity.finance.ui.theme.ClarityBorder
 import com.clarity.finance.ui.theme.ClarityBorderDark
 import com.clarity.finance.ui.theme.ClarityGrayBackground
+import com.clarity.finance.ui.theme.ClarityBlue
+import com.clarity.finance.ui.theme.ClarityBlueLight
+import com.clarity.finance.ui.theme.ClarityGreen
 import com.clarity.finance.ui.theme.ClarityRed
+import com.clarity.finance.ui.theme.ClarityRedLight
 import com.clarity.finance.ui.theme.ClarityTextMuted
 import com.clarity.finance.ui.theme.ClarityTextPrimary
 import com.clarity.finance.ui.theme.ClarityTextSecondary
 import com.clarity.finance.ui.theme.ClarityWhite
-import com.clarity.finance.viewmodel.ExpenseViewModel
-import java.text.NumberFormat
-import java.util.Locale
-
+import com.clarity.finance.util.CurrencyFormatter
+import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.DraftViewModel
+import com.clarity.finance.viewmodel.ExpenseViewModel
 
 @Composable
 fun ExpensesHistoryScreen(
@@ -75,17 +78,18 @@ fun ExpensesHistoryScreen(
     modifier: Modifier = Modifier,
     viewModel: ExpenseViewModel = hiltViewModel(),
     draftViewModel: DraftViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel(),
     onNavigateToDrafts: () -> Unit = {}
 ) {
     val historyState by viewModel.historyState.collectAsStateWithLifecycle()
     val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
+    val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     var expenseToDelete by remember { mutableStateOf<Expense?>(null) }
 
-    val numberFormat = remember { NumberFormat.getNumberInstance(Locale.US) }
-
     // Delete Confirmation Dialog
     expenseToDelete?.let { expense ->
+        val formattedAmount = CurrencyFormatter.format(expense.amount, currentCurrency)
         AlertDialog(
             onDismissRequest = { expenseToDelete = null },
             title = {
@@ -98,7 +102,7 @@ fun ExpensesHistoryScreen(
             },
             text = {
                 Text(
-                    text = "Are you sure you want to delete ${expense.categoryName} (${numberFormat.format(expense.amount)} LKR)?",
+                    text = "Are you sure you want to delete ${expense.categoryName} ($formattedAmount)?",
                     fontSize = 13.sp,
                     color = ClarityTextSecondary
                 )
@@ -225,12 +229,15 @@ fun ExpensesHistoryScreen(
             // 1. Monthly Summary Cards (Wireframe 3 Top Metrics)
             // =================================================================
             val metrics = historyState.metrics
+            val totalFormatted = CurrencyFormatter.format(metrics.totalExpense, currentCurrency)
+            val committedFormatted = CurrencyFormatter.format(metrics.committedTotal, currentCurrency)
+            val discretionaryFormatted = CurrencyFormatter.format(metrics.discretionaryTotal, currentCurrency)
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(ClarityGrayBackground, RoundedCornerShape(12.dp))
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(12.dp))
+                    .border(BorderStroke(1.2.dp, ClarityBorder), RoundedCornerShape(12.dp))
                     .padding(16.dp)
             ) {
                 Column {
@@ -257,11 +264,11 @@ fun ExpensesHistoryScreen(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "LKR ${numberFormat.format(metrics.totalExpense)}",
+                        text = totalFormatted,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextPrimary
+                        color = ClarityRed
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -275,8 +282,8 @@ fun ExpensesHistoryScreen(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .background(ClarityWhite, RoundedCornerShape(8.dp))
-                                .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+                                .background(ClarityBlueLight, RoundedCornerShape(8.dp))
+                                .border(BorderStroke(1.dp, ClarityBlue.copy(alpha = 0.4f)), RoundedCornerShape(8.dp))
                                 .padding(10.dp)
                         ) {
                             Column {
@@ -285,11 +292,11 @@ fun ExpensesHistoryScreen(
                                     fontSize = 9.sp,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
-                                    color = ClarityTextSecondary
+                                    color = ClarityBlue
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "LKR ${numberFormat.format(metrics.committedTotal)}",
+                                    text = committedFormatted,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Monospace,
@@ -299,7 +306,7 @@ fun ExpensesHistoryScreen(
                                     text = "${metrics.committedPercentage}% of outflow",
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
-                                    color = ClarityTextMuted
+                                    color = ClarityTextSecondary
                                 )
                             }
                         }
@@ -308,8 +315,8 @@ fun ExpensesHistoryScreen(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .background(ClarityWhite, RoundedCornerShape(8.dp))
-                                .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+                                .background(ClarityRedLight, RoundedCornerShape(8.dp))
+                                .border(BorderStroke(1.dp, ClarityRed.copy(alpha = 0.4f)), RoundedCornerShape(8.dp))
                                 .padding(10.dp)
                         ) {
                             Column {
@@ -318,11 +325,11 @@ fun ExpensesHistoryScreen(
                                     fontSize = 9.sp,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
-                                    color = ClarityTextSecondary
+                                    color = ClarityRed
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "LKR ${numberFormat.format(metrics.discretionaryTotal)}",
+                                    text = discretionaryFormatted,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     fontFamily = FontFamily.Monospace,
@@ -332,7 +339,7 @@ fun ExpensesHistoryScreen(
                                     text = "${metrics.discretionaryPercentage}% of outflow",
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
-                                    color = ClarityTextMuted
+                                    color = ClarityTextSecondary
                                 )
                             }
                         }
@@ -477,7 +484,7 @@ fun ExpensesHistoryScreen(
                     ) { expense ->
                         HistoryExpenseCard(
                             expense = expense,
-                            numberFormat = numberFormat,
+                            currentCurrency = currentCurrency,
                             onDeleteClick = { expenseToDelete = expense }
                         )
                     }
@@ -496,9 +503,9 @@ private fun HistoryFilterChip(
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(if (isSelected) ClarityBlack else ClarityGrayBackground)
+            .background(if (isSelected) ClarityGreen else ClarityGrayBackground)
             .border(
-                BorderStroke(1.dp, if (isSelected) ClarityBlack else ClarityBorder),
+                BorderStroke(1.dp, if (isSelected) ClarityGreen else ClarityBorder),
                 RoundedCornerShape(6.dp)
             )
             .clickable { onClick() }
@@ -517,14 +524,18 @@ private fun HistoryFilterChip(
 @Composable
 private fun HistoryExpenseCard(
     expense: Expense,
-    numberFormat: NumberFormat,
+    currentCurrency: String,
     onDeleteClick: () -> Unit
 ) {
+    val isCommitted = expense.type == SpendingType.COMMITTED
+    val badgeBg = if (isCommitted) ClarityBlueLight else ClarityRedLight
+    val badgeColor = if (isCommitted) ClarityBlue else ClarityRed
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ClarityWhite, RoundedCornerShape(8.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+            .background(ClarityWhite, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(10.dp))
             .padding(12.dp)
     ) {
         Row(
@@ -534,9 +545,9 @@ private fun HistoryExpenseCard(
             // Icon
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .background(ClarityGrayBackground, RoundedCornerShape(6.dp))
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(6.dp)),
+                    .size(38.dp)
+                    .background(badgeBg, RoundedCornerShape(8.dp))
+                    .border(BorderStroke(1.dp, badgeColor.copy(alpha = 0.3f)), RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -586,19 +597,15 @@ private fun HistoryExpenseCard(
                     // Obligation badge
                     Box(
                         modifier = Modifier
-                            .background(
-                                if (expense.type == SpendingType.COMMITTED) ClarityBlack.copy(alpha = 0.08f)
-                                else ClarityGrayBackground,
-                                RoundedCornerShape(3.dp)
-                            )
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                            .background(badgeBg, RoundedCornerShape(3.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
                     ) {
                         Text(
-                            text = if (expense.type == SpendingType.COMMITTED) "COMMITTED" else "DISCRETIONARY",
+                            text = if (isCommitted) "COMMITTED" else "DISCRETIONARY",
                             fontSize = 8.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = if (expense.type == SpendingType.COMMITTED) ClarityTextPrimary else ClarityTextSecondary
+                            color = badgeColor
                         )
                     }
 
@@ -617,11 +624,11 @@ private fun HistoryExpenseCard(
             // Amount and Delete Action
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = "-${numberFormat.format(expense.amount)} LKR",
+                    text = "-${CurrencyFormatter.format(expense.amount, currentCurrency)}",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextPrimary
+                    color = ClarityRed
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))

@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clarity.finance.ui.theme.ClarityBlack
 import com.clarity.finance.ui.theme.ClarityBorder
+import com.clarity.finance.ui.theme.ClarityGreen
+import com.clarity.finance.ui.theme.ClarityGreenBright
 import com.clarity.finance.ui.theme.ClarityTextMuted
 import com.clarity.finance.ui.theme.ClarityTextPrimary
 import com.clarity.finance.ui.theme.ClarityWhite
@@ -157,9 +159,9 @@ fun ClarityBottomBar(
                 .offset(y = 6.dp)
                 .size(46.dp),
             shape = CircleShape,
-            containerColor = ClarityBlack,
+            containerColor = ClarityGreen,
             contentColor = ClarityWhite,
-            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp, pressedElevation = 4.dp)
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp, pressedElevation = 6.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
@@ -194,7 +196,7 @@ private fun ClarityBottomNavItem(
         Icon(
             imageVector = if (isSelected) selectedIcon else unselectedIcon,
             contentDescription = label,
-            tint = if (isSelected) ClarityTextPrimary else ClarityTextMuted,
+            tint = if (isSelected) ClarityGreen else ClarityTextMuted,
             modifier = Modifier.size(20.dp)
         )
 
@@ -205,7 +207,7 @@ private fun ClarityBottomNavItem(
             fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) ClarityTextPrimary else ClarityTextMuted
+            color = if (isSelected) ClarityGreen else ClarityTextMuted
         )
     }
 }

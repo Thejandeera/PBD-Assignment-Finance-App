@@ -54,15 +54,25 @@ import com.clarity.finance.model.VelocityMetrics
 import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.ClarityBottomBar
 import com.clarity.finance.ui.components.ClarityNavTab
+import com.clarity.finance.ui.theme.ClarityAmber
+import com.clarity.finance.ui.theme.ClarityAmberLight
 import com.clarity.finance.ui.theme.ClarityBlack
+import com.clarity.finance.ui.theme.ClarityBlue
+import com.clarity.finance.ui.theme.ClarityBlueLight
 import com.clarity.finance.ui.theme.ClarityBorder
 import com.clarity.finance.ui.theme.ClarityBorderDark
 import com.clarity.finance.ui.theme.ClarityGrayBackground
+import com.clarity.finance.ui.theme.ClarityGreen
+import com.clarity.finance.ui.theme.ClarityGreenBright
+import com.clarity.finance.ui.theme.ClarityPurple
 import com.clarity.finance.ui.theme.ClarityRed
+import com.clarity.finance.ui.theme.ClarityRedLight
 import com.clarity.finance.ui.theme.ClarityTextMuted
 import com.clarity.finance.ui.theme.ClarityTextPrimary
 import com.clarity.finance.ui.theme.ClarityTextSecondary
 import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.util.CurrencyFormatter
+import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.ExpenseViewModel
 import com.clarity.finance.viewmodel.InsightsViewModel
 import java.text.NumberFormat
@@ -73,10 +83,11 @@ fun InsightsScreen(
     onNavigateToDashboard: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: InsightsViewModel = hiltViewModel(),
-    expenseViewModel: ExpenseViewModel = hiltViewModel()
+    expenseViewModel: ExpenseViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val numberFormat = remember { NumberFormat.getNumberInstance(Locale.US) }
+    val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
     var showAddExpenseSheet by remember { mutableStateOf(false) }
 
     if (showAddExpenseSheet) {
@@ -230,7 +241,7 @@ fun InsightsScreen(
                     committedPercentage = state.committedPercentage,
                     discretionaryAmount = state.discretionaryAmount,
                     discretionaryPercentage = state.discretionaryPercentage,
-                    numberFormat = numberFormat
+                    currentCurrency = currentCurrency
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -239,14 +250,14 @@ fun InsightsScreen(
                 // 3. Top Spending Leak & MacBook Pro M4 Goal Link
                 // =============================================================
                 state.spendingLeak?.let { leak ->
-                    SpendingLeakCard(leak = leak, numberFormat = numberFormat)
+                    SpendingLeakCard(leak = leak, currentCurrency = currentCurrency)
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 // =============================================================
                 // 4. Burn Rate Velocity & Month-End Projection
                 // =============================================================
-                BurnRateCard(velocity = state.velocity, numberFormat = numberFormat)
+                BurnRateCard(velocity = state.velocity, currentCurrency = currentCurrency)
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -255,7 +266,7 @@ fun InsightsScreen(
                 // =============================================================
                 CategoryBreakdownSection(
                     categories = state.topCategories,
-                    numberFormat = numberFormat
+                    currentCurrency = currentCurrency
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -265,7 +276,7 @@ fun InsightsScreen(
                 // =============================================================
                 PaymentChannelSection(
                     channels = state.channelBreakdown,
-                    numberFormat = numberFormat
+                    currentCurrency = currentCurrency
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -281,13 +292,17 @@ private fun CommittedVsDiscretionaryCard(
     committedPercentage: Int,
     discretionaryAmount: Double,
     discretionaryPercentage: Int,
-    numberFormat: NumberFormat
+    currentCurrency: String
 ) {
+    val totalFormatted = CurrencyFormatter.format(totalOutflow, currentCurrency)
+    val committedFormatted = CurrencyFormatter.format(committedAmount, currentCurrency)
+    val discretionaryFormatted = CurrencyFormatter.format(discretionaryAmount, currentCurrency)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(ClarityWhite, RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.2.dp, ClarityBorder), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -300,11 +315,11 @@ private fun CommittedVsDiscretionaryCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "LKR ${numberFormat.format(totalOutflow)}",
+                text = totalFormatted,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
-                color = ClarityTextPrimary
+                color = ClarityRed
             )
 
             Spacer(modifier = Modifier.height(14.dp))
@@ -313,10 +328,10 @@ private fun CommittedVsDiscretionaryCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(14.dp)
-                    .clip(RoundedCornerShape(7.dp))
+                    .height(16.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(ClarityGrayBackground)
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(7.dp))
+                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
             ) {
                 Row(modifier = Modifier.fillMaxSize()) {
                     if (committedPercentage > 0) {
@@ -324,7 +339,7 @@ private fun CommittedVsDiscretionaryCard(
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .weight((committedPercentage.coerceAtLeast(1)).toFloat())
-                                .background(ClarityBlack)
+                                .background(ClarityBlue)
                         )
                     }
                     if (discretionaryPercentage > 0) {
@@ -332,7 +347,7 @@ private fun CommittedVsDiscretionaryCard(
                             modifier = Modifier
                                 .fillMaxHeight()
                                 .weight((discretionaryPercentage.coerceAtLeast(1)).toFloat())
-                                .background(ClarityBorderDark)
+                                .background(ClarityRed)
                         )
                     }
                 }
@@ -350,7 +365,7 @@ private fun CommittedVsDiscretionaryCard(
                     Box(
                         modifier = Modifier
                             .size(10.dp)
-                            .background(ClarityBlack, RoundedCornerShape(2.dp))
+                            .background(ClarityBlue, RoundedCornerShape(2.dp))
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Column {
@@ -359,10 +374,10 @@ private fun CommittedVsDiscretionaryCard(
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = ClarityBlue
                         )
                         Text(
-                            text = "LKR ${numberFormat.format(committedAmount)}",
+                            text = committedFormatted,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             color = ClarityTextSecondary
@@ -375,7 +390,7 @@ private fun CommittedVsDiscretionaryCard(
                     Box(
                         modifier = Modifier
                             .size(10.dp)
-                            .background(ClarityBorderDark, RoundedCornerShape(2.dp))
+                            .background(ClarityRed, RoundedCornerShape(2.dp))
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Column(horizontalAlignment = Alignment.End) {
@@ -384,10 +399,10 @@ private fun CommittedVsDiscretionaryCard(
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = ClarityRed
                         )
                         Text(
-                            text = "LKR ${numberFormat.format(discretionaryAmount)}",
+                            text = discretionaryFormatted,
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
                             color = ClarityTextSecondary
@@ -402,13 +417,15 @@ private fun CommittedVsDiscretionaryCard(
 @Composable
 private fun SpendingLeakCard(
     leak: SpendingLeakAlert,
-    numberFormat: NumberFormat
+    currentCurrency: String
 ) {
+    val formattedLeakAmount = CurrencyFormatter.format(leak.amount, currentCurrency)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ClarityGrayBackground, RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.5.dp, ClarityBlack), RoundedCornerShape(12.dp))
+            .background(ClarityAmberLight, RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.2.dp, ClarityAmber), RoundedCornerShape(12.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -418,14 +435,14 @@ private fun SpendingLeakCard(
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = ClarityAmber
                 )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "${leak.categoryIcon} ${leak.categoryName} accounts for ${leak.percentageOfDiscretionary}% of your discretionary spending (LKR ${numberFormat.format(leak.amount)}).",
+                text = "${leak.categoryIcon} ${leak.categoryName} accounts for ${leak.percentageOfDiscretionary}% of your discretionary spending ($formattedLeakAmount).",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = ClarityTextPrimary
@@ -447,8 +464,11 @@ private fun SpendingLeakCard(
 @Composable
 private fun BurnRateCard(
     velocity: VelocityMetrics,
-    numberFormat: NumberFormat
+    currentCurrency: String
 ) {
+    val dailyBurn = CurrencyFormatter.format(velocity.dailyAverage, currentCurrency)
+    val projectedBurn = CurrencyFormatter.format(velocity.projectedMonthEnd, currentCurrency)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -471,11 +491,11 @@ private fun BurnRateCard(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "LKR ${numberFormat.format(velocity.dailyAverage.toInt())} / day",
+                    text = "$dailyBurn / day",
                     fontSize = 14.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = ClarityRed
                 )
                 Text(
                     text = "Over ${velocity.daysElapsed} days elapsed",
@@ -496,7 +516,7 @@ private fun BurnRateCard(
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "LKR ${numberFormat.format(velocity.projectedMonthEnd.toInt())}",
+                    text = projectedBurn,
                     fontSize = 14.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
@@ -516,7 +536,7 @@ private fun BurnRateCard(
 @Composable
 private fun CategoryBreakdownSection(
     categories: List<CategorySpending>,
-    numberFormat: NumberFormat
+    currentCurrency: String
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -530,12 +550,17 @@ private fun CategoryBreakdownSection(
         Spacer(modifier = Modifier.height(10.dp))
 
         categories.forEach { category ->
+            val isCommitted = category.type == SpendingType.COMMITTED
+            val badgeBg = if (isCommitted) ClarityBlueLight else ClarityRedLight
+            val badgeColor = if (isCommitted) ClarityBlue else ClarityRed
+            val barColor = if (isCommitted) ClarityBlue else ClarityGreenBright
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
-                    .background(ClarityWhite, RoundedCornerShape(8.dp))
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+                    .background(ClarityWhite, RoundedCornerShape(10.dp))
+                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(10.dp))
                     .padding(12.dp)
             ) {
                 Column {
@@ -556,29 +581,25 @@ private fun CategoryBreakdownSection(
                             Spacer(modifier = Modifier.width(6.dp))
                             Box(
                                 modifier = Modifier
-                                    .background(
-                                        if (category.type == SpendingType.COMMITTED) ClarityBlack.copy(alpha = 0.08f)
-                                        else ClarityGrayBackground,
-                                        RoundedCornerShape(3.dp)
-                                    )
+                                    .background(badgeBg, RoundedCornerShape(3.dp))
                                     .padding(horizontal = 4.dp, vertical = 1.dp)
                             ) {
                                 Text(
-                                    text = if (category.type == SpendingType.COMMITTED) "COMMITTED" else "DISCRETIONARY",
+                                    text = if (isCommitted) "COMMITTED" else "DISCRETIONARY",
                                     fontSize = 8.sp,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (category.type == SpendingType.COMMITTED) ClarityTextPrimary else ClarityTextSecondary
+                                    color = badgeColor
                                 )
                             }
                         }
 
                         Text(
-                            text = "-LKR ${numberFormat.format(category.amount)}",
+                            text = "-${CurrencyFormatter.format(category.amount, currentCurrency)}",
                             fontSize = 13.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = ClarityRed
                         )
                     }
 
@@ -600,7 +621,7 @@ private fun CategoryBreakdownSection(
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .fillMaxWidth((category.percentageOfTotal / 100f).coerceIn(0.01f, 1f))
-                                    .background(ClarityBlack)
+                                    .background(barColor)
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
@@ -620,7 +641,7 @@ private fun CategoryBreakdownSection(
 @Composable
 private fun PaymentChannelSection(
     channels: List<PaymentChannelSpending>,
-    numberFormat: NumberFormat
+    currentCurrency: String
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -655,7 +676,7 @@ private fun PaymentChannelSection(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "LKR ${numberFormat.format(channel.amount)}",
+                            text = CurrencyFormatter.format(channel.amount, currentCurrency),
                             fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
