@@ -27,7 +27,18 @@ class UserPreferencesRepository @Inject constructor(
         private const val KEY_LAST_ACTIVE_TIME = "key_last_active_time"
         private const val KEY_SMS_SCAN_ENABLED = "key_sms_scan_enabled"
         private const val KEY_DAILY_REMINDER = "key_daily_reminder"
+        private const val KEY_MONTHLY_INCOME = "key_monthly_income"
     }
+
+    var monthlyIncome: Double
+        get() = java.lang.Double.longBitsToDouble(prefs.getLong(KEY_MONTHLY_INCOME, java.lang.Double.doubleToLongBits(185000.0)))
+        set(value) {
+            prefs.edit().putLong(KEY_MONTHLY_INCOME, java.lang.Double.doubleToLongBits(value)).apply()
+            _monthlyIncomeFlow.value = value
+        }
+
+    private val _monthlyIncomeFlow = MutableStateFlow(monthlyIncome)
+    val monthlyIncomeFlow: StateFlow<Double> = _monthlyIncomeFlow.asStateFlow()
 
     var profilePhotoPath: String?
         get() = prefs.getString(KEY_PROFILE_PHOTO_PATH, null)

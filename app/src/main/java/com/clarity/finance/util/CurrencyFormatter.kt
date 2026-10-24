@@ -4,28 +4,36 @@ import java.text.NumberFormat
 import java.util.Locale
 
 object CurrencyFormatter {
-    const val USD_TO_LKR_RATE = 305.0
+    /** Fallback LKR-per-USD rate if live fetch fails. */
+    const val FALLBACK_LKR_PER_USD = 330.0
 
-    fun format(amountInLkr: Double, currency: String): String {
+    /**
+     * Format [amountInLkr] in the chosen [currency].
+     * [lkrPerUsd] defaults to the fallback rate; pass a live rate when available.
+     */
+    fun format(amountInLkr: Double, currency: String, lkrPerUsd: Double = FALLBACK_LKR_PER_USD): String {
         val formatter = NumberFormat.getNumberInstance(Locale.US)
         return if (currency.equals("USD", ignoreCase = true)) {
-            val usd = amountInLkr / USD_TO_LKR_RATE
+            val usd = amountInLkr / lkrPerUsd
             formatter.minimumFractionDigits = if (usd % 1.0 == 0.0) 0 else 2
             formatter.maximumFractionDigits = 2
-            "$" + formatter.format(usd)
+            "\$" + formatter.format(usd)
         } else {
             formatter.maximumFractionDigits = 0
             formatter.format(amountInLkr) + " LKR"
         }
     }
 
-    fun formatCompact(amountInLkr: Double, currency: String): String {
+    /**
+     * Compact format — e.g. $1.2k or 145.0k
+     */
+    fun formatCompact(amountInLkr: Double, currency: String, lkrPerUsd: Double = FALLBACK_LKR_PER_USD): String {
         return if (currency.equals("USD", ignoreCase = true)) {
-            val usd = amountInLkr / USD_TO_LKR_RATE
+            val usd = amountInLkr / lkrPerUsd
             if (usd >= 1000.0) {
-                String.format(Locale.US, "$%.1fk", usd / 1000.0)
+                String.format(Locale.US, "\$%.1fk", usd / 1000.0)
             } else {
-                String.format(Locale.US, "$%.0f", usd)
+                String.format(Locale.US, "\$%.0f", usd)
             }
         } else {
             if (amountInLkr >= 1000.0) {
@@ -37,6 +45,6 @@ object CurrencyFormatter {
     }
 
     fun getSymbol(currency: String): String {
-        return if (currency.equals("USD", ignoreCase = true)) "$" else "LKR"
+        return if (currency.equals("USD", ignoreCase = true)) "\$" else "LKR"
     }
 }
