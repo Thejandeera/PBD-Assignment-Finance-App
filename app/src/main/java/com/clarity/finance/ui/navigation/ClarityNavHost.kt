@@ -20,6 +20,7 @@ sealed class Screen(val route: String) {
     data object Login : Screen("login")
     data object Register : Screen("register")
     data object Dashboard : Screen("dashboard")
+    data object ExpensesHistory : Screen("expenses_history")
 }
 
 @Composable
@@ -82,6 +83,17 @@ fun ClarityNavHost(
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Dashboard.route) { inclusive = true }
                     }
+                },
+                onNavigateToExpensesHistory = {
+                    navController.navigate(Screen.ExpensesHistory.route)
+                }
+            )
+        }
+
+        composable(Screen.ExpensesHistory.route) {
+            com.clarity.finance.ui.screens.ExpensesHistoryScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
                 }
             )
         }
