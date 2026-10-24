@@ -12,8 +12,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.clarity.finance.ui.screens.DashboardScreen
+import com.clarity.finance.ui.screens.DraftsScreen
+import com.clarity.finance.ui.screens.ExpensesHistoryScreen
+import com.clarity.finance.ui.screens.InsightsScreen
 import com.clarity.finance.ui.screens.LoginScreen
 import com.clarity.finance.ui.screens.RegisterScreen
+import com.clarity.finance.ui.screens.SettingsScreen
 import com.clarity.finance.viewmodel.AuthViewModel
 
 sealed class Screen(val route: String) {
@@ -22,6 +26,8 @@ sealed class Screen(val route: String) {
     data object Dashboard : Screen("dashboard")
     data object ExpensesHistory : Screen("expenses_history")
     data object Insights : Screen("insights")
+    data object Settings : Screen("settings")
+    data object Drafts : Screen("drafts")
 }
 
 @Composable
@@ -90,25 +96,56 @@ fun ClarityNavHost(
                 },
                 onNavigateToInsights = {
                     navController.navigate(Screen.Insights.route)
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
+                },
+                onNavigateToDrafts = {
+                    navController.navigate(Screen.Drafts.route)
                 }
             )
         }
 
         composable(Screen.ExpensesHistory.route) {
-            com.clarity.finance.ui.screens.ExpensesHistoryScreen(
+            ExpensesHistoryScreen(
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToDrafts = {
+                    navController.navigate(Screen.Drafts.route)
                 }
             )
         }
 
         composable(Screen.Insights.route) {
-            com.clarity.finance.ui.screens.InsightsScreen(
+            InsightsScreen(
                 onNavigateToDashboard = {
                     navController.navigate(Screen.Dashboard.route) {
                         popUpTo(Screen.Dashboard.route) { inclusive = true }
                         launchSingleTop = true
                     }
+                }
+            )
+        }
+
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                authViewModel = authViewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onSignOutSuccess = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(Screen.Dashboard.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Drafts.route) {
+            DraftsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
                 }
             )
         }

@@ -42,6 +42,27 @@ import com.clarity.finance.ui.theme.ClarityWhite
 import com.clarity.finance.viewmodel.AuthUiState
 import com.clarity.finance.viewmodel.AuthViewModel
 
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import com.clarity.finance.ui.theme.ClarityBorder
+import com.clarity.finance.ui.theme.ClarityGrayBackground
+
 @Composable
 fun RegisterScreen(
     authViewModel: AuthViewModel,
@@ -49,6 +70,7 @@ fun RegisterScreen(
     onRegisterSuccess: (message: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -57,6 +79,13 @@ fun RegisterScreen(
     var password by rememberSaveable { mutableStateOf("") }
     var confirmPassword by rememberSaveable { mutableStateOf("") }
     var isPasswordVisible by rememberSaveable { mutableStateOf(false) }
+    var selectedPhotoUri by remember { mutableStateOf<Uri?>(null) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedPhotoUri = uri
+    }
 
     LaunchedEffect(uiState) {
         when (val state = uiState) {
@@ -109,6 +138,80 @@ fun RegisterScreen(
 
             // Input Fields
             Column(modifier = Modifier.fillMaxWidth()) {
+                // Optional Profile Photo Picker
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .background(ClarityGrayBackground)
+                            .border(BorderStroke(1.dp, ClarityBorder), CircleShape)
+                            .clickable { photoPickerLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val bitmap = remember(selectedPhotoUri) {
+                            if (selectedPhotoUri != null) {
+                                try {
+                                    context.contentResolver.openInputStream(selectedPhotoUri!!)?.use { stream ->
+                                        BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                                    }
+                                } catch (_: Exception) { null }
+                            } else null
+                        }
+
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap,
+                                contentDescription = "Profile Photo Preview",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.AddAPhoto,
+                                contentDescription = "Choose Profile Photo",
+                                tint = ClarityTextSecondary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (selectedPhotoUri != null) "Photo selected" else "Profile Photo (Optional)",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = ClarityTextPrimary
+                        )
+                        Text(
+                            text = if (selectedPhotoUri != null) "Tap avatar to change" else "Tap avatar to pick from gallery",
+                            fontSize = 11.sp,
+                            color = ClarityTextMuted
+                        )
+                    }
+
+                    if (selectedPhotoUri != null) {
+                        Text(
+                            text = "Remove",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Red,
+                            modifier = Modifier
+                                .clickable { selectedPhotoUri = null }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
                 ClarityTextField(
                     value = fullName,
                     onValueChange = { fullName = it },
@@ -167,7 +270,7 @@ fun RegisterScreen(
                 PrimaryButton(
                     text = "CREATE ACCOUNT",
                     onClick = {
-                        authViewModel.signUp(fullName, email, password, confirmPassword)
+                        authViewModel.signUp(fullName, email, password, confirmPassword, selectedPhotoUri)
                     },
                     isLoading = isLoading
                 )

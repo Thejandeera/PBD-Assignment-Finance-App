@@ -67,13 +67,18 @@ import com.clarity.finance.viewmodel.ExpenseViewModel
 import java.text.NumberFormat
 import java.util.Locale
 
+import com.clarity.finance.viewmodel.DraftViewModel
+
 @Composable
 fun ExpensesHistoryScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ExpenseViewModel = hiltViewModel()
+    viewModel: ExpenseViewModel = hiltViewModel(),
+    draftViewModel: DraftViewModel = hiltViewModel(),
+    onNavigateToDrafts: () -> Unit = {}
 ) {
     val historyState by viewModel.historyState.collectAsStateWithLifecycle()
+    val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     var expenseToDelete by remember { mutableStateOf<Expense?>(null) }
 
@@ -171,6 +176,51 @@ fun ExpensesHistoryScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
+            // SMS Drafts notification banner
+            if (draftCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(ClarityGrayBackground)
+                        .border(BorderStroke(1.dp, ClarityBlack), RoundedCornerShape(8.dp))
+                        .clickable { onNavigateToDrafts() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "⚡", fontSize = 14.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "$draftCount Transactions Drafted from SMS",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ClarityTextPrimary
+                                )
+                                Text(
+                                    text = "Tap to review & approve into expenses",
+                                    fontSize = 10.sp,
+                                    color = ClarityTextMuted
+                                )
+                            }
+                        }
+                        Text(
+                            text = "REVIEW →",
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            color = ClarityBlack
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+            }
+
             // =================================================================
             // 1. Monthly Summary Cards (Wireframe 3 Top Metrics)
             // =================================================================
