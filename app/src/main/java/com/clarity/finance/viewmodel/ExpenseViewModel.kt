@@ -61,6 +61,13 @@ class ExpenseViewModel @Inject constructor(
         _formState.update { it.copy(amountInput = formatted, amountError = null) }
     }
 
+    /**
+     * Helper for quick amount increments ([+500], [+1,000], [+5,000]).
+     */
+    fun applyQuickIncrement(increment: Int) {
+        onQuickAmountIncrement(increment.toDouble())
+    }
+
     fun onCategorySelected(category: CategoryItem) {
         _formState.update {
             it.copy(
@@ -83,7 +90,7 @@ class ExpenseViewModel @Inject constructor(
         try {
             val parsed = LocalDate.parse(dateString)
             if (parsed.isAfter(LocalDate.now())) {
-                _formState.update { it.copy(dateError = "Date cannot be in the future") }
+                _formState.update { it.copy(date = dateString, dateError = "Date cannot be in the future") }
                 return
             }
             val display = if (parsed == LocalDate.now()) {
@@ -99,7 +106,7 @@ class ExpenseViewModel @Inject constructor(
                 )
             }
         } catch (e: Exception) {
-            _formState.update { it.copy(dateError = "Invalid date format (YYYY-MM-DD)") }
+            _formState.update { it.copy(date = dateString, dateError = "Invalid date format (YYYY-MM-DD)") }
         }
     }
 
@@ -132,8 +139,8 @@ class ExpenseViewModel @Inject constructor(
 
         // Validation 2: Date cannot be in future
         val dateParsed = runCatching { LocalDate.parse(state.date) }.getOrNull()
-        if (dateParsed == null || dateParsed.isAfter(LocalDate.now())) {
-            _formState.update { it.copy(dateError = "Expense date cannot be in the future") }
+        if (state.dateError != null || dateParsed == null || dateParsed.isAfter(LocalDate.now())) {
+            _formState.update { it.copy(dateError = "Date cannot be in the future") }
             return
         }
 
