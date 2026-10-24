@@ -8,8 +8,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -53,11 +55,8 @@ import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.ui.components.DashedInfoBox
 import com.clarity.finance.ui.theme.ClarityAmber
 import com.clarity.finance.ui.theme.ClarityAmberLight
-import com.clarity.finance.ui.theme.ClarityBlack
 import com.clarity.finance.ui.theme.ClarityBlue
 import com.clarity.finance.ui.theme.ClarityBlueLight
-import com.clarity.finance.ui.theme.ClarityBorder
-import com.clarity.finance.ui.theme.ClarityGrayBackground
 import com.clarity.finance.ui.theme.ClarityGreen
 import com.clarity.finance.ui.theme.ClarityGreenBright
 import com.clarity.finance.ui.theme.ClarityGreenLight
@@ -65,9 +64,6 @@ import com.clarity.finance.ui.theme.ClarityPurple
 import com.clarity.finance.ui.theme.ClarityPurpleLight
 import com.clarity.finance.ui.theme.ClarityRed
 import com.clarity.finance.ui.theme.ClarityRedLight
-import com.clarity.finance.ui.theme.ClarityTextMuted
-import com.clarity.finance.ui.theme.ClarityTextPrimary
-import com.clarity.finance.ui.theme.ClarityTextSecondary
 import com.clarity.finance.ui.theme.ClarityWhite
 import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.util.ProfileImageManager
@@ -91,6 +87,8 @@ fun DashboardScreen(
     val historyState by expenseViewModel.historyState.collectAsStateWithLifecycle()
     val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
     val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
+    val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
+    val monthlyIncome by authViewModel.monthlyIncomeFlow.collectAsStateWithLifecycle()
 
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showAddExpenseSheet by remember { mutableStateOf(false) }
@@ -98,13 +96,12 @@ fun DashboardScreen(
     val displayName = currentUser?.displayName?.ifBlank { "User" } ?: "User"
 
     // Real financial data calculations
-    val estimatedIncome = 185_000.0 // Base monthly income in LKR
     val totalExpense = historyState.metrics.totalExpense
-    val availableAmount = (estimatedIncome - totalExpense).coerceAtLeast(0.0)
+    val availableAmount = (monthlyIncome - totalExpense).coerceAtLeast(0.0)
 
-    val incomeFormatted = CurrencyFormatter.formatCompact(estimatedIncome, currentCurrency)
-    val expensesFormatted = CurrencyFormatter.formatCompact(totalExpense, currentCurrency)
-    val availableFormatted = CurrencyFormatter.formatCompact(availableAmount, currentCurrency)
+    val incomeFormatted = CurrencyFormatter.formatCompact(monthlyIncome, currentCurrency, exchangeRate)
+    val expensesFormatted = CurrencyFormatter.formatCompact(totalExpense, currentCurrency, exchangeRate)
+    val availableFormatted = CurrencyFormatter.formatCompact(availableAmount, currentCurrency, exchangeRate)
     val currencySymbol = CurrencyFormatter.getSymbol(currentCurrency)
 
     if (showAddExpenseSheet) {
@@ -126,13 +123,13 @@ fun DashboardScreen(
                 Text(
                     text = "Sign Out",
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             },
             text = {
                 Text(
                     text = "Are you sure you want to sign out from Clarity Finance?",
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
@@ -148,7 +145,7 @@ fun DashboardScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutDialog = false }) {
-                    Text(text = "Cancel", color = ClarityTextPrimary)
+                    Text(text = "Cancel", color = MaterialTheme.colorScheme.onSurface)
                 }
             },
             containerColor = MaterialTheme.colorScheme.surface,
@@ -181,7 +178,6 @@ fun DashboardScreen(
         ) {
             // =========================================================================
             // 1. STICKY TOP SECTION: Header Greeting & Financial Summary Cards
-            // (Pins on top while rest of dashboard scrolls underneath)
             // =========================================================================
             Column(
                 modifier = Modifier
@@ -200,7 +196,7 @@ fun DashboardScreen(
                             text = "OCTOBER 2026 ▼",
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = ClarityTextMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Medium
                         )
                         Spacer(modifier = Modifier.height(2.dp))
@@ -208,7 +204,7 @@ fun DashboardScreen(
                             text = "Hi, $displayName",
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityTextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
@@ -222,7 +218,7 @@ fun DashboardScreen(
                         modifier = Modifier
                             .size(42.dp)
                             .clip(CircleShape)
-                            .background(ClarityGrayBackground)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
                             .border(BorderStroke(1.5.dp, ClarityGreen), CircleShape)
                             .clickable { onNavigateToSettings() },
                         contentAlignment = Alignment.Center
@@ -240,7 +236,7 @@ fun DashboardScreen(
                             Icon(
                                 imageVector = Icons.Default.Settings,
                                 contentDescription = "Settings",
-                                tint = ClarityTextPrimary,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -249,9 +245,11 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Sticky Summary Cards Row (INCOME, EXPENSES, AVAILABLE)
+                // Sticky Summary Cards Row (Equal Height & Equal Width)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     ColorfulSummaryCard(
@@ -259,9 +257,11 @@ fun DashboardScreen(
                         amount = incomeFormatted,
                         currency = currencySymbol,
                         tag = "▲ Inflow",
-                        accentColor = ClarityGreen,
+                        accentColor = ClarityGreenBright,
                         containerColor = ClarityGreenLight,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
                     )
                     ColorfulSummaryCard(
                         title = "EXPENSES",
@@ -270,7 +270,9 @@ fun DashboardScreen(
                         tag = "▼ Outflow",
                         accentColor = ClarityRed,
                         containerColor = ClarityRedLight,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
                     )
                     ColorfulSummaryCard(
                         title = "AVAILABLE",
@@ -279,7 +281,9 @@ fun DashboardScreen(
                         tag = "★ Net Cash",
                         accentColor = ClarityBlue,
                         containerColor = ClarityBlueLight,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
                     )
                 }
             }
@@ -289,7 +293,7 @@ fun DashboardScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(ClarityBorder)
+                    .background(MaterialTheme.colorScheme.outline)
             )
 
             // =========================================================================
@@ -303,11 +307,14 @@ fun DashboardScreen(
             ) {
                 // Bank SMS Drafts notification banner if pending drafts exist
                 if (draftCount > 0) {
+                    val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
+                    val bannerBg = if (isDark) ClarityAmber.copy(alpha = 0.15f) else ClarityAmberLight
+
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
-                            .background(ClarityAmberLight)
+                            .background(bannerBg)
                             .border(BorderStroke(1.2.dp, ClarityAmber), RoundedCornerShape(10.dp))
                             .clickable { onNavigateToDrafts() }
                             .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -325,12 +332,12 @@ fun DashboardScreen(
                                         text = "$draftCount Bank SMS Transactions Drafted",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = ClarityTextPrimary
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = "Tap to review & approve into expenses",
                                         fontSize = 10.sp,
-                                        color = ClarityTextSecondary
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -347,7 +354,10 @@ fun DashboardScreen(
                 }
 
                 // Primary Savings Goal Card
-                SavingsGoalCard(currentCurrency = currentCurrency)
+                SavingsGoalCard(
+                    currentCurrency = currentCurrency,
+                    exchangeRate = exchangeRate
+                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -359,7 +369,8 @@ fun DashboardScreen(
                 // Live Spending Overview Card (Committed vs Discretionary)
                 SpendingOverviewCard(
                     metrics = historyState.metrics,
-                    currentCurrency = currentCurrency
+                    currentCurrency = currentCurrency,
+                    exchangeRate = exchangeRate
                 )
 
                 Spacer(modifier = Modifier.height(18.dp))
@@ -368,6 +379,7 @@ fun DashboardScreen(
                 RecentTransactionsSection(
                     expenses = historyState.expenses,
                     currentCurrency = currentCurrency,
+                    exchangeRate = exchangeRate,
                     onSeeAllClick = onNavigateToExpensesHistory
                 )
 
@@ -387,14 +399,21 @@ private fun ColorfulSummaryCard(
     containerColor: Color,
     modifier: Modifier = Modifier
 ) {
+    val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
+    val effectiveBg = if (isDark) accentColor.copy(alpha = 0.15f) else containerColor
+
     Box(
         modifier = modifier
-            .background(containerColor, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.2.dp, accentColor.copy(alpha = 0.5f)), RoundedCornerShape(10.dp))
+            .fillMaxHeight()
+            .background(effectiveBg, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.2.dp, accentColor.copy(alpha = if (isDark) 0.6f else 0.5f)), RoundedCornerShape(10.dp))
             .padding(vertical = 12.dp, horizontal = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
             Text(
                 text = title,
                 fontSize = 9.sp,
@@ -407,14 +426,14 @@ private fun ColorfulSummaryCard(
                 text = amount,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
-                color = ClarityTextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "$currency • $tag",
                 fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,
-                color = ClarityTextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -422,15 +441,16 @@ private fun ColorfulSummaryCard(
 
 @Composable
 private fun SavingsGoalCard(
-    currentCurrency: String
+    currentCurrency: String,
+    exchangeRate: Double
 ) {
     val currentSavedInLkr = 11_200.0
     val targetInLkr = 490_000.0
     val monthlyTargetInLkr = 39_900.0
 
-    val currentFormatted = CurrencyFormatter.format(currentSavedInLkr, currentCurrency)
-    val targetFormatted = CurrencyFormatter.format(targetInLkr, currentCurrency)
-    val monthlyFormatted = CurrencyFormatter.format(monthlyTargetInLkr, currentCurrency)
+    val currentFormatted = CurrencyFormatter.format(currentSavedInLkr, currentCurrency, exchangeRate)
+    val targetFormatted = CurrencyFormatter.format(targetInLkr, currentCurrency, exchangeRate)
+    val monthlyFormatted = CurrencyFormatter.format(monthlyTargetInLkr, currentCurrency, exchangeRate)
 
     Box(
         modifier = Modifier
@@ -474,7 +494,7 @@ private fun SavingsGoalCard(
                 text = "MacBook Pro M4",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = ClarityTextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -486,7 +506,7 @@ private fun SavingsGoalCard(
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
                 color = ClarityPurple,
-                trackColor = ClarityBorder
+                trackColor = MaterialTheme.colorScheme.outline
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -499,13 +519,13 @@ private fun SavingsGoalCard(
                     text = currentFormatted,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = "Target: $targetFormatted",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -521,6 +541,9 @@ private fun SavingsGoalCard(
 
 @Composable
 private fun PendingPaymentsCard() {
+    val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
+    val iconBg = if (isDark) ClarityAmber.copy(alpha = 0.2f) else ClarityAmberLight
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -535,7 +558,7 @@ private fun PendingPaymentsCard() {
             Box(
                 modifier = Modifier
                     .size(32.dp)
-                    .background(ClarityAmberLight, RoundedCornerShape(6.dp))
+                    .background(iconBg, RoundedCornerShape(6.dp))
                     .border(BorderStroke(1.dp, ClarityAmber.copy(alpha = 0.6f)), RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
             ) {
@@ -552,13 +575,13 @@ private fun PendingPaymentsCard() {
                     text = "2 Pending Inflow Payments",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "Upwork $180 & DevContract LKR 30k",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -581,20 +604,21 @@ private fun PendingPaymentsCard() {
 @Composable
 private fun SpendingOverviewCard(
     metrics: com.clarity.finance.viewmodel.ExpenseMonthlyMetrics,
-    currentCurrency: String
+    currentCurrency: String,
+    exchangeRate: Double
 ) {
     val total = metrics.totalExpense
     val committedPct = if (total > 0) metrics.committedPercentage else 60
     val discretionaryPct = if (total > 0) metrics.discretionaryPercentage else 40
 
-    val committedFormatted = CurrencyFormatter.format(metrics.committedTotal, currentCurrency)
-    val discretionaryFormatted = CurrencyFormatter.format(metrics.discretionaryTotal, currentCurrency)
+    val committedFormatted = CurrencyFormatter.format(metrics.committedTotal, currentCurrency, exchangeRate)
+    val discretionaryFormatted = CurrencyFormatter.format(metrics.discretionaryTotal, currentCurrency, exchangeRate)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -606,13 +630,13 @@ private fun SpendingOverviewCard(
                     text = "Spending Overview",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "60/40 Target Rule",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -671,7 +695,7 @@ private fun SpendingOverviewCard(
                         text = "Committed: $committedFormatted",
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -682,7 +706,7 @@ private fun SpendingOverviewCard(
                         text = "Discretionary: $discretionaryFormatted",
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -694,6 +718,7 @@ private fun SpendingOverviewCard(
 private fun RecentTransactionsSection(
     expenses: List<Expense>,
     currentCurrency: String,
+    exchangeRate: Double,
     onSeeAllClick: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -707,7 +732,7 @@ private fun RecentTransactionsSection(
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = ClarityTextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = "See all →",
@@ -728,8 +753,8 @@ private fun RecentTransactionsSection(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ClarityGrayBackground, RoundedCornerShape(10.dp))
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
                     .padding(20.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -737,15 +762,17 @@ private fun RecentTransactionsSection(
                     text = "No expenses recorded yet. Tap + to add one.",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {
+            val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
+
             expenses.take(4).forEach { expense ->
-                val amountFormatted = CurrencyFormatter.format(expense.amount, currentCurrency)
+                val amountFormatted = CurrencyFormatter.format(expense.amount, currentCurrency, exchangeRate)
                 val badgeColor = when (expense.type) {
-                    SpendingType.COMMITTED -> ClarityBlueLight
-                    SpendingType.DISCRETIONARY -> ClarityRedLight
+                    SpendingType.COMMITTED -> if (isDark) ClarityBlue.copy(alpha = 0.2f) else ClarityBlueLight
+                    SpendingType.DISCRETIONARY -> if (isDark) ClarityRed.copy(alpha = 0.2f) else ClarityRedLight
                 }
                 val badgeTextColor = when (expense.type) {
                     SpendingType.COMMITTED -> ClarityBlue
@@ -757,7 +784,7 @@ private fun RecentTransactionsSection(
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
                         .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-                        .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(10.dp))
+                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
                         .padding(12.dp)
                 ) {
                     Row(
@@ -784,14 +811,14 @@ private fun RecentTransactionsSection(
                                 text = expense.categoryName,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = ClarityTextPrimary
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = expense.date,
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
-                                    color = ClarityTextMuted
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Box(
