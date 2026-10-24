@@ -104,8 +104,11 @@ fun ClarityNavHost(
 
         composable(Screen.Insights.route) {
             com.clarity.finance.ui.screens.InsightsScreen(
-                onNavigateBack = {
-                    navController.popBackStack()
+                onNavigateToDashboard = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.Dashboard.route) { inclusive = true }
+                        launchSingleTop = true
+                    }
                 }
             )
         }

@@ -56,6 +56,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.clarity.finance.model.Expense
 import com.clarity.finance.model.SpendingType
 import com.clarity.finance.ui.components.AddExpenseSheet
+import com.clarity.finance.ui.components.ClarityBottomBar
+import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.viewmodel.ExpenseViewModel
 import java.text.NumberFormat
 import java.util.Locale
@@ -124,9 +126,17 @@ fun DashboardScreen(
         modifier = modifier.fillMaxSize(),
         containerColor = ClarityWhite,
         bottomBar = {
-            DashboardBottomBar(
-                onAddClick = { showAddExpenseSheet = true },
-                onInsightsClick = onNavigateToInsights
+            ClarityBottomBar(
+                currentTab = ClarityNavTab.HOME,
+                onTabSelected = { tab ->
+                    when (tab) {
+                        ClarityNavTab.HOME -> { /* Already on Home */ }
+                        ClarityNavTab.INSIGHTS -> onNavigateToInsights()
+                        ClarityNavTab.INCOME -> { /* Future slice */ }
+                        ClarityNavTab.GOAL -> { /* Future slice */ }
+                    }
+                },
+                onAddClick = { showAddExpenseSheet = true }
             )
         }
     ) { innerPadding ->
@@ -658,77 +668,3 @@ private fun TransactionItem(
     }
 }
 
-@Composable
-private fun DashboardBottomBar(
-    onAddClick: () -> Unit = {},
-    onInsightsClick: () -> Unit = {}
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ClarityWhite)
-            .border(BorderStroke(1.dp, ClarityBorder))
-            .padding(vertical = 10.dp, horizontal = 24.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BottomNavItem(label = "HOME", isSelected = true)
-            BottomNavItem(label = "INCOME", isSelected = false)
-
-            // Centre Floating Action Button "+"
-            FloatingActionButton(
-                onClick = onAddClick,
-                modifier = Modifier.size(42.dp),
-                shape = CircleShape,
-                containerColor = ClarityBlack,
-                contentColor = ClarityWhite,
-                elevation = FloatingActionButtonDefaults.elevation(0.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Add",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            BottomNavItem(
-                label = "INSIGHTS",
-                isSelected = false,
-                onClick = onInsightsClick
-            )
-            BottomNavItem(label = "GOAL", isSelected = false)
-        }
-    }
-}
-
-@Composable
-private fun BottomNavItem(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit = {}
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }
-    ) {
-        Box(
-            modifier = Modifier
-                .size(16.dp)
-                .border(
-                    BorderStroke(1.5.dp, if (isSelected) ClarityBlack else ClarityBorder),
-                    RoundedCornerShape(3.dp)
-                )
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = if (isSelected) ClarityTextPrimary else ClarityTextMuted
-        )
-    }
-}

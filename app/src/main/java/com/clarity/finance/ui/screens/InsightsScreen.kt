@@ -31,7 +31,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,6 +51,9 @@ import com.clarity.finance.model.PaymentMethod
 import com.clarity.finance.model.SpendingLeakAlert
 import com.clarity.finance.model.SpendingType
 import com.clarity.finance.model.VelocityMetrics
+import com.clarity.finance.ui.components.AddExpenseSheet
+import com.clarity.finance.ui.components.ClarityBottomBar
+import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.ui.theme.ClarityBlack
 import com.clarity.finance.ui.theme.ClarityBorder
 import com.clarity.finance.ui.theme.ClarityBorderDark
@@ -58,56 +63,61 @@ import com.clarity.finance.ui.theme.ClarityTextMuted
 import com.clarity.finance.ui.theme.ClarityTextPrimary
 import com.clarity.finance.ui.theme.ClarityTextSecondary
 import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.viewmodel.ExpenseViewModel
 import com.clarity.finance.viewmodel.InsightsViewModel
 import java.text.NumberFormat
 import java.util.Locale
 
 @Composable
 fun InsightsScreen(
-    onNavigateBack: () -> Unit,
+    onNavigateToDashboard: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: InsightsViewModel = hiltViewModel()
+    viewModel: InsightsViewModel = hiltViewModel(),
+    expenseViewModel: ExpenseViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val numberFormat = remember { NumberFormat.getNumberInstance(Locale.US) }
+    var showAddExpenseSheet by remember { mutableStateOf(false) }
+
+    if (showAddExpenseSheet) {
+        AddExpenseSheet(
+            viewModel = expenseViewModel,
+            onDismiss = { showAddExpenseSheet = false }
+        )
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = ClarityWhite,
         topBar = {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(ClarityWhite)
-                    .border(BorderStroke(1.dp, ClarityBorder))
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = ClarityTextPrimary
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = "INSIGHTS & ANALYTICS",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        color = ClarityTextPrimary
-                    )
-                }
+                Text(
+                    text = "INSIGHTS & ANALYTICS",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    color = ClarityTextPrimary
+                )
             }
+        },
+        bottomBar = {
+            ClarityBottomBar(
+                currentTab = ClarityNavTab.INSIGHTS,
+                onTabSelected = { tab ->
+                    when (tab) {
+                        ClarityNavTab.HOME -> onNavigateToDashboard()
+                        ClarityNavTab.INSIGHTS -> { /* Already on insights */ }
+                        ClarityNavTab.INCOME -> { /* Future slice */ }
+                        ClarityNavTab.GOAL -> { /* Future slice */ }
+                    }
+                },
+                onAddClick = { showAddExpenseSheet = true }
+            )
         }
     ) { innerPadding ->
         Column(
