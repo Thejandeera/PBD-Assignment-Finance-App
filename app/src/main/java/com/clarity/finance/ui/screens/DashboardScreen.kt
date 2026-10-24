@@ -1,6 +1,7 @@
 package com.clarity.finance.ui.screens
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,12 +21,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,34 +38,42 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.clarity.finance.ui.components.DashedInfoBox
-import com.clarity.finance.ui.theme.ClarityBlack
-import com.clarity.finance.ui.theme.ClarityBorder
-import com.clarity.finance.ui.theme.ClarityGrayBackground
-import com.clarity.finance.ui.theme.ClarityTextMuted
-import com.clarity.finance.ui.theme.ClarityTextPrimary
-import com.clarity.finance.ui.theme.ClarityTextSecondary
-import com.clarity.finance.ui.theme.ClarityWhite
-import com.clarity.finance.viewmodel.AuthViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.Expense
 import com.clarity.finance.model.SpendingType
 import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.ClarityBottomBar
 import com.clarity.finance.ui.components.ClarityNavTab
-import com.clarity.finance.viewmodel.ExpenseViewModel
-import java.text.NumberFormat
-import java.util.Locale
-
-import androidx.compose.foundation.Image
-import androidx.compose.material.icons.filled.Settings
+import com.clarity.finance.ui.components.DashedInfoBox
+import com.clarity.finance.ui.theme.ClarityAmber
+import com.clarity.finance.ui.theme.ClarityAmberLight
+import com.clarity.finance.ui.theme.ClarityBlack
+import com.clarity.finance.ui.theme.ClarityBlue
+import com.clarity.finance.ui.theme.ClarityBlueLight
+import com.clarity.finance.ui.theme.ClarityBorder
+import com.clarity.finance.ui.theme.ClarityGrayBackground
+import com.clarity.finance.ui.theme.ClarityGreen
+import com.clarity.finance.ui.theme.ClarityGreenBright
+import com.clarity.finance.ui.theme.ClarityGreenLight
+import com.clarity.finance.ui.theme.ClarityPurple
+import com.clarity.finance.ui.theme.ClarityPurpleLight
+import com.clarity.finance.ui.theme.ClarityRed
+import com.clarity.finance.ui.theme.ClarityRedLight
+import com.clarity.finance.ui.theme.ClarityTextMuted
+import com.clarity.finance.ui.theme.ClarityTextPrimary
+import com.clarity.finance.ui.theme.ClarityTextSecondary
+import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.util.ProfileImageManager
+import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.DraftViewModel
+import com.clarity.finance.viewmodel.ExpenseViewModel
 
 @Composable
 fun DashboardScreen(
@@ -82,10 +90,22 @@ fun DashboardScreen(
     val currentUser by authViewModel.currentUserFlow.collectAsStateWithLifecycle()
     val historyState by expenseViewModel.historyState.collectAsStateWithLifecycle()
     val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
+    val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
+
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showAddExpenseSheet by remember { mutableStateOf(false) }
 
-    val displayName = currentUser?.displayName?.ifBlank { "Kavindu" } ?: "Kavindu"
+    val displayName = currentUser?.displayName?.ifBlank { "User" } ?: "User"
+
+    // Real financial data calculations
+    val estimatedIncome = 185_000.0 // Base monthly income in LKR
+    val totalExpense = historyState.metrics.totalExpense
+    val availableAmount = (estimatedIncome - totalExpense).coerceAtLeast(0.0)
+
+    val incomeFormatted = CurrencyFormatter.formatCompact(estimatedIncome, currentCurrency)
+    val expensesFormatted = CurrencyFormatter.formatCompact(totalExpense, currentCurrency)
+    val availableFormatted = CurrencyFormatter.formatCompact(availableAmount, currentCurrency)
+    val currencySymbol = CurrencyFormatter.getSymbol(currentCurrency)
 
     if (showAddExpenseSheet) {
         AddExpenseSheet(
@@ -123,7 +143,7 @@ fun DashboardScreen(
                         onSignOutSuccess()
                     }
                 ) {
-                    Text(text = "Sign Out", color = Color.Red, fontWeight = FontWeight.Bold)
+                    Text(text = "Sign Out", color = ClarityRed, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -131,14 +151,14 @@ fun DashboardScreen(
                     Text(text = "Cancel", color = ClarityTextPrimary)
                 }
             },
-            containerColor = ClarityWhite,
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(12.dp)
         )
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = ClarityWhite,
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             ClarityBottomBar(
                 currentTab = ClarityNavTab.HOME,
@@ -158,198 +178,231 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
-            // Header: Month & User & Settings Icon
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // =========================================================================
+            // 1. STICKY TOP SECTION: Header Greeting & Financial Summary Cards
+            // (Pins on top while rest of dashboard scrolls underneath)
+            // =========================================================================
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-                Column {
-                    Text(
-                        text = "OCTOBER 2026 ▼",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = ClarityTextMuted,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "Hi, $displayName",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = ClarityTextPrimary
-                    )
-                }
-
-                // Settings & Profile Avatar button
-                val photoPath = authViewModel.profilePhotoPath
-                val avatarBitmap = remember(photoPath) {
-                    ProfileImageManager.loadBitmap(photoPath)
-                }
-
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(ClarityGrayBackground)
-                        .border(BorderStroke(1.2.dp, ClarityBorder), CircleShape)
-                        .clickable { onNavigateToSettings() },
-                    contentAlignment = Alignment.Center
+                // Header: Month & User Greeting & Settings Icon
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (avatarBitmap != null) {
-                        Image(
-                            bitmap = avatarBitmap,
-                            contentDescription = "Settings & Profile",
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = ClarityTextPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Bank SMS Drafts notification banner if pending drafts exist
-            if (draftCount > 0) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(ClarityGrayBackground)
-                        .border(BorderStroke(1.dp, ClarityBlack), RoundedCornerShape(8.dp))
-                        .clickable { onNavigateToDrafts() }
-                        .padding(horizontal = 14.dp, vertical = 10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "⚡", fontSize = 14.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = "$draftCount Bank SMS Transactions Drafted",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = ClarityTextPrimary
-                                )
-                                Text(
-                                    text = "Tap to review & approve into expenses",
-                                    fontSize = 10.sp,
-                                    color = ClarityTextMuted
-                                )
-                            }
-                        }
+                    Column {
                         Text(
-                            text = "REVIEW →",
+                            text = "OCTOBER 2026 ▼",
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
+                            color = ClarityTextMuted,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Hi, $displayName",
+                            fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
-                            color = ClarityBlack
+                            color = ClarityTextPrimary
                         )
                     }
+
+                    // Settings & Profile Avatar button
+                    val photoPath = authViewModel.profilePhotoPath
+                    val avatarBitmap = remember(photoPath) {
+                        ProfileImageManager.loadBitmap(photoPath)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(ClarityGrayBackground)
+                            .border(BorderStroke(1.5.dp, ClarityGreen), CircleShape)
+                            .clickable { onNavigateToSettings() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (avatarBitmap != null) {
+                            Image(
+                                bitmap = avatarBitmap,
+                                contentDescription = "Settings & Profile",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = ClarityTextPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
+
                 Spacer(modifier = Modifier.height(14.dp))
+
+                // Sticky Summary Cards Row (INCOME, EXPENSES, AVAILABLE)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    ColorfulSummaryCard(
+                        title = "INCOME",
+                        amount = incomeFormatted,
+                        currency = currencySymbol,
+                        tag = "▲ Inflow",
+                        accentColor = ClarityGreen,
+                        containerColor = ClarityGreenLight,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ColorfulSummaryCard(
+                        title = "EXPENSES",
+                        amount = expensesFormatted,
+                        currency = currencySymbol,
+                        tag = "▼ Outflow",
+                        accentColor = ClarityRed,
+                        containerColor = ClarityRedLight,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ColorfulSummaryCard(
+                        title = "AVAILABLE",
+                        amount = availableFormatted,
+                        currency = currencySymbol,
+                        tag = "★ Net Cash",
+                        accentColor = ClarityBlue,
+                        containerColor = ClarityBlueLight,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
 
-            // Summary Cards Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                SummaryCard(
-                    title = "INCOME",
-                    amount = "185k",
-                    currency = "LKR",
-                    modifier = Modifier.weight(1f)
-                )
-                SummaryCard(
-                    title = "EXPENSES",
-                    amount = "121.5k",
-                    currency = "LKR",
-                    modifier = Modifier.weight(1f)
-                )
-                SummaryCard(
-                    title = "AVAILABLE",
-                    amount = "63.5k",
-                    currency = "LKR",
-                    isHighlighted = true,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Primary Savings Goal
-            SavingsGoalCard()
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Pending Payments
-            PendingPaymentsCard()
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Spending Overview
-            SpendingOverviewCard()
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Recent Transactions
-            RecentTransactionsSection(
-                expenses = historyState.expenses,
-                onSeeAllClick = onNavigateToExpensesHistory
+            // Divider separating sticky summary header from scrollable body
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(ClarityBorder)
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            // =========================================================================
+            // 2. SCROLLABLE BODY CONTENT
+            // =========================================================================
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 14.dp)
+            ) {
+                // Bank SMS Drafts notification banner if pending drafts exist
+                if (draftCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(ClarityAmberLight)
+                            .border(BorderStroke(1.2.dp, ClarityAmber), RoundedCornerShape(10.dp))
+                            .clickable { onNavigateToDrafts() }
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "⚡", fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "$draftCount Bank SMS Transactions Drafted",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ClarityTextPrimary
+                                    )
+                                    Text(
+                                        text = "Tap to review & approve into expenses",
+                                        fontSize = 10.sp,
+                                        color = ClarityTextSecondary
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "REVIEW →",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                color = ClarityAmber
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
+
+                // Primary Savings Goal Card
+                SavingsGoalCard(currentCurrency = currentCurrency)
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Pending Payments Card
+                PendingPaymentsCard()
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Live Spending Overview Card (Committed vs Discretionary)
+                SpendingOverviewCard(
+                    metrics = historyState.metrics,
+                    currentCurrency = currentCurrency
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Recent Transactions
+                RecentTransactionsSection(
+                    expenses = historyState.expenses,
+                    currentCurrency = currentCurrency,
+                    onSeeAllClick = onNavigateToExpensesHistory
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+            }
         }
     }
 }
 
 @Composable
-private fun SummaryCard(
+private fun ColorfulSummaryCard(
     title: String,
     amount: String,
     currency: String,
-    modifier: Modifier = Modifier,
-    isHighlighted: Boolean = false
+    tag: String,
+    accentColor: Color,
+    containerColor: Color,
+    modifier: Modifier = Modifier
 ) {
-    val borderStroke = if (isHighlighted) {
-        BorderStroke(2.dp, ClarityBlack)
-    } else {
-        BorderStroke(1.dp, ClarityBorder)
-    }
-
     Box(
         modifier = modifier
-            .background(ClarityWhite, RoundedCornerShape(8.dp))
-            .border(borderStroke, RoundedCornerShape(8.dp))
-            .padding(vertical = 14.dp, horizontal = 8.dp),
+            .background(containerColor, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.2.dp, accentColor.copy(alpha = 0.5f)), RoundedCornerShape(10.dp))
+            .padding(vertical = 12.dp, horizontal = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = title,
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,
-                color = ClarityTextMuted,
-                fontWeight = FontWeight.Medium
+                color = accentColor,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = amount,
                 fontSize = 17.sp,
@@ -358,8 +411,8 @@ private fun SummaryCard(
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = currency,
-                fontSize = 10.sp,
+                text = "$currency • $tag",
+                fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,
                 color = ClarityTextSecondary
             )
@@ -368,12 +421,22 @@ private fun SummaryCard(
 }
 
 @Composable
-private fun SavingsGoalCard() {
+private fun SavingsGoalCard(
+    currentCurrency: String
+) {
+    val currentSavedInLkr = 11_200.0
+    val targetInLkr = 490_000.0
+    val monthlyTargetInLkr = 39_900.0
+
+    val currentFormatted = CurrencyFormatter.format(currentSavedInLkr, currentCurrency)
+    val targetFormatted = CurrencyFormatter.format(targetInLkr, currentCurrency)
+    val monthlyFormatted = CurrencyFormatter.format(monthlyTargetInLkr, currentCurrency)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ClarityWhite, RoundedCornerShape(8.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.2.dp, ClarityPurple.copy(alpha = 0.4f)), RoundedCornerShape(10.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -386,11 +449,13 @@ private fun SavingsGoalCard() {
                     text = "PRIMARY SAVINGS GOAL",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = ClarityTextMuted
+                    fontWeight = FontWeight.Bold,
+                    color = ClarityPurple
                 )
                 Box(
                     modifier = Modifier
-                        .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(4.dp))
+                        .background(ClarityPurpleLight, RoundedCornerShape(4.dp))
+                        .border(BorderStroke(1.dp, ClarityPurple.copy(alpha = 0.5f)), RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
@@ -398,7 +463,7 @@ private fun SavingsGoalCard() {
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityTextPrimary
+                        color = ClarityPurple
                     )
                 }
             }
@@ -418,9 +483,9 @@ private fun SavingsGoalCard() {
                 progress = { 0.023f },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp)),
-                color = ClarityBlack,
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = ClarityPurple,
                 trackColor = ClarityBorder
             )
 
@@ -431,13 +496,13 @@ private fun SavingsGoalCard() {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "LKR 11,200",
+                    text = currentFormatted,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     color = ClarityTextSecondary
                 )
                 Text(
-                    text = "Target: LKR 490,000",
+                    text = "Target: $targetFormatted",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     color = ClarityTextSecondary
@@ -447,8 +512,8 @@ private fun SavingsGoalCard() {
             Spacer(modifier = Modifier.height(12.dp))
 
             DashedInfoBox(
-                text = "Save LKR 39,900/mo to finish in Oct 2027   View Goal →",
-                prefix = ""
+                text = "Save $monthlyFormatted/mo to finish in Oct 2027   View Goal →",
+                prefix = "🎯"
             )
         }
     }
@@ -459,8 +524,8 @@ private fun PendingPaymentsCard() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ClarityWhite, RoundedCornerShape(8.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.2.dp, ClarityAmber.copy(alpha = 0.4f)), RoundedCornerShape(10.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -469,15 +534,14 @@ private fun PendingPaymentsCard() {
         ) {
             Box(
                 modifier = Modifier
-                    .size(28.dp)
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(4.dp)),
+                    .size(32.dp)
+                    .background(ClarityAmberLight, RoundedCornerShape(6.dp))
+                    .border(BorderStroke(1.dp, ClarityAmber.copy(alpha = 0.6f)), RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "!",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ClarityTextPrimary
+                    text = "⚠️",
+                    fontSize = 14.sp
                 )
             }
 
@@ -485,7 +549,7 @@ private fun PendingPaymentsCard() {
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "2 Pending Payments",
+                    text = "2 Pending Inflow Payments",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = ClarityTextPrimary
@@ -500,7 +564,7 @@ private fun PendingPaymentsCard() {
 
             Box(
                 modifier = Modifier
-                    .background(ClarityBlack, RoundedCornerShape(4.dp))
+                    .background(ClarityAmber, RoundedCornerShape(6.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
                 Text(
@@ -515,12 +579,22 @@ private fun PendingPaymentsCard() {
 }
 
 @Composable
-private fun SpendingOverviewCard() {
+private fun SpendingOverviewCard(
+    metrics: com.clarity.finance.viewmodel.ExpenseMonthlyMetrics,
+    currentCurrency: String
+) {
+    val total = metrics.totalExpense
+    val committedPct = if (total > 0) metrics.committedPercentage else 60
+    val discretionaryPct = if (total > 0) metrics.discretionaryPercentage else 40
+
+    val committedFormatted = CurrencyFormatter.format(metrics.committedTotal, currentCurrency)
+    val discretionaryFormatted = CurrencyFormatter.format(metrics.discretionaryTotal, currentCurrency)
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ClarityWhite, RoundedCornerShape(8.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(10.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -544,59 +618,73 @@ private fun SpendingOverviewCard() {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Committed vs Discretionary Bar
+            // Committed vs Discretionary Multi-Color Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(18.dp)
-                    .clip(RoundedCornerShape(4.dp))
+                    .height(20.dp)
+                    .clip(RoundedCornerShape(6.dp))
             ) {
+                val committedWeight = (committedPct.coerceAtLeast(5)).toFloat()
+                val discretionaryWeight = (discretionaryPct.coerceAtLeast(5)).toFloat()
+
                 Box(
                     modifier = Modifier
-                        .weight(0.62f)
-                        .background(ClarityBlack),
+                        .weight(committedWeight)
+                        .background(ClarityBlue),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "62% Committed",
+                        text = "$committedPct% Committed",
                         fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityWhite
+                        color = ClarityWhite,
+                        fontWeight = FontWeight.Bold
                     )
                 }
                 Box(
                     modifier = Modifier
-                        .weight(0.38f)
-                        .background(ClarityBorder),
+                        .weight(discretionaryWeight)
+                        .background(ClarityRed),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "38% Disc.",
+                        text = "$discretionaryPct% Disc.",
                         fontSize = 9.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = ClarityTextPrimary
+                        color = ClarityWhite,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Committed: LKR 75,330",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
-                )
-                Text(
-                    text = "Discretionary: LKR 46,170",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(ClarityBlue, CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Committed: $committedFormatted",
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = ClarityTextSecondary
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(ClarityRed, CircleShape))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Discretionary: $discretionaryFormatted",
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = ClarityTextSecondary
+                    )
+                }
             }
         }
     }
@@ -605,10 +693,9 @@ private fun SpendingOverviewCard() {
 @Composable
 private fun RecentTransactionsSection(
     expenses: List<Expense>,
+    currentCurrency: String,
     onSeeAllClick: () -> Unit
 ) {
-    val numberFormat = remember { NumberFormat.getNumberInstance(Locale.US) }
-
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -623,10 +710,11 @@ private fun RecentTransactionsSection(
                 color = ClarityTextPrimary
             )
             Text(
-                text = "See all",
+                text = "See all →",
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
-                color = ClarityTextSecondary,
+                fontWeight = FontWeight.Bold,
+                color = ClarityGreen,
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
                     .clickable { onSeeAllClick() }
@@ -640,9 +728,9 @@ private fun RecentTransactionsSection(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(ClarityGrayBackground, RoundedCornerShape(8.dp))
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
-                    .padding(16.dp),
+                    .background(ClarityGrayBackground, RoundedCornerShape(10.dp))
+                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(10.dp))
+                    .padding(20.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -654,75 +742,84 @@ private fun RecentTransactionsSection(
             }
         } else {
             expenses.take(4).forEach { expense ->
-                TransactionItem(
-                    iconTag = expense.categoryIcon.ifBlank { "🏷️" },
-                    title = expense.categoryName,
-                    subtitle = "${expense.date} • ${if (expense.type == SpendingType.COMMITTED) "Committed" else "Discretionary"}",
-                    amount = "-${numberFormat.format(expense.amount)} LKR"
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                val amountFormatted = CurrencyFormatter.format(expense.amount, currentCurrency)
+                val badgeColor = when (expense.type) {
+                    SpendingType.COMMITTED -> ClarityBlueLight
+                    SpendingType.DISCRETIONARY -> ClarityRedLight
+                }
+                val badgeTextColor = when (expense.type) {
+                    SpendingType.COMMITTED -> ClarityBlue
+                    SpendingType.DISCRETIONARY -> ClarityRed
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+                        .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(10.dp))
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(badgeColor, RoundedCornerShape(8.dp))
+                                .border(BorderStroke(1.dp, badgeTextColor.copy(alpha = 0.3f)), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = expense.categoryIcon.ifBlank { "🏷️" },
+                                fontSize = 16.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = expense.categoryName,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = ClarityTextPrimary
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = expense.date,
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = ClarityTextMuted
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .background(badgeColor, RoundedCornerShape(3.dp))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = if (expense.type == SpendingType.COMMITTED) "COMMITTED" else "DISC.",
+                                        fontSize = 8.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        color = badgeTextColor
+                                    )
+                                }
+                            }
+                        }
+
+                        Text(
+                            text = "-$amountFormatted",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = ClarityRed
+                        )
+                    }
+                }
             }
         }
     }
 }
-
-@Composable
-private fun TransactionItem(
-    iconTag: String,
-    title: String,
-    subtitle: String,
-    amount: String
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(ClarityWhite, RoundedCornerShape(8.dp))
-            .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(8.dp))
-            .padding(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .border(BorderStroke(1.dp, ClarityBorder), RoundedCornerShape(4.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = iconTag,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = ClarityTextPrimary
-                )
-                Text(
-                    text = subtitle,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = ClarityTextSecondary
-                )
-            }
-
-            Text(
-                text = amount,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                color = ClarityTextPrimary
-            )
-        }
-    }
-}
-
