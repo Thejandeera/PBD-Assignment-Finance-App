@@ -65,6 +65,7 @@ import com.clarity.finance.ui.theme.ClarityPurpleLight
 import com.clarity.finance.ui.theme.ClarityRed
 import com.clarity.finance.ui.theme.ClarityRedLight
 import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.theme.LocalIsDarkTheme
 import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.util.ProfileImageManager
 import com.clarity.finance.viewmodel.AuthViewModel
@@ -83,6 +84,7 @@ fun DashboardScreen(
     onNavigateToSettings: () -> Unit = {},
     onNavigateToDrafts: () -> Unit = {}
 ) {
+    val isDark = LocalIsDarkTheme.current
     val currentUser by authViewModel.currentUserFlow.collectAsStateWithLifecycle()
     val historyState by expenseViewModel.historyState.collectAsStateWithLifecycle()
     val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
@@ -123,13 +125,13 @@ fun DashboardScreen(
                 Text(
                     text = "Sign Out",
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
                 )
             },
             text = {
                 Text(
                     text = "Are you sure you want to sign out from Clarity Finance?",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
@@ -145,17 +147,17 @@ fun DashboardScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showSignOutDialog = false }) {
-                    Text(text = "Cancel", color = MaterialTheme.colorScheme.onSurface)
+                    Text(text = "Cancel", color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface)
                 }
             },
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(12.dp)
         )
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.background,
         bottomBar = {
             ClarityBottomBar(
                 currentTab = ClarityNavTab.HOME,
@@ -182,7 +184,7 @@ fun DashboardScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
+                    .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
                 // Header: Month & User Greeting & Settings Icon
@@ -196,7 +198,7 @@ fun DashboardScreen(
                             text = "OCTOBER 2026 ▼",
                             fontSize = 11.sp,
                             fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Medium
                         )
                         Spacer(modifier = Modifier.height(2.dp))
@@ -204,7 +206,7 @@ fun DashboardScreen(
                             text = "Hi, $displayName",
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
                         )
                     }
 
@@ -218,7 +220,7 @@ fun DashboardScreen(
                         modifier = Modifier
                             .size(42.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surfaceVariant)
                             .border(BorderStroke(1.5.dp, ClarityGreen), CircleShape)
                             .clickable { onNavigateToSettings() },
                         contentAlignment = Alignment.Center
@@ -236,7 +238,7 @@ fun DashboardScreen(
                             Icon(
                                 imageVector = Icons.Default.Settings,
                                 contentDescription = "Settings",
-                                tint = MaterialTheme.colorScheme.onSurface,
+                                tint = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -293,7 +295,7 @@ fun DashboardScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outline)
+                    .background(if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline)
             )
 
             // =========================================================================
@@ -307,15 +309,15 @@ fun DashboardScreen(
             ) {
                 // Bank SMS Drafts notification banner if pending drafts exist
                 if (draftCount > 0) {
-                    val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
-                    val bannerBg = if (isDark) ClarityAmber.copy(alpha = 0.15f) else ClarityAmberLight
+                    val bannerBg = if (isDark) Color(0xFF000000) else ClarityAmberLight
+                    val bannerBorder = if (isDark) BorderStroke(1.5.dp, ClarityAmber) else BorderStroke(1.2.dp, ClarityAmber)
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(10.dp))
                             .background(bannerBg)
-                            .border(BorderStroke(1.2.dp, ClarityAmber), RoundedCornerShape(10.dp))
+                            .border(bannerBorder, RoundedCornerShape(10.dp))
                             .clickable { onNavigateToDrafts() }
                             .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
@@ -332,12 +334,12 @@ fun DashboardScreen(
                                         text = "$draftCount Bank SMS Transactions Drafted",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = "Tap to review & approve into expenses",
                                         fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -399,14 +401,15 @@ private fun ColorfulSummaryCard(
     containerColor: Color,
     modifier: Modifier = Modifier
 ) {
-    val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
-    val effectiveBg = if (isDark) accentColor.copy(alpha = 0.15f) else containerColor
+    val isDark = LocalIsDarkTheme.current
+    val effectiveBg = if (isDark) Color(0xFF000000) else containerColor
+    val cardBorder = if (isDark) BorderStroke(1.5.dp, accentColor) else BorderStroke(1.2.dp, accentColor.copy(alpha = 0.5f))
 
     Box(
         modifier = modifier
             .fillMaxHeight()
             .background(effectiveBg, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.2.dp, accentColor.copy(alpha = if (isDark) 0.6f else 0.5f)), RoundedCornerShape(10.dp))
+            .border(cardBorder, RoundedCornerShape(10.dp))
             .padding(vertical = 12.dp, horizontal = 8.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -426,14 +429,14 @@ private fun ColorfulSummaryCard(
                 text = amount,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "$currency • $tag",
                 fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -444,6 +447,7 @@ private fun SavingsGoalCard(
     currentCurrency: String,
     exchangeRate: Double
 ) {
+    val isDark = LocalIsDarkTheme.current
     val currentSavedInLkr = 11_200.0
     val targetInLkr = 490_000.0
     val monthlyTargetInLkr = 39_900.0
@@ -455,8 +459,8 @@ private fun SavingsGoalCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.2.dp, ClarityPurple.copy(alpha = 0.4f)), RoundedCornerShape(10.dp))
+            .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.2.dp, if (isDark) ClarityPurple else ClarityPurple.copy(alpha = 0.4f)), RoundedCornerShape(10.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -474,8 +478,8 @@ private fun SavingsGoalCard(
                 )
                 Box(
                     modifier = Modifier
-                        .background(ClarityPurpleLight, RoundedCornerShape(4.dp))
-                        .border(BorderStroke(1.dp, ClarityPurple.copy(alpha = 0.5f)), RoundedCornerShape(4.dp))
+                        .background(if (isDark) Color(0xFF000000) else ClarityPurpleLight, RoundedCornerShape(4.dp))
+                        .border(BorderStroke(1.dp, ClarityPurple), RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
@@ -483,7 +487,7 @@ private fun SavingsGoalCard(
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        color = ClarityPurple
+                        color = if (isDark) Color(0xFFFFFFFF) else ClarityPurple
                     )
                 }
             }
@@ -494,7 +498,7 @@ private fun SavingsGoalCard(
                 text = "MacBook Pro M4",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -506,7 +510,7 @@ private fun SavingsGoalCard(
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
                 color = ClarityPurple,
-                trackColor = MaterialTheme.colorScheme.outline
+                trackColor = if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -519,13 +523,13 @@ private fun SavingsGoalCard(
                     text = currentFormatted,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = "Target: $targetFormatted",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -541,14 +545,15 @@ private fun SavingsGoalCard(
 
 @Composable
 private fun PendingPaymentsCard() {
-    val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
-    val iconBg = if (isDark) ClarityAmber.copy(alpha = 0.2f) else ClarityAmberLight
+    val isDark = LocalIsDarkTheme.current
+    val cardBg = if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface
+    val iconBg = if (isDark) Color(0xFF000000) else ClarityAmberLight
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.2.dp, ClarityAmber.copy(alpha = 0.4f)), RoundedCornerShape(10.dp))
+            .background(cardBg, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.2.dp, if (isDark) ClarityAmber else ClarityAmber.copy(alpha = 0.4f)), RoundedCornerShape(10.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -559,7 +564,7 @@ private fun PendingPaymentsCard() {
                 modifier = Modifier
                     .size(32.dp)
                     .background(iconBg, RoundedCornerShape(6.dp))
-                    .border(BorderStroke(1.dp, ClarityAmber.copy(alpha = 0.6f)), RoundedCornerShape(6.dp)),
+                    .border(BorderStroke(1.dp, ClarityAmber), RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -575,13 +580,13 @@ private fun PendingPaymentsCard() {
                     text = "2 Pending Inflow Payments",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "Upwork $180 & DevContract LKR 30k",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -607,6 +612,7 @@ private fun SpendingOverviewCard(
     currentCurrency: String,
     exchangeRate: Double
 ) {
+    val isDark = LocalIsDarkTheme.current
     val total = metrics.totalExpense
     val committedPct = if (total > 0) metrics.committedPercentage else 60
     val discretionaryPct = if (total > 0) metrics.discretionaryPercentage else 40
@@ -617,8 +623,8 @@ private fun SpendingOverviewCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
+            .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.dp, if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
             .padding(16.dp)
     ) {
         Column {
@@ -630,13 +636,13 @@ private fun SpendingOverviewCard(
                     text = "Spending Overview",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "60/40 Target Rule",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -695,7 +701,7 @@ private fun SpendingOverviewCard(
                         text = "Committed: $committedFormatted",
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -706,7 +712,7 @@ private fun SpendingOverviewCard(
                         text = "Discretionary: $discretionaryFormatted",
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -721,6 +727,7 @@ private fun RecentTransactionsSection(
     exchangeRate: Double,
     onSeeAllClick: () -> Unit
 ) {
+    val isDark = LocalIsDarkTheme.current
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -732,14 +739,14 @@ private fun RecentTransactionsSection(
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = "See all →",
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                color = ClarityGreen,
+                color = ClarityGreenBright,
                 modifier = Modifier
                     .clip(RoundedCornerShape(4.dp))
                     .clickable { onSeeAllClick() }
@@ -753,8 +760,8 @@ private fun RecentTransactionsSection(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
+                    .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
+                    .border(BorderStroke(1.dp, if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
                     .padding(20.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -762,29 +769,23 @@ private fun RecentTransactionsSection(
                     text = "No expenses recorded yet. Tap + to add one.",
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {
-            val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
-
             expenses.take(4).forEach { expense ->
                 val amountFormatted = CurrencyFormatter.format(expense.amount, currentCurrency, exchangeRate)
-                val badgeColor = when (expense.type) {
-                    SpendingType.COMMITTED -> if (isDark) ClarityBlue.copy(alpha = 0.2f) else ClarityBlueLight
-                    SpendingType.DISCRETIONARY -> if (isDark) ClarityRed.copy(alpha = 0.2f) else ClarityRedLight
-                }
-                val badgeTextColor = when (expense.type) {
-                    SpendingType.COMMITTED -> ClarityBlue
-                    SpendingType.DISCRETIONARY -> ClarityRed
-                }
+                val isCommitted = expense.type == SpendingType.COMMITTED
+                val badgeBorderColor = if (isCommitted) ClarityBlue else ClarityRed
+                val badgeColor = if (isDark) Color(0xFF000000) else if (isCommitted) ClarityBlueLight else ClarityRedLight
+                val badgeTextColor = if (isDark) Color(0xFFFFFFFF) else if (isCommitted) ClarityBlue else ClarityRed
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
-                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
+                        .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+                        .border(BorderStroke(1.dp, if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
                         .padding(12.dp)
                 ) {
                     Row(
@@ -795,7 +796,7 @@ private fun RecentTransactionsSection(
                             modifier = Modifier
                                 .size(36.dp)
                                 .background(badgeColor, RoundedCornerShape(8.dp))
-                                .border(BorderStroke(1.dp, badgeTextColor.copy(alpha = 0.3f)), RoundedCornerShape(8.dp)),
+                                .border(BorderStroke(1.dp, badgeBorderColor), RoundedCornerShape(8.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -811,23 +812,24 @@ private fun RecentTransactionsSection(
                                 text = expense.categoryName,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = expense.date,
                                     fontSize = 10.sp,
                                     fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Box(
                                     modifier = Modifier
                                         .background(badgeColor, RoundedCornerShape(3.dp))
+                                        .border(BorderStroke(0.5.dp, badgeBorderColor), RoundedCornerShape(3.dp))
                                         .padding(horizontal = 4.dp, vertical = 1.dp)
                                 ) {
                                     Text(
-                                        text = if (expense.type == SpendingType.COMMITTED) "COMMITTED" else "DISC.",
+                                        text = if (isCommitted) "COMMITTED" else "DISC.",
                                         fontSize = 8.sp,
                                         fontFamily = FontFamily.Monospace,
                                         fontWeight = FontWeight.Bold,

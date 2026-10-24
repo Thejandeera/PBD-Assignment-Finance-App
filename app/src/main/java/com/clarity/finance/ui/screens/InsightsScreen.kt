@@ -61,6 +61,7 @@ import com.clarity.finance.ui.theme.ClarityGreenBright
 import com.clarity.finance.ui.theme.ClarityRed
 import com.clarity.finance.ui.theme.ClarityRedLight
 import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.theme.LocalIsDarkTheme
 import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.ExpenseViewModel
@@ -424,8 +425,8 @@ private fun SpendingLeakCard(
     exchangeRate: Double
 ) {
     val formattedLeakAmount = CurrencyFormatter.format(leak.amount, currentCurrency, exchangeRate)
-    val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
-    val cardBg = if (isDark) ClarityAmber.copy(alpha = 0.15f) else ClarityAmberLight
+    val isDark = LocalIsDarkTheme.current
+    val cardBg = if (isDark) Color(0xFF000000) else ClarityAmberLight
 
     Box(
         modifier = Modifier
@@ -546,7 +547,7 @@ private fun CategoryBreakdownSection(
     currentCurrency: String,
     exchangeRate: Double
 ) {
-    val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
+    val isDark = LocalIsDarkTheme.current
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -561,20 +562,17 @@ private fun CategoryBreakdownSection(
 
         categories.forEach { category ->
             val isCommitted = category.type == SpendingType.COMMITTED
-            val badgeBg = if (isCommitted) {
-                if (isDark) ClarityBlue.copy(alpha = 0.2f) else ClarityBlueLight
-            } else {
-                if (isDark) ClarityRed.copy(alpha = 0.2f) else ClarityRedLight
-            }
             val badgeColor = if (isCommitted) ClarityBlue else ClarityRed
+            val badgeBg = if (isDark) Color(0xFF000000) else if (isCommitted) ClarityBlueLight else ClarityRedLight
+            val badgeBorder = if (isDark) BorderStroke(1.dp, badgeColor) else BorderStroke(1.dp, badgeColor.copy(alpha = 0.3f))
             val barColor = if (isCommitted) ClarityBlue else ClarityGreenBright
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
+                    .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+                    .border(BorderStroke(1.dp, if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
                     .padding(12.dp)
             ) {
                 Column {
@@ -596,6 +594,7 @@ private fun CategoryBreakdownSection(
                             Box(
                                 modifier = Modifier
                                     .background(badgeBg, RoundedCornerShape(3.dp))
+                                    .border(badgeBorder, RoundedCornerShape(3.dp))
                                     .padding(horizontal = 4.dp, vertical = 1.dp)
                             ) {
                                 Text(
@@ -603,7 +602,7 @@ private fun CategoryBreakdownSection(
                                     fontSize = 8.sp,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
-                                    color = badgeColor
+                                    color = if (isDark) Color(0xFFFFFFFF) else badgeColor
                                 )
                             }
                         }

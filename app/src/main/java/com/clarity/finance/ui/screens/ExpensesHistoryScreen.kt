@@ -62,6 +62,7 @@ import com.clarity.finance.ui.theme.ClarityGreen
 import com.clarity.finance.ui.theme.ClarityRed
 import com.clarity.finance.ui.theme.ClarityRedLight
 import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.theme.LocalIsDarkTheme
 import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.DraftViewModel
@@ -76,6 +77,7 @@ fun ExpensesHistoryScreen(
     authViewModel: AuthViewModel = hiltViewModel(),
     onNavigateToDrafts: () -> Unit = {}
 ) {
+    val isDark = LocalIsDarkTheme.current
     val historyState by viewModel.historyState.collectAsStateWithLifecycle()
     val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
     val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
@@ -179,8 +181,7 @@ fun ExpensesHistoryScreen(
         ) {
             // SMS Drafts notification banner
             if (draftCount > 0) {
-                val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
-                val bannerBg = if (isDark) ClarityAmber.copy(alpha = 0.15f) else ClarityAmber.copy(alpha = 0.1f)
+                val bannerBg = if (isDark) Color(0xFF000000) else ClarityAmber.copy(alpha = 0.1f)
 
                 Box(
                     modifier = Modifier
@@ -233,9 +234,8 @@ fun ExpensesHistoryScreen(
             val committedFormatted = CurrencyFormatter.format(metrics.committedTotal, currentCurrency, exchangeRate)
             val discretionaryFormatted = CurrencyFormatter.format(metrics.discretionaryTotal, currentCurrency, exchangeRate)
 
-            val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
-            val commBg = if (isDark) ClarityBlue.copy(alpha = 0.15f) else ClarityBlueLight
-            val discBg = if (isDark) ClarityRed.copy(alpha = 0.15f) else ClarityRedLight
+            val commBg = if (isDark) Color(0xFF000000) else ClarityBlueLight
+            val discBg = if (isDark) Color(0xFF000000) else ClarityRedLight
 
             Box(
                 modifier = Modifier
@@ -536,19 +536,16 @@ private fun HistoryExpenseCard(
     onDeleteClick: () -> Unit
 ) {
     val isCommitted = expense.type == SpendingType.COMMITTED
-    val isDark = MaterialTheme.colorScheme.background == Color(0xFF000000)
-    val badgeBg = if (isCommitted) {
-        if (isDark) ClarityBlue.copy(alpha = 0.2f) else ClarityBlueLight
-    } else {
-        if (isDark) ClarityRed.copy(alpha = 0.2f) else ClarityRedLight
-    }
+    val isDark = LocalIsDarkTheme.current
     val badgeColor = if (isCommitted) ClarityBlue else ClarityRed
+    val badgeBg = if (isDark) Color(0xFF000000) else if (isCommitted) ClarityBlueLight else ClarityRedLight
+    val badgeBorder = if (isDark) BorderStroke(1.dp, badgeColor) else BorderStroke(1.dp, badgeColor.copy(alpha = 0.3f))
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
+            .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+            .border(BorderStroke(1.dp, if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
             .padding(12.dp)
     ) {
         Row(
@@ -560,7 +557,7 @@ private fun HistoryExpenseCard(
                 modifier = Modifier
                     .size(38.dp)
                     .background(badgeBg, RoundedCornerShape(8.dp))
-                    .border(BorderStroke(1.dp, badgeColor.copy(alpha = 0.3f)), RoundedCornerShape(8.dp)),
+                    .border(badgeBorder, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
