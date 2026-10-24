@@ -7,5 +7,6 @@ package com.clarity.finance.model
 data class AuthUser(
     val uid: String,
     val email: String,
-    val displayName: String
+    val displayName: String,
+    val photoPath: String? = null
 )

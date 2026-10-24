@@ -8,7 +8,11 @@ data class UserProfile(
     val name: String = "",
     val email: String = "",
     val baseCurrency: String = CurrencyType.LKR.name,
-    val rates: Map<String, Double> = DEFAULT_RATES
+    val rates: Map<String, Double> = DEFAULT_RATES,
+    val photoPath: String? = null,
+    val themeMode: String = "SYSTEM", // "LIGHT", "DARK", "SYSTEM"
+    val smsDraftsEnabled: Boolean = true,
+    val dailyReminderEnabled: Boolean = true
 ) {
     companion object {
         const val DEFAULT_USD_RATE = 305.0

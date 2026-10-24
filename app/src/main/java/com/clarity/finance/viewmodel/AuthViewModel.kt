@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import com.clarity.finance.util.ProfileImageManager
+import android.net.Uri
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -26,7 +28,8 @@ sealed interface AuthUiState {
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val profileImageManager: ProfileImageManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
@@ -82,7 +85,7 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun signUp(name: String, email: String, password: String, confirmPassword: String) {
+    fun signUp(name: String, email: String, password: String, confirmPassword: String, photoUri: Uri? = null) {
         val trimmedName = name.trim()
         val trimmedEmail = email.trim()
 
@@ -109,8 +112,15 @@ class AuthViewModel @Inject constructor(
 
         _uiState.value = AuthUiState.Loading
         viewModelScope.launch {
-            authRepository.signUp(trimmedName, trimmedEmail, password)
-                .onSuccess {
+            val tempId = java.util.UUID.randomUUID().toString()
+            val initialSavedPath = photoUri?.let { profileImageManager.saveProfileImage(tempId, it) }
+
+            authRepository.signUp(trimmedName, trimmedEmail, password, initialSavedPath)
+                .onSuccess { user ->
+                    if (photoUri != null) {
+                        val permanentPath = profileImageManager.saveProfileImage(user.uid, photoUri)
+                        userPreferencesRepository.profilePhotoPath = permanentPath
+                    }
                     // Sign out immediately so user must perform their first login on LoginScreen
                     authRepository.signOut()
                     _uiState.value = AuthUiState.RegisteredSuccess(
@@ -121,6 +131,48 @@ class AuthViewModel @Inject constructor(
                     _uiState.value = AuthUiState.Error(mapFirebaseError(error))
                 }
         }
+    }
+
+    fun updateProfile(name: String, photoUri: Uri? = null, onResult: ((Boolean) -> Unit)? = null) {
+        val user = authRepository.currentUser ?: return
+        viewModelScope.launch {
+            val newPath = photoUri?.let { profileImageManager.saveProfileImage(user.uid, it) }
+                ?: userPreferencesRepository.profilePhotoPath
+            val result = authRepository.updateProfile(name.trim(), newPath)
+            if (result.isSuccess) {
+                userPreferencesRepository.profilePhotoPath = newPath
+            }
+            onResult?.invoke(result.isSuccess)
+        }
+    }
+
+    val profilePhotoPath: String?
+        get() = userPreferencesRepository.profilePhotoPath
+
+    val themeMode: String
+        get() = userPreferencesRepository.themeMode
+
+    fun setThemeMode(mode: String) {
+        userPreferencesRepository.themeMode = mode
+    }
+
+    val isSmsScanEnabled: Boolean
+        get() = userPreferencesRepository.isSmsScanEnabled
+
+    fun setSmsScanEnabled(enabled: Boolean) {
+        userPreferencesRepository.isSmsScanEnabled = enabled
+    }
+
+    val isDailyReminderEnabled: Boolean
+        get() = userPreferencesRepository.isDailyReminderEnabled
+
+    fun setDailyReminderEnabled(enabled: Boolean) {
+        userPreferencesRepository.isDailyReminderEnabled = enabled
+    }
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        userPreferencesRepository.isBiometricEnabled = enabled
+        _canUseBiometrics.value = userPreferencesRepository.canUseBiometrics()
     }
 
     /**
