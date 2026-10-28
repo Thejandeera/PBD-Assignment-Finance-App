@@ -8,7 +8,7 @@ enum class SpendingType(val displayName: String) {
 enum class PaymentMethod(val displayName: String) {
     CARD("Card"),
     CASH("Cash"),
-    SECONDARY("Secondary acct"),
+    SECONDARY("Digital"),
     ONLINE("Online Transfer")
 }
 

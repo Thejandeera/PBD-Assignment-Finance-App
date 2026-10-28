@@ -4,42 +4,39 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Sms
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.MarkEmailRead
+import androidx.compose.material.icons.rounded.Sms
+import androidx.compose.material.icons.rounded.UnfoldMore
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,25 +48,43 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clarity.finance.model.CategoryItem
 import com.clarity.finance.model.DraftTransaction
 import com.clarity.finance.model.DraftTransactionType
 import com.clarity.finance.model.getDefaultCategories
-import com.clarity.finance.ui.theme.ClarityGreen
-import com.clarity.finance.ui.theme.ClarityRed
-import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.components.ActivityIndicator
+import com.clarity.finance.ui.components.AlertAction
+import com.clarity.finance.ui.components.AlertActionStyle
+import com.clarity.finance.ui.components.ClarityAlertDialog
+import com.clarity.finance.ui.components.ClarityCard
+import com.clarity.finance.ui.components.ClarityNavigationBar
+import com.clarity.finance.ui.components.ClaritySnackbarHost
+import com.clarity.finance.ui.components.DisplayDates
+import com.clarity.finance.ui.components.EmptyStateView
+import com.clarity.finance.ui.components.LargeTitleHeader
+import com.clarity.finance.ui.components.LegendDot
+import com.clarity.finance.ui.components.PrimaryButton
+import com.clarity.finance.ui.components.SectionHeaderLabel
+import com.clarity.finance.ui.components.TextLinkButton
+import com.clarity.finance.ui.components.TintedButton
+import com.clarity.finance.ui.components.isScrolledPast
+import com.clarity.finance.ui.components.pressFade
+import com.clarity.finance.ui.theme.ClarityTheme
+import com.clarity.finance.ui.theme.ClarityType
 import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.DraftViewModel
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DraftsScreen(
     onNavigateBack: () -> Unit,
@@ -78,10 +93,16 @@ fun DraftsScreen(
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    val colors = ClarityTheme.colors
     val uiState by draftViewModel.uiState.collectAsStateWithLifecycle()
     val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
     val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showClearConfirmation by remember { mutableStateOf(false) }
+
+    val listState = rememberLazyListState()
+    val isCollapsed = listState.isScrolledPast(40.dp)
+    val navigationBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     val smsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -98,254 +119,165 @@ fun DraftsScreen(
         }
     }
 
+    if (showClearConfirmation) {
+        val count = uiState.drafts.size
+        ClarityAlertDialog(
+            title = "Clear All Drafts?",
+            message = if (count == 1) {
+                "The pending draft will be discarded. Expenses you've already logged aren't affected."
+            } else {
+                "All $count pending drafts will be discarded. Expenses you've already logged aren't affected."
+            },
+            onDismissRequest = { showClearConfirmation = false },
+            actions = listOf(
+                AlertAction(label = "Cancel", style = AlertActionStyle.Cancel) { showClearConfirmation = false },
+                AlertAction(label = "Clear All", style = AlertActionStyle.Destructive) {
+                    showClearConfirmation = false
+                    draftViewModel.clearAll()
+                }
+            )
+        )
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = colors.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { ClaritySnackbarHost(snackbarHostState, modifier = Modifier.navigationBarsPadding()) },
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "TRANSACTION INBOX",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Bank SMS Drafts",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                if (uiState.drafts.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .background(ClarityGreen, RoundedCornerShape(12.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "${uiState.drafts.size} pending",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ClarityWhite
-                        )
-                    }
-                }
-            }
+            ClarityNavigationBar(
+                title = "SMS Drafts",
+                collapsed = isCollapsed,
+                onBack = onNavigateBack
+            )
         }
     ) { innerPadding ->
-        Column(
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(top = innerPadding.calculateTopPadding()),
+            contentPadding = PaddingValues(bottom = navigationBarPadding + 32.dp)
         ) {
-            // Action Buttons Bar
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Scan Device SMS
-                OutlinedButton(
-                    onClick = {
-                        val hasPerm = ContextCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.READ_SMS
-                        ) == PackageManager.PERMISSION_GRANTED
-
-                        if (hasPerm) {
-                            draftViewModel.scanDeviceInbox(context)
-                        } else {
-                            smsPermissionLauncher.launch(Manifest.permission.READ_SMS)
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(6.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    enabled = !uiState.isScanning
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Sms,
-                        contentDescription = "Scan SMS",
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "SCAN SMS",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                // Load Sample SMS (BOC & COMBANK)
-                OutlinedButton(
-                    onClick = { draftViewModel.loadSampleSmsDrafts() },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(6.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                    enabled = !uiState.isScanning
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Demo SMS",
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "DEMO SMS",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+            item(key = "title") {
+                LargeTitleHeader(
+                    title = "SMS Drafts",
+                    subtitle = "Transactions detected in BOC and ComBank messages"
+                )
             }
 
-            if (uiState.drafts.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+            item(key = "actions") {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "TAP 'APPROVE' TO COMMIT TO EXPENSES",
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "APPROVE ALL",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ClarityGreen,
-                            modifier = Modifier
-                                .clickable { draftViewModel.approveAll() }
-                                .padding(4.dp)
-                        )
-                        Text(
-                            text = "CLEAR",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = ClarityRed,
-                            modifier = Modifier
-                                .clickable { draftViewModel.clearAll() }
-                                .padding(4.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            if (uiState.isScanning) {
-                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 40.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Scanning SMS messages...",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else if (uiState.drafts.isEmpty()) {
-                // Empty State
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(vertical = 60.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(horizontal = 24.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Sms,
-                                contentDescription = "Empty Drafts",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(32.dp)
-                            )
+                    TintedButton(
+                        text = "Scan Inbox",
+                        leadingIcon = Icons.Rounded.Sms,
+                        enabled = !uiState.isScanning,
+                        minHeight = 44.dp,
+                        textStyle = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            val hasPermission = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.READ_SMS
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                            if (hasPermission) {
+                                draftViewModel.scanDeviceInbox(context)
+                            } else {
+                                smsPermissionLauncher.launch(Manifest.permission.READ_SMS)
+                            }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "No Pending Drafts",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                    )
+                    TintedButton(
+                        text = "Load Samples",
+                        leadingIcon = Icons.Rounded.Download,
+                        enabled = !uiState.isScanning,
+                        minHeight = 44.dp,
+                        textStyle = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.weight(1f),
+                        onClick = { draftViewModel.loadSampleSmsDrafts() }
+                    )
+                }
+            }
+
+            if (uiState.drafts.isNotEmpty() && !uiState.isScanning) {
+                item(key = "pending-header") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 12.dp, top = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SectionHeaderLabel(
+                            text = "${uiState.drafts.size} Pending",
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(top = 7.dp)
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Tap 'SCAN SMS' to scan incoming bank messages or 'DEMO SMS' to load sample BOC and COMBANK transactions.",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        TextLinkButton(
+                            text = "Clear All",
+                            onClick = { showClearConfirmation = true },
+                            color = colors.redText,
+                            style = ClarityType.subheadline
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextLinkButton(
+                            text = "Approve All",
+                            onClick = { draftViewModel.approveAll() },
+                            style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold)
                         )
                     }
                 }
-            } else {
-                // Drafts List
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(uiState.drafts, key = { it.id }) { draft ->
-                        DraftCard(
-                            draft = draft,
-                            currentCurrency = currentCurrency,
-                            exchangeRate = exchangeRate,
-                            onApprove = { catId, catName ->
-                                draftViewModel.approveDraft(
-                                    draft = draft,
-                                    selectedCategoryId = catId,
-                                    selectedCategoryName = catName
-                                )
-                            },
-                            onDiscard = { draftViewModel.discardDraft(draft.id) }
+            }
+
+            when {
+                uiState.isScanning -> item(key = "scanning") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 56.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        ActivityIndicator(size = 28.dp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Scanning messages…",
+                            style = ClarityType.subheadline,
+                            color = colors.secondaryLabel
                         )
                     }
+                }
+
+                uiState.drafts.isEmpty() -> item(key = "empty") {
+                    EmptyStateView(
+                        icon = Icons.Rounded.MarkEmailRead,
+                        title = "No Drafts to Review",
+                        message = "Scan your inbox to draft expenses from BOC and ComBank messages, or load samples to see how it works."
+                    )
+                }
+
+                else -> items(items = uiState.drafts, key = { it.id }) { draft ->
+                    DraftCard(
+                        draft = draft,
+                        currency = currentCurrency,
+                        exchangeRate = exchangeRate,
+                        onApprove = { catId, catName ->
+                            draftViewModel.approveDraft(
+                                draft = draft,
+                                selectedCategoryId = catId,
+                                selectedCategoryName = catName
+                            )
+                        },
+                        onDiscard = { draftViewModel.discardDraft(draft.id) },
+                        modifier = Modifier
+                            .padding(start = 16.dp, end = 16.dp, top = 12.dp)
+                            .animateItemPlacement()
+                    )
                 }
             }
         }
@@ -355,203 +287,169 @@ fun DraftsScreen(
 @Composable
 private fun DraftCard(
     draft: DraftTransaction,
-    currentCurrency: String,
+    currency: String,
     exchangeRate: Double,
     onApprove: (selectedCategoryId: String, selectedCategoryName: String) -> Unit,
-    onDiscard: () -> Unit
+    onDiscard: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    var selectedCategory by remember {
-        mutableStateOf(
-            getDefaultCategories().firstOrNull { it.id == draft.suggestedCategoryId }
-                ?: getDefaultCategories().first()
-        )
+    val colors = ClarityTheme.colors
+    val categories = remember { getDefaultCategories() }
+    var selectedCategory by remember(draft.id) {
+        mutableStateOf(categories.firstOrNull { it.id == draft.suggestedCategoryId } ?: categories.first())
     }
     var showCategoryMenu by remember { mutableStateOf(false) }
 
-    val formattedAmount = CurrencyFormatter.format(draft.amount, currentCurrency, exchangeRate)
+    val isIncome = draft.type == DraftTransactionType.INCOME
+    val formattedAmount = CurrencyFormatter.format(draft.amount, currency, exchangeRate)
+    val timestamp = listOfNotNull(DisplayDates.short(draft.date), draft.time?.takeIf { it.isNotBlank() })
+        .joinToString(" · ")
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
-            .padding(14.dp)
-    ) {
-        Column {
-            // Header Row: Type Badge + Sender + Time
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+    ClarityCard(modifier = modifier) {
+        Row(
+            modifier = Modifier.semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(colors.tertiaryFill)
+                    .padding(horizontal = 10.dp, vertical = 3.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    val isIncome = draft.type == DraftTransactionType.INCOME
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                if (isIncome) ClarityGreen else ClarityRed,
-                                RoundedCornerShape(4.dp)
-                            )
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = if (isIncome) "+ INCOME" else "- OUTCOME",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ClarityWhite
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = draft.sender,
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
                 Text(
-                    text = "${draft.date} ${draft.time.orEmpty()}",
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = draft.sender,
+                    style = ClarityType.caption1.copy(fontWeight = FontWeight.SemiBold),
+                    color = colors.label
                 )
             }
+            Spacer(modifier = Modifier.width(10.dp))
+            LegendDot(color = if (isIncome) colors.income else colors.outflow)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (isIncome) "Income" else "Expense",
+                style = ClarityType.footnote,
+                color = colors.secondaryLabel,
+                modifier = Modifier.weight(1f)
+            )
+            Text(text = timestamp, style = ClarityType.footnote, color = colors.secondaryLabel)
+        }
 
-            Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-            // Main Info: Title and Amount
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
+        Row(
+            modifier = Modifier.semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = draft.merchantOrTitle,
+                    style = ClarityType.headline,
+                    color = colors.label,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!draft.accountNumber.isNullOrBlank()) {
                     Text(
-                        text = draft.merchantOrTitle,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        text = draft.accountNumber,
+                        style = ClarityType.footnote,
+                        color = colors.secondaryLabel
                     )
-                    if (!draft.accountNumber.isNullOrBlank()) {
-                        Text(
-                            text = draft.accountNumber,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
-
-                Text(
-                    text = formattedAmount,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (draft.type == DraftTransactionType.INCOME) ClarityGreen else ClarityRed
-                )
             }
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = if (isIncome) "+$formattedAmount" else formattedAmount,
+                style = ClarityType.amountTitle.copy(fontSize = ClarityType.title3.fontSize),
+                color = if (isIncome) colors.greenText else colors.label,
+                maxLines = 1
+            )
+        }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Category Selector Chip
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Box {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(6.dp))
-                            .clickable { showCategoryMenu = true }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = selectedCategory.icon, fontSize = 12.sp)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "${selectedCategory.name} ▼",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showCategoryMenu,
-                        onDismissRequest = { showCategoryMenu = false }
-                    ) {
-                        getDefaultCategories().forEach { cat ->
-                            DropdownMenuItem(
-                                text = { Text("${cat.icon} ${cat.name}") },
-                                onClick = {
-                                    selectedCategory = cat
-                                    showCategoryMenu = false
+        if (!isIncome) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Box {
+                CategoryPickerButton(
+                    category = selectedCategory,
+                    onClick = { showCategoryMenu = true }
+                )
+                DropdownMenu(
+                    expanded = showCategoryMenu,
+                    onDismissRequest = { showCategoryMenu = false }
+                ) {
+                    categories.forEach { category ->
+                        DropdownMenuItem(
+                            text = { Text(text = "${category.icon}  ${category.name}", style = ClarityType.body) },
+                            trailingIcon = if (category.id == selectedCategory.id) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Check,
+                                        contentDescription = "Selected",
+                                        tint = colors.accent
+                                    )
                                 }
-                            )
-                        }
-                    }
-                }
-
-                // Action Buttons: Approve (✓) and Discard (✕)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = onDiscard,
-                        shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(1.dp, ClarityRed),
-                        modifier = Modifier.height(34.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Discard",
-                            tint = ClarityRed,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "DISCARD",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = ClarityRed
-                        )
-                    }
-
-                    Button(
-                        onClick = { onApprove(selectedCategory.id, selectedCategory.name) },
-                        shape = RoundedCornerShape(6.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = ClarityGreen),
-                        modifier = Modifier.height(34.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Approve",
-                            tint = ClarityWhite,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "APPROVE",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ClarityWhite
+                            } else {
+                                null
+                            },
+                            onClick = {
+                                selectedCategory = category
+                                showCategoryMenu = false
+                            }
                         )
                     }
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TintedButton(
+                text = "Discard",
+                onClick = onDiscard,
+                tint = colors.secondaryLabel,
+                minHeight = 44.dp,
+                textStyle = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                modifier = Modifier.weight(1f)
+            )
+            PrimaryButton(
+                text = "Approve",
+                onClick = { onApprove(selectedCategory.id, selectedCategory.name) },
+                minHeight = 44.dp,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+/** iOS pop-up button: current value with an up/down chevron that opens a menu. */
+@Composable
+private fun CategoryPickerButton(
+    category: CategoryItem,
+    onClick: () -> Unit
+) {
+    val colors = ClarityTheme.colors
+    Row(
+        modifier = Modifier
+            .pressFade(onClickLabel = "Change category", onClick = onClick)
+            .heightIn(min = 36.dp)
+            .clip(CircleShape)
+            .background(colors.tertiaryFill)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = category.icon, fontSize = 14.sp)
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = category.name,
+            style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+            color = colors.label
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Icon(
+            imageVector = Icons.Rounded.UnfoldMore,
+            contentDescription = null,
+            tint = colors.secondaryLabel,
+            modifier = Modifier.size(16.dp)
+        )
     }
 }

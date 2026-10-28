@@ -1,65 +1,82 @@
 package com.clarity.finance.ui.components
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Sms
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.CategoryItem
 import com.clarity.finance.model.PaymentMethod
 import com.clarity.finance.model.SpendingType
-import com.clarity.finance.ui.theme.ClarityAmber
-import com.clarity.finance.ui.theme.ClarityBlue
-import com.clarity.finance.ui.theme.ClarityGreen
-import com.clarity.finance.ui.theme.ClarityRed
-import com.clarity.finance.ui.theme.ClarityWhite
+import com.clarity.finance.ui.theme.ClarityShapes
+import com.clarity.finance.ui.theme.ClarityTheme
+import com.clarity.finance.ui.theme.ClarityType
 import com.clarity.finance.viewmodel.ExpenseViewModel
+import kotlinx.coroutines.launch
 
+private val PaymentOptions = listOf(
+    "Cash" to PaymentMethod.CASH,
+    "Card" to PaymentMethod.CARD,
+    "Digital" to PaymentMethod.SECONDARY
+)
+
+/**
+ * Add-expense sheet (HIG > Sheets): Cancel / title / Add navigation row, a large Apple Cash
+ * style amount, then category, obligation type and payment method. Quick mode trims the form
+ * to the three essentials for sub-five-second logging.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseSheet(
@@ -69,728 +86,504 @@ fun AddExpenseSheet(
     onNavigateToDrafts: (() -> Unit)? = null,
     pendingDraftCount: Int = 0
 ) {
+    val colors = ClarityTheme.colors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
 
     var showAddCategoryDialog by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(
+    val hideThen: (() -> Unit) -> Unit = { action ->
+        scope.launch { sheetState.hide() }.invokeOnCompletion { action() }
+    }
+    val canSubmit = (formState.amountInput.toDoubleOrNull() ?: 0.0) > 0.0
+
+    ClaritySheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = null,
         modifier = modifier
     ) {
+        // The sheet is its own window, so focus and keyboard must be read from inside it.
+        val focusManager = LocalFocusManager.current
+        val keyboardController = LocalSoftwareKeyboardController.current
+        val dismissKeyboard = {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
+
+        // Navigation row stays fixed while the form scrolls.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .padding(horizontal = 8.dp)
+        ) {
+            TextLinkButton(
+                text = "Cancel",
+                onClick = { hideThen(onDismiss) },
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 4.dp)
+            )
+            Text(
+                text = if (formState.isQuickMode) "Quick Log" else "New Expense",
+                style = ClarityType.headline,
+                color = colors.label,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .semantics { heading() }
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 4.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (formState.isSubmitting) {
+                    ActivityIndicator(size = 20.dp, modifier = Modifier.padding(horizontal = 14.dp))
+                } else {
+                    TextLinkButton(
+                        text = "Add",
+                        enabled = canSubmit,
+                        onClick = {
+                            dismissKeyboard()
+                            viewModel.submitExpense(onSuccess = { hideThen(onDismiss) })
+                        },
+                        style = ClarityType.body.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 18.dp)
+                .padding(bottom = 28.dp)
+                .animateContentSize()
         ) {
-            // =================================================================
-            // Top Bar: Mode Toggle & Cancel
-            // =================================================================
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = if (formState.isQuickMode) "QUICK LOG" else "NEW EXPENSE",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(4.dp))
-                            .clickable { viewModel.setQuickMode(!formState.isQuickMode) }
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        Text(
-                            text = if (formState.isQuickMode) "Full Form" else "Quick Form",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+            SegmentedControl(
+                options = listOf("Quick", "Detailed"),
+                selectedIndex = if (formState.isQuickMode) 0 else 1,
+                onSelect = { index -> viewModel.setQuickMode(index == 0) },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
 
-                Text(
-                    text = "✕ Cancel",
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clickable { onDismiss() }
-                )
-            }
-
-            // Drafts shortcut banner if pending drafts exist
+            // SMS drafts shortcut
             if (pendingDraftCount > 0 && onNavigateToDrafts != null) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(BorderStroke(1.dp, ClarityAmber), RoundedCornerShape(6.dp))
-                        .clickable { onNavigateToDrafts() }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "⚡ $pendingDraftCount SMS Drafts Waiting",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "REVIEW →",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ClarityAmber
-                        )
-                    }
+                Spacer(modifier = Modifier.height(12.dp))
+                GroupedSection(containerColor = colors.elevatedCard) {
+                    ListRow(
+                        title = if (pendingDraftCount == 1) "1 SMS draft waiting" else "$pendingDraftCount SMS drafts waiting",
+                        subtitle = "Review bank messages instead of typing",
+                        leading = { IconTile(icon = Icons.Rounded.Sms, background = colors.indigo) },
+                        showChevron = true,
+                        onClick = { hideThen(onNavigateToDrafts) }
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // =================================================================
-            // Outflow Amount Box with Quick Increments
-            // =================================================================
-            Box(
+            // Amount
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                    .border(
-                        BorderStroke(
-                            1.5.dp,
-                            if (formState.amountError != null) ClarityRed else MaterialTheme.colorScheme.outline
-                        ),
-                        RoundedCornerShape(8.dp)
-                    )
-                    .padding(vertical = 14.dp, horizontal = 16.dp)
+                    .padding(start = 16.dp, end = 16.dp, top = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "OUTFLOW AMOUNT (LKR)",
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "LKR ",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        BasicTextField(
-                            value = formState.amountInput,
-                            onValueChange = { viewModel.onAmountChanged(it) },
-                            textStyle = TextStyle(
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Start
-                            ),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            decorationBox = { innerTextField ->
-                                if (formState.amountInput.isEmpty()) {
-                                    Text(
-                                        text = "0.00",
-                                        fontSize = 28.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                    )
-                                }
-                                innerTextField()
-                            }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Quick Increment Chips [+500], [+1,000], [+5,000]
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        QuickIncrementChip(label = "+500") { viewModel.onQuickAmountIncrement(500.0) }
-                        QuickIncrementChip(label = "+1,000") { viewModel.onQuickAmountIncrement(1000.0) }
-                        QuickIncrementChip(label = "+5,000") { viewModel.onQuickAmountIncrement(5000.0) }
-                    }
-                }
-            }
-
-            if (formState.amountError != null) {
                 Text(
-                    text = formState.amountError.orEmpty(),
-                    fontSize = 11.sp,
-                    color = ClarityRed,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+                    text = "LKR",
+                    style = ClarityType.headline,
+                    color = colors.secondaryLabel
                 )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // =================================================================
-            // Category Selection (Standard Chips vs Quick 3x3 Grid)
-            // =================================================================
-            if (formState.isQuickMode) {
-                Row(
+                BasicTextField(
+                    value = formState.amountInput,
+                    onValueChange = { viewModel.onAmountChanged(it) },
+                    singleLine = true,
+                    textStyle = ClarityType.amountEntry.copy(
+                        color = colors.label,
+                        textAlign = TextAlign.Center
+                    ),
+                    cursorBrush = SolidColor(colors.accent),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { dismissKeyboard() }),
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                    decorationBox = { innerTextField ->
+                        Box(contentAlignment = Alignment.Center) {
+                            if (formState.amountInput.isEmpty()) {
+                                Text(
+                                    text = "0",
+                                    style = ClarityType.amountEntry,
+                                    color = colors.placeholder,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                            innerTextField()
+                        }
+                    }
+                )
+
+                AnimatedVisibility(visible = formState.amountError != null) {
                     Text(
-                        text = "1. TAP CATEGORY",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "9 Core Buckets",
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = formState.amountError.orEmpty(),
+                        style = ClarityType.footnote,
+                        color = colors.redText,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    QuickAmountChip(label = "+500") { viewModel.onQuickAmountIncrement(500.0) }
+                    QuickAmountChip(label = "+1,000") { viewModel.onQuickAmountIncrement(1000.0) }
+                    QuickAmountChip(label = "+5,000") { viewModel.onQuickAmountIncrement(5000.0) }
+                }
+            }
 
-                // Display in 3 columns
-                val gridCategories = categories.take(9)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (row in gridCategories.chunked(3)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            for (cat in row) {
-                                val isSelected = formState.selectedCategory?.id == cat.id
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(42.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(if (isSelected) ClarityGreen else MaterialTheme.colorScheme.surfaceVariant)
-                                        .border(
-                                            BorderStroke(
-                                                1.dp,
-                                                if (isSelected) ClarityGreen else MaterialTheme.colorScheme.outline
-                                            ),
-                                            RoundedCornerShape(6.dp)
-                                        )
-                                        .clickable { viewModel.onCategorySelected(cat) },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = cat.name,
-                                        fontSize = 12.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) ClarityWhite else MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Category
+            if (formState.isQuickMode) {
+                SectionHeaderLabel(text = "Category", modifier = Modifier.padding(horizontal = 16.dp))
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    categories.take(9).chunked(3).forEach { rowItems ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowItems.forEach { category ->
+                                CategoryTile(
+                                    category = category,
+                                    isSelected = formState.selectedCategory?.id == category.id,
+                                    onClick = { viewModel.onCategorySelected(category) },
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
+                            repeat(3 - rowItems.size) { Spacer(modifier = Modifier.weight(1f)) }
                         }
                     }
                 }
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "CATEGORY CLASSIFICATION",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "+ Custom",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = ClarityGreen,
-                        modifier = Modifier.clickable { showAddCategoryDialog = true }
-                    )
+                SectionHeaderLabel(text = "Category", modifier = Modifier.padding(horizontal = 16.dp))
+                val chipRowState = rememberLazyListState()
+                // Bring the current selection into view, e.g. after switching from Quick mode.
+                LaunchedEffect(Unit) {
+                    val selectedIndex = categories.indexOfFirst { it.id == formState.selectedCategory?.id }
+                    if (selectedIndex >= 2) chipRowState.scrollToItem(selectedIndex)
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
+                LazyRow(
+                    state = chipRowState,
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    for (cat in categories) {
-                        val isSelected = formState.selectedCategory?.id == cat.id
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) ClarityGreen else MaterialTheme.colorScheme.surfaceVariant)
-                                .border(
-                                    BorderStroke(
-                                        1.dp,
-                                        if (isSelected) ClarityGreen else MaterialTheme.colorScheme.outline
-                                    ),
-                                    RoundedCornerShape(6.dp)
-                                )
-                                .clickable { viewModel.onCategorySelected(cat) }
-                                .padding(horizontal = 14.dp, vertical = 9.dp)
-                        ) {
-                            Text(
-                                text = if (isSelected) "${cat.name} •" else cat.name,
-                                fontSize = 12.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (isSelected) ClarityWhite else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                    item(key = "new-category") {
+                        NewCategoryChip(onClick = { showAddCategoryDialog = true })
+                    }
+                    items(items = categories, key = { it.id }) { category ->
+                        CategoryChip(
+                            category = category,
+                            isSelected = formState.selectedCategory?.id == category.id,
+                            onClick = { viewModel.onCategorySelected(category) }
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // =================================================================
-            // Obligation Type: Committed vs Discretionary Cards
-            // =================================================================
-            Text(
-                text = if (formState.isQuickMode) "2. NATURE" else "OBLIGATION TYPE (CRUCIAL METRIC)",
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            // Obligation type
+            SectionHeaderLabel(text = "Type", modifier = Modifier.padding(horizontal = 16.dp))
+            SegmentedControl(
+                options = listOf("Committed", "Discretionary"),
+                selectedIndex = if (formState.spendingType == SpendingType.COMMITTED) 0 else 1,
+                onSelect = { index ->
+                    viewModel.onSpendingTypeSelected(
+                        if (index == 0) SpendingType.COMMITTED else SpendingType.DISCRETIONARY
+                    )
+                },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            SectionFooterLabel(
+                text = if (formState.spendingType == SpendingType.COMMITTED) {
+                    "Fixed obligations such as rent, utilities and subscriptions."
+                } else {
+                    "Flexible spending such as food, transport and shopping."
+                },
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                val isCommitted = formState.spendingType == SpendingType.COMMITTED
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isCommitted) ClarityBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant)
-                        .border(
-                            BorderStroke(
-                                if (isCommitted) 2.dp else 1.dp,
-                                if (isCommitted) ClarityBlue else MaterialTheme.colorScheme.outline
-                            ),
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { viewModel.onSpendingTypeSelected(SpendingType.COMMITTED) }
-                        .padding(vertical = 10.dp, horizontal = 12.dp)
-                ) {
-                    Column {
-                        Text(
-                            text = if (isCommitted) "• Committed" else "Committed",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = if (isCommitted) ClarityBlue else MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Fixed Obligation",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                val isDiscretionary = formState.spendingType == SpendingType.DISCRETIONARY
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isDiscretionary) ClarityRed.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant)
-                        .border(
-                            BorderStroke(
-                                if (isDiscretionary) 2.dp else 1.dp,
-                                if (isDiscretionary) ClarityRed else MaterialTheme.colorScheme.outline
-                            ),
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { viewModel.onSpendingTypeSelected(SpendingType.DISCRETIONARY) }
-                        .padding(vertical = 10.dp, horizontal = 12.dp)
-                ) {
-                    Column {
-                        Text(
-                            text = if (isDiscretionary) "• Discretionary" else "Discretionary",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = if (isDiscretionary) ClarityRed else MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Flexible / Leisure",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+            // Payment method
+            SectionHeaderLabel(text = "Paid With", modifier = Modifier.padding(horizontal = 16.dp))
+            val paymentIndex = when (formState.paymentMethod) {
+                PaymentMethod.CASH -> 0
+                PaymentMethod.CARD -> 1
+                PaymentMethod.SECONDARY, PaymentMethod.ONLINE -> 2
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // =================================================================
-            // Payment Method / Channel: Cash, Card, Online
-            // =================================================================
-            Text(
-                text = if (formState.isQuickMode) "3. CHANNEL" else "PAYMENT METHOD",
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            SegmentedControl(
+                options = PaymentOptions.map { it.first },
+                selectedIndex = paymentIndex,
+                onSelect = { index -> viewModel.onPaymentMethodSelected(PaymentOptions[index].second) },
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                PaymentMethodTab(
-                    label = "Cash",
-                    isSelected = formState.paymentMethod == PaymentMethod.CASH,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    viewModel.onPaymentMethodSelected(PaymentMethod.CASH)
-                }
-
-                PaymentMethodTab(
-                    label = "Card",
-                    isSelected = formState.paymentMethod == PaymentMethod.CARD,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    viewModel.onPaymentMethodSelected(PaymentMethod.CARD)
-                }
-
-                PaymentMethodTab(
-                    label = if (formState.isQuickMode) "Digital" else "Online",
-                    isSelected = formState.paymentMethod == PaymentMethod.SECONDARY,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    viewModel.onPaymentMethodSelected(PaymentMethod.SECONDARY)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // =================================================================
-            // Date & Optional Note
-            // =================================================================
-            if (!formState.isQuickMode) {
-                Box(
+            if (formState.isQuickMode) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
-                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 14.dp, vertical = 11.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Date:",
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = formState.formattedDateDisplay,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "OPTIONAL NOTE",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-
-                OutlinedTextField(
-                    value = formState.note,
-                    onValueChange = { viewModel.onNoteChanged(it) },
-                    placeholder = {
-                        Text(
-                            text = "e.g. Lunch at Bambalapitiya",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            fontSize = 13.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(6.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    )
-                )
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                        .padding(start = 20.dp, end = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Date: Today (Auto)",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Logged for today",
+                        style = ClarityType.footnote,
+                        color = colors.secondaryLabel,
+                        modifier = Modifier.weight(1f)
                     )
-                    Text(
-                        text = "▸ More details",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = ClarityGreen,
-                        modifier = Modifier.clickable { viewModel.setQuickMode(false) }
+                    TextLinkButton(
+                        text = "Add a Note",
+                        onClick = { viewModel.setQuickMode(false) },
+                        style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+            } else {
+                GroupedSection(containerColor = colors.elevatedCard, footer = formState.dateError) {
+                    DetailRow(label = "Date", value = formState.formattedDateDisplay, showDivider = true)
+                    NoteField(
+                        value = formState.note,
+                        onValueChange = { viewModel.onNoteChanged(it) }
                     )
                 }
             }
 
             if (formState.errorMessage != null) {
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = formState.errorMessage.orEmpty(),
-                    fontSize = 12.sp,
-                    color = ClarityRed,
-                    fontFamily = FontFamily.Monospace
+                    style = ClarityType.footnote,
+                    color = colors.redText,
+                    modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 12.dp)
                 )
             }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // =================================================================
-            // Primary Submission Button
-            // =================================================================
-            Button(
-                onClick = {
-                    viewModel.submitExpense(onSuccess = onDismiss)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                enabled = !formState.isSubmitting,
-                shape = RoundedCornerShape(6.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ClarityGreen,
-                    contentColor = ClarityWhite,
-                    disabledContainerColor = ClarityGreen.copy(alpha = 0.5f)
-                )
-            ) {
-                if (formState.isSubmitting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = ClarityWhite,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text(
-                        text = if (formState.isQuickMode) "LOG IN < 5 SECONDS" else "SAVE EXPENSE",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 
-    // =========================================================================
-    // Add Custom Category Dialog
-    // =========================================================================
     if (showAddCategoryDialog) {
         var newCategoryName by remember { mutableStateOf("") }
         var isCommittedCategory by remember { mutableStateOf(false) }
 
-        AlertDialog(
+        ClarityAlertDialog(
+            title = "New Category",
+            message = "Name the category and choose how it's usually classified.",
             onDismissRequest = { showAddCategoryDialog = false },
-            title = {
-                Text(
-                    text = "Add Custom Category",
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = newCategoryName,
-                        onValueChange = { newCategoryName = it },
-                        label = { Text("Category Name", fontFamily = FontFamily.Monospace, fontSize = 12.sp) },
-                        placeholder = { Text("e.g. Doctor, Books", fontFamily = FontFamily.Monospace, fontSize = 12.sp) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = if (isCommittedCategory) "Type: Committed" else "Type: Discretionary",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        TextButton(onClick = { isCommittedCategory = !isCommittedCategory }) {
-                            Text(text = "Toggle", fontFamily = FontFamily.Monospace, color = ClarityGreen)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
+            actions = listOf(
+                AlertAction(
+                    label = "Cancel",
+                    style = AlertActionStyle.Cancel,
+                    onClick = { showAddCategoryDialog = false }
+                ),
+                AlertAction(
+                    label = "Add",
+                    style = AlertActionStyle.Preferred,
+                    enabled = newCategoryName.isNotBlank(),
                     onClick = {
-                        if (newCategoryName.isNotBlank()) {
-                            viewModel.addCustomCategory(
-                                name = newCategoryName,
-                                defaultType = if (isCommittedCategory) SpendingType.COMMITTED else SpendingType.DISCRETIONARY,
-                                onSuccess = { showAddCategoryDialog = false }
-                            )
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = ClarityGreen)
-                ) {
-                    Text("Add", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, color = ClarityWhite)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddCategoryDialog = false }) {
-                    Text("Cancel", fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            },
-            containerColor = MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(12.dp)
-        )
+                        viewModel.addCustomCategory(
+                            name = newCategoryName,
+                            defaultType = if (isCommittedCategory) SpendingType.COMMITTED else SpendingType.DISCRETIONARY,
+                            onSuccess = { showAddCategoryDialog = false }
+                        )
+                    }
+                )
+            )
+        ) {
+            ClarityTextField(
+                value = newCategoryName,
+                onValueChange = { newCategoryName = it },
+                label = "",
+                placeholder = "e.g. Doctor, Books",
+                containerColor = colors.card
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            SegmentedControl(
+                options = listOf("Discretionary", "Committed"),
+                selectedIndex = if (isCommittedCategory) 1 else 0,
+                onSelect = { index -> isCommittedCategory = index == 1 }
+            )
+        }
     }
 }
 
 @Composable
-private fun QuickIncrementChip(
+private fun QuickAmountChip(
     label: String,
     onClick: () -> Unit
 ) {
+    val colors = ClarityTheme.colors
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(4.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    ) {
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
-private fun PaymentMethodTab(
-    label: String,
-    isSelected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .height(38.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (isSelected) ClarityGreen else MaterialTheme.colorScheme.surfaceVariant)
-            .border(
-                BorderStroke(
-                    1.dp,
-                    if (isSelected) ClarityGreen else MaterialTheme.colorScheme.outline
-                ),
-                RoundedCornerShape(6.dp)
-            )
-            .clickable { onClick() },
+            .pressScale(onClickLabel = "Add $label", onClick = onClick)
+            .heightIn(min = 36.dp)
+            .clip(CircleShape)
+            .background(colors.tertiaryFill)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = if (isSelected) ClarityWhite else MaterialTheme.colorScheme.onSurface
+            style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+            color = colors.accent
         )
     }
+}
+
+/** Quick-mode category tile: emoji over a short name; selection shown by tint, border and weight. */
+@Composable
+private fun CategoryTile(
+    category: CategoryItem,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = ClarityTheme.colors
+    Column(
+        modifier = modifier
+            .pressScale(role = Role.RadioButton, onClick = onClick)
+            .semantics { selected = isSelected }
+            .heightIn(min = 72.dp)
+            .clip(ClarityShapes.card)
+            .background(if (isSelected) colors.accent.copy(alpha = if (colors.isDark) 0.24f else 0.12f) else colors.elevatedCard)
+            .then(
+                if (isSelected) Modifier.border(1.5.dp, colors.accent, ClarityShapes.card) else Modifier
+            )
+            .padding(horizontal = 6.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(text = category.icon, fontSize = 22.sp)
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = category.name,
+            style = ClarityType.caption1.copy(fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium),
+            color = if (isSelected) colors.accent else colors.label,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+/** Detailed-mode category capsule. */
+@Composable
+private fun CategoryChip(
+    category: CategoryItem,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = ClarityTheme.colors
+    Row(
+        modifier = Modifier
+            .pressScale(role = Role.RadioButton, onClick = onClick)
+            .semantics { selected = isSelected }
+            .heightIn(min = 38.dp)
+            .clip(CircleShape)
+            .background(if (isSelected) colors.accentFill else colors.elevatedCard)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = category.icon, fontSize = 15.sp)
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = category.name,
+            style = ClarityType.subheadline.copy(fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal),
+            color = if (isSelected) colors.onAccent else colors.label,
+            maxLines = 1
+        )
+    }
+}
+
+/** Leading chip that creates a custom category. */
+@Composable
+private fun NewCategoryChip(onClick: () -> Unit) {
+    val colors = ClarityTheme.colors
+    Row(
+        modifier = Modifier
+            .pressScale(onClickLabel = "Create a new category", onClick = onClick)
+            .heightIn(min = 38.dp)
+            .clip(CircleShape)
+            .background(colors.accent.copy(alpha = if (colors.isDark) 0.22f else 0.12f))
+            .padding(start = 10.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Add,
+            contentDescription = null,
+            tint = colors.accent,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = "New",
+            style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+            color = colors.accent
+        )
+    }
+}
+
+/** Inline multi-line note field styled as a grouped-list row. */
+@Composable
+private fun NoteField(
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    val colors = ClarityTheme.colors
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        textStyle = ClarityType.body.copy(color = colors.label),
+        cursorBrush = SolidColor(colors.accent),
+        maxLines = 3,
+        modifier = Modifier.fillMaxWidth(),
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .padding(horizontal = 16.dp, vertical = 13.dp)
+            ) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = "Note (optional), e.g. Lunch at Bambalapitiya",
+                        style = ClarityType.body,
+                        color = colors.placeholder,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                innerTextField()
+            }
+        }
+    )
+}
+
+/** Shared "+" toolbar button that opens the add-expense sheet. */
+@Composable
+fun AddExpenseButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    CircleIconButton(
+        icon = Icons.Rounded.Add,
+        contentDescription = "Add expense",
+        onClick = onClick,
+        filled = true,
+        modifier = modifier
+    )
 }

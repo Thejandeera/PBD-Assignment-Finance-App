@@ -1,36 +1,36 @@
 package com.clarity.finance.ui.screens
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.LaptopMac
+import androidx.compose.material.icons.rounded.Receipt
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Sms
+import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,51 +40,67 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.Expense
-import com.clarity.finance.model.SpendingType
+import com.clarity.finance.ui.components.AddExpenseButton
 import com.clarity.finance.ui.components.AddExpenseSheet
+import com.clarity.finance.ui.components.CapsuleProgressBar
 import com.clarity.finance.ui.components.ClarityBottomBar
+import com.clarity.finance.ui.components.ClarityCard
 import com.clarity.finance.ui.components.ClarityNavTab
-import com.clarity.finance.ui.components.DashedInfoBox
-import com.clarity.finance.ui.theme.ClarityAmber
-import com.clarity.finance.ui.theme.ClarityAmberLight
-import com.clarity.finance.ui.theme.ClarityBlue
-import com.clarity.finance.ui.theme.ClarityBlueLight
-import com.clarity.finance.ui.theme.ClarityGreen
-import com.clarity.finance.ui.theme.ClarityGreenBright
-import com.clarity.finance.ui.theme.ClarityGreenLight
-import com.clarity.finance.ui.theme.ClarityPurple
-import com.clarity.finance.ui.theme.ClarityPurpleLight
-import com.clarity.finance.ui.theme.ClarityRed
-import com.clarity.finance.ui.theme.ClarityRedLight
-import com.clarity.finance.ui.theme.ClarityWhite
-import com.clarity.finance.ui.theme.LocalIsDarkTheme
+import com.clarity.finance.ui.components.CollapsingTitleBar
+import com.clarity.finance.ui.components.DisplayDates
+import com.clarity.finance.ui.components.EmptyStateView
+import com.clarity.finance.ui.components.ExpenseDetailSheet
+import com.clarity.finance.ui.components.ExpenseRow
+import com.clarity.finance.ui.components.GroupedSection
+import com.clarity.finance.ui.components.Hairline
+import com.clarity.finance.ui.components.IconTile
+import com.clarity.finance.ui.components.InfoNote
+import com.clarity.finance.ui.components.LargeTitleHeader
+import com.clarity.finance.ui.components.LegendDot
+import com.clarity.finance.ui.components.ListRow
+import com.clarity.finance.ui.components.ProfileAvatar
+import com.clarity.finance.ui.components.SectionTitle
+import com.clarity.finance.ui.components.StackedBar
+import com.clarity.finance.ui.components.VerticalHairline
+import com.clarity.finance.ui.components.isScrolledPast
+import com.clarity.finance.ui.components.pressFade
+import com.clarity.finance.ui.theme.ClarityTheme
+import com.clarity.finance.ui.theme.ClarityType
 import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.util.ProfileImageManager
 import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.DraftViewModel
+import com.clarity.finance.viewmodel.ExpenseMonthlyMetrics
 import com.clarity.finance.viewmodel.ExpenseViewModel
+import java.util.Locale
+import kotlin.math.roundToInt
 
+/**
+ * Home tab. [onSignOutSuccess] is kept for API compatibility; signing out now lives in Settings.
+ */
 @Composable
 fun DashboardScreen(
     authViewModel: AuthViewModel,
-    onSignOutSuccess: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onSignOutSuccess: () -> Unit,
     modifier: Modifier = Modifier,
     expenseViewModel: ExpenseViewModel = hiltViewModel(),
     draftViewModel: DraftViewModel = hiltViewModel(),
     onNavigateToExpensesHistory: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToDrafts: () -> Unit = {}
+    onNavigateToDrafts: () -> Unit = {},
+    onNavigateToIncome: () -> Unit = {},
+    onNavigateToGoal: () -> Unit = {}
 ) {
-    val isDark = LocalIsDarkTheme.current
+    val colors = ClarityTheme.colors
     val currentUser by authViewModel.currentUserFlow.collectAsStateWithLifecycle()
     val historyState by expenseViewModel.historyState.collectAsStateWithLifecycle()
     val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
@@ -92,19 +108,18 @@ fun DashboardScreen(
     val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
     val monthlyIncome by authViewModel.monthlyIncomeFlow.collectAsStateWithLifecycle()
 
-    var showSignOutDialog by remember { mutableStateOf(false) }
     var showAddExpenseSheet by remember { mutableStateOf(false) }
+    var selectedExpense by remember { mutableStateOf<Expense?>(null) }
 
     val displayName = currentUser?.displayName?.ifBlank { "User" } ?: "User"
+    val firstName = displayName.trim().substringBefore(' ').ifBlank { displayName }
+    val greeting = "Hi, $firstName"
 
-    // Real financial data calculations
-    val totalExpense = historyState.metrics.totalExpense
-    val availableAmount = (monthlyIncome - totalExpense).coerceAtLeast(0.0)
+    val photoPath = authViewModel.profilePhotoPath
+    val avatarBitmap = remember(photoPath) { ProfileImageManager.loadBitmap(photoPath) }
 
-    val incomeFormatted = CurrencyFormatter.formatCompact(monthlyIncome, currentCurrency, exchangeRate)
-    val expensesFormatted = CurrencyFormatter.formatCompact(totalExpense, currentCurrency, exchangeRate)
-    val availableFormatted = CurrencyFormatter.formatCompact(availableAmount, currentCurrency, exchangeRate)
-    val currencySymbol = CurrencyFormatter.getSymbol(currentCurrency)
+    val scrollState = rememberScrollState()
+    val isCollapsed = scrollState.isScrolledPast(52.dp)
 
     if (showAddExpenseSheet) {
         AddExpenseSheet(
@@ -118,325 +133,238 @@ fun DashboardScreen(
         )
     }
 
-    if (showSignOutDialog) {
-        AlertDialog(
-            onDismissRequest = { showSignOutDialog = false },
-            title = {
-                Text(
-                    text = "Sign Out",
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-                )
-            },
-            text = {
-                Text(
-                    text = "Are you sure you want to sign out from Clarity Finance?",
-                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showSignOutDialog = false
-                        authViewModel.signOut()
-                        onSignOutSuccess()
-                    }
-                ) {
-                    Text(text = "Sign Out", color = ClarityRed, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showSignOutDialog = false }) {
-                    Text(text = "Cancel", color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface)
-                }
-            },
-            containerColor = if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface,
-            shape = RoundedCornerShape(12.dp)
+    selectedExpense?.let { expense ->
+        ExpenseDetailSheet(
+            expense = expense,
+            currency = currentCurrency,
+            exchangeRate = exchangeRate,
+            onDismiss = { selectedExpense = null },
+            onDelete = { expenseViewModel.deleteExpense(expense.id) }
         )
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.background,
+        containerColor = colors.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             ClarityBottomBar(
                 currentTab = ClarityNavTab.HOME,
                 onTabSelected = { tab ->
                     when (tab) {
-                        ClarityNavTab.HOME -> { /* Already on Home */ }
+                        ClarityNavTab.HOME -> Unit
+                        ClarityNavTab.INCOME -> onNavigateToIncome()
                         ClarityNavTab.INSIGHTS -> onNavigateToInsights()
-                        ClarityNavTab.INCOME -> { /* Future slice */ }
-                        ClarityNavTab.GOAL -> { /* Future slice */ }
+                        ClarityNavTab.GOAL -> onNavigateToGoal()
                     }
-                },
-                onAddClick = { showAddExpenseSheet = true }
+                }
             )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
-            // =========================================================================
-            // 1. STICKY TOP SECTION: Header Greeting & Financial Summary Cards
-            // =========================================================================
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface)
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-            ) {
-                // Header: Month & User Greeting & Settings Icon
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "OCTOBER 2026 ▼",
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Hi, $displayName",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    // Settings & Profile Avatar button
-                    val photoPath = authViewModel.profilePhotoPath
-                    val avatarBitmap = remember(photoPath) {
-                        ProfileImageManager.loadBitmap(photoPath)
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(CircleShape)
-                            .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surfaceVariant)
-                            .border(BorderStroke(1.5.dp, ClarityGreen), CircleShape)
-                            .clickable { onNavigateToSettings() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (avatarBitmap != null) {
-                            Image(
-                                bitmap = avatarBitmap,
-                                contentDescription = "Settings & Profile",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Sticky Summary Cards Row (Equal Height & Equal Width)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Min),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    ColorfulSummaryCard(
-                        title = "INCOME",
-                        amount = incomeFormatted,
-                        currency = currencySymbol,
-                        tag = "▲ Inflow",
-                        accentColor = ClarityGreenBright,
-                        containerColor = ClarityGreenLight,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    )
-                    ColorfulSummaryCard(
-                        title = "EXPENSES",
-                        amount = expensesFormatted,
-                        currency = currencySymbol,
-                        tag = "▼ Outflow",
-                        accentColor = ClarityRed,
-                        containerColor = ClarityRedLight,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    )
-                    ColorfulSummaryCard(
-                        title = "AVAILABLE",
-                        amount = availableFormatted,
-                        currency = currencySymbol,
-                        tag = "★ Net Cash",
-                        accentColor = ClarityBlue,
-                        containerColor = ClarityBlueLight,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                    )
-                }
-            }
-
-            // Divider separating sticky summary header from scrollable body
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline)
-            )
-
-            // =========================================================================
-            // 2. SCROLLABLE BODY CONTENT
-            // =========================================================================
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 14.dp)
+                    .verticalScroll(scrollState)
             ) {
-                // Bank SMS Drafts notification banner if pending drafts exist
-                if (draftCount > 0) {
-                    val bannerBg = if (isDark) Color(0xFF000000) else ClarityAmberLight
-                    val bannerBorder = if (isDark) BorderStroke(1.5.dp, ClarityAmber) else BorderStroke(1.2.dp, ClarityAmber)
+                Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(bannerBg)
-                            .border(bannerBorder, RoundedCornerShape(10.dp))
-                            .clickable { onNavigateToDrafts() }
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                LargeTitleHeader(
+                    title = greeting,
+                    eyebrow = DisplayDates.todayEyebrow(),
+                    trailing = {
+                        AddExpenseButton(onClick = { showAddExpenseSheet = true })
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .pressFade(onClickLabel = "Open settings", onClick = onNavigateToSettings),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "⚡", fontSize = 16.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = "$draftCount Bank SMS Transactions Drafted",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Tap to review & approve into expenses",
-                                        fontSize = 10.sp,
-                                        color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "REVIEW →",
-                                fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                color = ClarityAmber
+                            ProfileAvatar(
+                                bitmap = avatarBitmap,
+                                name = displayName,
+                                size = 36.dp,
+                                contentDescription = "Profile and settings"
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
+                )
+
+                BalanceCard(
+                    income = monthlyIncome,
+                    expenses = historyState.metrics.totalExpense,
+                    currency = currentCurrency,
+                    exchangeRate = exchangeRate,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                AnimatedVisibility(visible = draftCount > 0) {
+                    GroupedSection(modifier = Modifier.padding(top = 16.dp)) {
+                        ListRow(
+                            title = if (draftCount == 1) "1 bank SMS to review" else "$draftCount bank SMS to review",
+                            subtitle = "Approve drafted transactions as expenses",
+                            leading = { IconTile(icon = Icons.Rounded.Sms, background = colors.indigo) },
+                            showChevron = true,
+                            onClick = onNavigateToDrafts
+                        )
+                    }
                 }
 
-                // Primary Savings Goal Card
+                Spacer(modifier = Modifier.height(16.dp))
+
                 SavingsGoalCard(
-                    currentCurrency = currentCurrency,
-                    exchangeRate = exchangeRate
+                    currency = currentCurrency,
+                    exchangeRate = exchangeRate,
+                    modifier = Modifier.padding(horizontal = 16.dp)
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Pending Payments Card
                 PendingPaymentsCard()
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Live Spending Overview Card (Committed vs Discretionary)
-                SpendingOverviewCard(
+                SpendingMixCard(
                     metrics = historyState.metrics,
-                    currentCurrency = currentCurrency,
-                    exchangeRate = exchangeRate
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // Recent Transactions
-                RecentTransactionsSection(
-                    expenses = historyState.expenses,
-                    currentCurrency = currentCurrency,
+                    currency = currentCurrency,
                     exchangeRate = exchangeRate,
-                    onSeeAllClick = onNavigateToExpensesHistory
+                    modifier = Modifier.padding(horizontal = 16.dp)
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
+
+                RecentTransactionsSection(
+                    expenses = historyState.expenses,
+                    currency = currentCurrency,
+                    exchangeRate = exchangeRate,
+                    onSeeAllClick = onNavigateToExpensesHistory,
+                    onExpenseClick = { selectedExpense = it },
+                    onAddClick = { showAddExpenseSheet = true }
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
             }
+
+            CollapsingTitleBar(title = greeting, collapsed = isCollapsed)
         }
     }
 }
 
 @Composable
-private fun ColorfulSummaryCard(
-    title: String,
-    amount: String,
+private fun BalanceCard(
+    income: Double,
+    expenses: Double,
     currency: String,
-    tag: String,
-    accentColor: Color,
-    containerColor: Color,
+    exchangeRate: Double,
     modifier: Modifier = Modifier
 ) {
-    val isDark = LocalIsDarkTheme.current
-    val effectiveBg = if (isDark) Color(0xFF000000) else containerColor
-    val cardBorder = if (isDark) BorderStroke(1.5.dp, accentColor) else BorderStroke(1.2.dp, accentColor.copy(alpha = 0.5f))
+    val colors = ClarityTheme.colors
+    val available = (income - expenses).coerceAtLeast(0.0)
+    val spentRatio = if (income > 0.0) (expenses / income).toFloat() else 0f
+    val spentPercent = (spentRatio * 100).roundToInt()
+    val progressColor = when {
+        spentRatio > 1f -> colors.red
+        spentRatio >= 0.75f -> colors.orange
+        else -> colors.green
+    }
 
-    Box(
-        modifier = modifier
-            .fillMaxHeight()
-            .background(effectiveBg, RoundedCornerShape(10.dp))
-            .border(cardBorder, RoundedCornerShape(10.dp))
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+    ClarityCard(modifier = modifier) {
+        Column(modifier = Modifier.semantics(mergeDescendants = true) {}) {
             Text(
-                text = title,
-                fontSize = 9.sp,
-                fontFamily = FontFamily.Monospace,
-                color = accentColor,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = amount,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
+                text = "Available to Spend",
+                style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                color = colors.secondaryLabel
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "$currency • $tag",
-                fontSize = 9.sp,
-                fontFamily = FontFamily.Monospace,
-                color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
+                text = CurrencyFormatter.format(available, currency, exchangeRate),
+                style = ClarityType.amountHero,
+                color = colors.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (income > 0.0) {
+                Spacer(modifier = Modifier.height(12.dp))
+                CapsuleProgressBar(progress = spentRatio, color = progressColor, height = 6.dp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = if (spentRatio > 1f) {
+                        "Spending is above this month's income"
+                    } else {
+                        "$spentPercent% of this month's income spent"
+                    },
+                    style = ClarityType.footnote,
+                    color = colors.secondaryLabel
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+        Hairline()
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+            BalanceStat(
+                label = "Income",
+                amount = CurrencyFormatter.format(income, currency, exchangeRate),
+                icon = Icons.Rounded.ArrowDownward,
+                tint = colors.income,
+                modifier = Modifier.weight(1f)
+            )
+            VerticalHairline(modifier = Modifier.fillMaxHeight())
+            BalanceStat(
+                label = "Expenses",
+                amount = CurrencyFormatter.format(expenses, currency, exchangeRate),
+                icon = Icons.Rounded.ArrowUpward,
+                tint = colors.outflow,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 14.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BalanceStat(
+    label: String,
+    amount: String,
+    icon: ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    val colors = ClarityTheme.colors
+    Row(
+        modifier = modifier.semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(tint.copy(alpha = if (colors.isDark) 0.24f else 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column {
+            Text(text = label, style = ClarityType.footnote, color = colors.secondaryLabel)
+            Text(
+                text = amount,
+                style = ClarityType.amountCallout,
+                color = colors.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -444,410 +372,189 @@ private fun ColorfulSummaryCard(
 
 @Composable
 private fun SavingsGoalCard(
-    currentCurrency: String,
-    exchangeRate: Double
+    currency: String,
+    exchangeRate: Double,
+    modifier: Modifier = Modifier
 ) {
-    val isDark = LocalIsDarkTheme.current
-    val currentSavedInLkr = 11_200.0
+    val colors = ClarityTheme.colors
+    val savedInLkr = 11_200.0
     val targetInLkr = 490_000.0
     val monthlyTargetInLkr = 39_900.0
+    val progress = (savedInLkr / targetInLkr).toFloat()
 
-    val currentFormatted = CurrencyFormatter.format(currentSavedInLkr, currentCurrency, exchangeRate)
-    val targetFormatted = CurrencyFormatter.format(targetInLkr, currentCurrency, exchangeRate)
-    val monthlyFormatted = CurrencyFormatter.format(monthlyTargetInLkr, currentCurrency, exchangeRate)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.2.dp, if (isDark) ClarityPurple else ClarityPurple.copy(alpha = 0.4f)), RoundedCornerShape(10.dp))
-            .padding(16.dp)
-    ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "PRIMARY SAVINGS GOAL",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = ClarityPurple
-                )
-                Box(
-                    modifier = Modifier
-                        .background(if (isDark) Color(0xFF000000) else ClarityPurpleLight, RoundedCornerShape(4.dp))
-                        .border(BorderStroke(1.dp, ClarityPurple), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = "2.3%",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isDark) Color(0xFFFFFFFF) else ClarityPurple
-                    )
-                }
+    ClarityCard(modifier = modifier) {
+        Row(
+            modifier = Modifier.semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconTile(icon = Icons.Rounded.LaptopMac, background = colors.goal, size = 40.dp)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "MacBook Pro M4", style = ClarityType.headline, color = colors.label)
+                Text(text = "Primary savings goal", style = ClarityType.subheadline, color = colors.secondaryLabel)
             }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
             Text(
-                text = "MacBook Pro M4",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            LinearProgressIndicator(
-                progress = { 0.023f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = ClarityPurple,
-                trackColor = if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = currentFormatted,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Target: $targetFormatted",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            DashedInfoBox(
-                text = "Save $monthlyFormatted/mo to finish in Oct 2027   View Goal →",
-                prefix = "🎯"
+                text = String.format(Locale.US, "%.1f%%", progress * 100),
+                style = ClarityType.headline,
+                color = colors.purpleText
             )
         }
+
+        Spacer(modifier = Modifier.height(14.dp))
+        CapsuleProgressBar(progress = progress, color = colors.goal, height = 8.dp)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "${CurrencyFormatter.format(savedInLkr, currency, exchangeRate)} saved",
+                style = ClarityType.footnote,
+                color = colors.secondaryLabel,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "of ${CurrencyFormatter.format(targetInLkr, currency, exchangeRate)}",
+                style = ClarityType.footnote,
+                color = colors.secondaryLabel
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+        InfoNote(
+            text = "Save ${CurrencyFormatter.format(monthlyTargetInLkr, currency, exchangeRate)} a month to reach it by October 2027.",
+            icon = Icons.Rounded.TrackChanges,
+            iconTint = colors.goal
+        )
     }
 }
 
 @Composable
 private fun PendingPaymentsCard() {
-    val isDark = LocalIsDarkTheme.current
-    val cardBg = if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface
-    val iconBg = if (isDark) Color(0xFF000000) else ClarityAmberLight
+    val colors = ClarityTheme.colors
+    GroupedSection {
+        ListRow(
+            title = "2 Pending Payments",
+            subtitle = "Upwork \$180 · DevContract LKR 30k",
+            leading = { IconTile(icon = Icons.Rounded.Schedule, background = colors.teal) }
+        )
+    }
+}
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(cardBg, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.2.dp, if (isDark) ClarityAmber else ClarityAmber.copy(alpha = 0.4f)), RoundedCornerShape(10.dp))
-            .padding(14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(iconBg, RoundedCornerShape(6.dp))
-                    .border(BorderStroke(1.dp, ClarityAmber), RoundedCornerShape(6.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "⚠️",
-                    fontSize = 14.sp
-                )
-            }
+@Composable
+private fun SpendingMixCard(
+    metrics: ExpenseMonthlyMetrics,
+    currency: String,
+    exchangeRate: Double,
+    modifier: Modifier = Modifier
+) {
+    val colors = ClarityTheme.colors
+    val hasSpending = metrics.totalExpense > 0.0
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "2 Pending Inflow Payments",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Upwork $180 & DevContract LKR 30k",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .background(ClarityAmber, RoundedCornerShape(6.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "VIEW",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ClarityWhite
-                )
-            }
+    ClarityCard(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Spending Mix",
+                style = ClarityType.headline,
+                color = colors.label,
+                modifier = Modifier.weight(1f)
+            )
+            Text(text = "Target 60 / 40", style = ClarityType.footnote, color = colors.secondaryLabel)
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        StackedBar(
+            segments = listOf(
+                metrics.committedTotal.toFloat() to colors.committed,
+                metrics.discretionaryTotal.toFloat() to colors.discretionary
+            )
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        if (hasSpending) {
+            LegendRow(
+                label = "Committed",
+                percentage = metrics.committedPercentage,
+                amount = CurrencyFormatter.format(metrics.committedTotal, currency, exchangeRate),
+                color = colors.committed
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            LegendRow(
+                label = "Discretionary",
+                percentage = metrics.discretionaryPercentage,
+                amount = CurrencyFormatter.format(metrics.discretionaryTotal, currency, exchangeRate),
+                color = colors.discretionary
+            )
+        } else {
+            Text(
+                text = "No spending recorded this month yet.",
+                style = ClarityType.footnote,
+                color = colors.secondaryLabel
+            )
         }
     }
 }
 
 @Composable
-private fun SpendingOverviewCard(
-    metrics: com.clarity.finance.viewmodel.ExpenseMonthlyMetrics,
-    currentCurrency: String,
-    exchangeRate: Double
+internal fun LegendRow(
+    label: String,
+    percentage: Int,
+    amount: String,
+    color: Color,
+    modifier: Modifier = Modifier
 ) {
-    val isDark = LocalIsDarkTheme.current
-    val total = metrics.totalExpense
-    val committedPct = if (total > 0) metrics.committedPercentage else 60
-    val discretionaryPct = if (total > 0) metrics.discretionaryPercentage else 40
-
-    val committedFormatted = CurrencyFormatter.format(metrics.committedTotal, currentCurrency, exchangeRate)
-    val discretionaryFormatted = CurrencyFormatter.format(metrics.discretionaryTotal, currentCurrency, exchangeRate)
-
-    Box(
-        modifier = Modifier
+    val colors = ClarityTheme.colors
+    Row(
+        modifier = modifier
             .fillMaxWidth()
-            .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-            .border(BorderStroke(1.dp, if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
-            .padding(16.dp)
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Spending Overview",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "60/40 Target Rule",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Committed vs Discretionary Multi-Color Bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(20.dp)
-                    .clip(RoundedCornerShape(6.dp))
-            ) {
-                val committedWeight = (committedPct.coerceAtLeast(5)).toFloat()
-                val discretionaryWeight = (discretionaryPct.coerceAtLeast(5)).toFloat()
-
-                Box(
-                    modifier = Modifier
-                        .weight(committedWeight)
-                        .background(ClarityBlue),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "$committedPct% Committed",
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = ClarityWhite,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .weight(discretionaryWeight)
-                        .background(ClarityRed),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "$discretionaryPct% Disc.",
-                        fontSize = 9.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = ClarityWhite,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(8.dp).background(ClarityBlue, CircleShape))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Committed: $committedFormatted",
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(8.dp).background(ClarityRed, CircleShape))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Discretionary: $discretionaryFormatted",
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
+        LegendDot(color = color, size = 10.dp)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = label, style = ClarityType.subheadline, color = colors.label)
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = "$percentage%",
+            style = ClarityType.subheadline,
+            color = colors.secondaryLabel,
+            modifier = Modifier.weight(1f)
+        )
+        Text(text = amount, style = ClarityType.amountCallout, color = colors.label, maxLines = 1)
     }
 }
 
 @Composable
 private fun RecentTransactionsSection(
     expenses: List<Expense>,
-    currentCurrency: String,
+    currency: String,
     exchangeRate: Double,
-    onSeeAllClick: () -> Unit
+    onSeeAllClick: () -> Unit,
+    onExpenseClick: (Expense) -> Unit,
+    onAddClick: () -> Unit
 ) {
-    val isDark = LocalIsDarkTheme.current
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "RECENT TRANSACTIONS",
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "See all →",
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = ClarityGreenBright,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .clickable { onSeeAllClick() }
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-            )
-        }
+    SectionTitle(
+        title = "Recent Transactions",
+        actionLabel = if (expenses.isNotEmpty()) "See All" else null,
+        onAction = onSeeAllClick
+    )
+    Spacer(modifier = Modifier.height(4.dp))
 
-        Spacer(modifier = Modifier.height(10.dp))
-
+    GroupedSection {
         if (expenses.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp))
-                    .border(BorderStroke(1.dp, if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
-                    .padding(20.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No expenses recorded yet. Tap + to add one.",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            EmptyStateView(
+                icon = Icons.Rounded.Receipt,
+                title = "No Expenses Yet",
+                message = "Expenses you log this month will appear here.",
+                actionLabel = "Add Expense",
+                onAction = onAddClick
+            )
         } else {
-            expenses.take(4).forEach { expense ->
-                val amountFormatted = CurrencyFormatter.format(expense.amount, currentCurrency, exchangeRate)
-                val isCommitted = expense.type == SpendingType.COMMITTED
-                val badgeBorderColor = if (isCommitted) ClarityBlue else ClarityRed
-                val badgeColor = if (isDark) Color(0xFF000000) else if (isCommitted) ClarityBlueLight else ClarityRedLight
-                val badgeTextColor = if (isDark) Color(0xFFFFFFFF) else if (isCommitted) ClarityBlue else ClarityRed
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-                        .border(BorderStroke(1.dp, if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
-                        .padding(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .background(badgeColor, RoundedCornerShape(8.dp))
-                                .border(BorderStroke(1.dp, badgeBorderColor), RoundedCornerShape(8.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = expense.categoryIcon.ifBlank { "🏷️" },
-                                fontSize = 16.sp
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = expense.categoryName,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurface
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = expense.date,
-                                    fontSize = 10.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = if (isDark) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .background(badgeColor, RoundedCornerShape(3.dp))
-                                        .border(BorderStroke(0.5.dp, badgeBorderColor), RoundedCornerShape(3.dp))
-                                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                                ) {
-                                    Text(
-                                        text = if (isCommitted) "COMMITTED" else "DISC.",
-                                        fontSize = 8.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Bold,
-                                        color = badgeTextColor
-                                    )
-                                }
-                            }
-                        }
-
-                        Text(
-                            text = "-$amountFormatted",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = ClarityRed
-                        )
-                    }
-                }
+            val recent = expenses.take(4)
+            recent.forEachIndexed { index, expense ->
+                ExpenseRow(
+                    expense = expense,
+                    currency = currency,
+                    exchangeRate = exchangeRate,
+                    showDivider = index < recent.lastIndex,
+                    onClick = { onExpenseClick(expense) }
+                )
             }
         }
     }
