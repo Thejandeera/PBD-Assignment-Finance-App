@@ -1,31 +1,31 @@
 package com.clarity.finance.ui.screens
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.Lightbulb
+import androidx.compose.material.icons.rounded.Payments
+import androidx.compose.material.icons.rounded.Smartphone
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,38 +35,48 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.CategorySpending
 import com.clarity.finance.model.PaymentChannelSpending
+import com.clarity.finance.model.PaymentMethod
 import com.clarity.finance.model.SpendingLeakAlert
-import com.clarity.finance.model.SpendingType
 import com.clarity.finance.model.VelocityMetrics
+import com.clarity.finance.ui.components.ActivityIndicator
+import com.clarity.finance.ui.components.AddExpenseButton
 import com.clarity.finance.ui.components.AddExpenseSheet
+import com.clarity.finance.ui.components.CapsuleProgressBar
+import com.clarity.finance.ui.components.CircleIconButton
 import com.clarity.finance.ui.components.ClarityBottomBar
+import com.clarity.finance.ui.components.ClarityCard
 import com.clarity.finance.ui.components.ClarityNavTab
-import com.clarity.finance.ui.theme.ClarityAmber
-import com.clarity.finance.ui.theme.ClarityAmberLight
-import com.clarity.finance.ui.theme.ClarityBlue
-import com.clarity.finance.ui.theme.ClarityBlueLight
-import com.clarity.finance.ui.theme.ClarityGreen
-import com.clarity.finance.ui.theme.ClarityGreenBright
-import com.clarity.finance.ui.theme.ClarityRed
-import com.clarity.finance.ui.theme.ClarityRedLight
-import com.clarity.finance.ui.theme.ClarityWhite
-import com.clarity.finance.ui.theme.LocalIsDarkTheme
+import com.clarity.finance.ui.components.CollapsingTitleBar
+import com.clarity.finance.ui.components.EmojiBadge
+import com.clarity.finance.ui.components.EmptyStateView
+import com.clarity.finance.ui.components.GroupedSection
+import com.clarity.finance.ui.components.IconTile
+import com.clarity.finance.ui.components.LargeTitleHeader
+import com.clarity.finance.ui.components.ListRow
+import com.clarity.finance.ui.components.SectionTitle
+import com.clarity.finance.ui.components.StackedBar
+import com.clarity.finance.ui.components.VerticalHairline
+import com.clarity.finance.ui.components.isScrolledPast
+import com.clarity.finance.ui.components.spendingTypeColor
+import com.clarity.finance.ui.theme.ClarityTheme
+import com.clarity.finance.ui.theme.ClarityType
 import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.ExpenseViewModel
 import com.clarity.finance.viewmodel.InsightsViewModel
-import java.util.Locale
 
 @Composable
 fun InsightsScreen(
@@ -74,12 +84,18 @@ fun InsightsScreen(
     modifier: Modifier = Modifier,
     viewModel: InsightsViewModel = hiltViewModel(),
     expenseViewModel: ExpenseViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel()
+    authViewModel: AuthViewModel = hiltViewModel(),
+    onNavigateToIncome: () -> Unit = {},
+    onNavigateToGoal: () -> Unit = {}
 ) {
+    val colors = ClarityTheme.colors
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
     val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
     var showAddExpenseSheet by remember { mutableStateOf(false) }
+
+    val scrollState = rememberScrollState()
+    val isCollapsed = scrollState.isScrolledPast(52.dp)
 
     if (showAddExpenseSheet) {
         AddExpenseSheet(
@@ -90,563 +106,344 @@ fun InsightsScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline))
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
-            ) {
-                Text(
-                    text = "INSIGHTS & ANALYTICS",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        },
+        containerColor = colors.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             ClarityBottomBar(
                 currentTab = ClarityNavTab.INSIGHTS,
                 onTabSelected = { tab ->
                     when (tab) {
                         ClarityNavTab.HOME -> onNavigateToDashboard()
-                        ClarityNavTab.INSIGHTS -> { /* Already on insights */ }
-                        ClarityNavTab.INCOME -> { /* Future slice */ }
-                        ClarityNavTab.GOAL -> { /* Future slice */ }
+                        ClarityNavTab.INCOME -> onNavigateToIncome()
+                        ClarityNavTab.INSIGHTS -> Unit
+                        ClarityNavTab.GOAL -> onNavigateToGoal()
                     }
-                },
-                onAddClick = { showAddExpenseSheet = true }
+                }
             )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 14.dp)
+                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
-            // =================================================================
-            // 1. Month Switcher Bar (< October 2026 >)
-            // =================================================================
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
             ) {
-                IconButton(
-                    onClick = { viewModel.selectPreviousMonth() },
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                        contentDescription = "Previous Month",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+                Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
-                Text(
-                    text = state.displayMonthHeader.uppercase(Locale.US),
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                LargeTitleHeader(
+                    title = "Insights",
+                    trailing = { AddExpenseButton(onClick = { showAddExpenseSheet = true }) }
                 )
 
-                IconButton(
-                    onClick = { viewModel.selectNextMonth() },
-                    enabled = state.canGoForward,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "Next Month",
-                        tint = if (state.canGoForward) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
-                    )
-                }
-            }
+                MonthSwitcher(
+                    title = state.displayMonthHeader,
+                    canGoForward = state.canGoForward,
+                    onPrevious = { viewModel.selectPreviousMonth() },
+                    onNext = { viewModel.selectNextMonth() },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            if (state.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(250.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            } else if (state.totalOutflow == 0.0) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(12.dp))
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "[i]",
-                            fontSize = 22.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                when {
+                    state.isLoading -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(240.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            ActivityIndicator(size = 28.dp)
+                        }
+                    }
+
+                    state.totalOutflow == 0.0 -> {
+                        GroupedSection {
+                            EmptyStateView(
+                                icon = Icons.Rounded.BarChart,
+                                title = "No Spending in ${state.displayMonthHeader}",
+                                message = "Log expenses to see where your money goes, by category and payment method.",
+                                actionLabel = "Add Expense",
+                                onAction = { showAddExpenseSheet = true }
+                            )
+                        }
+                    }
+
+                    else -> {
+                        TotalSpentCard(
+                            totalOutflow = state.totalOutflow,
+                            committedAmount = state.committedAmount,
+                            committedPercentage = state.committedPercentage,
+                            discretionaryAmount = state.discretionaryAmount,
+                            discretionaryPercentage = state.discretionaryPercentage,
+                            currency = currentCurrency,
+                            exchangeRate = exchangeRate,
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "No expenses recorded for ${state.displayMonthHeader}.",
-                            fontSize = 13.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center
+
+                        state.spendingLeak?.let { leak ->
+                            Spacer(modifier = Modifier.height(16.dp))
+                            SpendingLeakCard(
+                                leak = leak,
+                                currency = currentCurrency,
+                                exchangeRate = exchangeRate,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        SpendingPaceCard(
+                            velocity = state.velocity,
+                            currency = currentCurrency,
+                            exchangeRate = exchangeRate,
+                            modifier = Modifier.padding(horizontal = 16.dp)
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Log transactions via the '+' button on Dashboard to see visual spending patterns.",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        CategoryBreakdownSection(
+                            categories = state.topCategories,
+                            currency = currentCurrency,
+                            exchangeRate = exchangeRate
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        PaymentChannelSection(
+                            channels = state.channelBreakdown,
+                            currency = currentCurrency,
+                            exchangeRate = exchangeRate
                         )
                     }
                 }
-            } else {
-                // =============================================================
-                // 2. Hero: Committed vs Discretionary Ratio
-                // =============================================================
-                CommittedVsDiscretionaryCard(
-                    totalOutflow = state.totalOutflow,
-                    committedAmount = state.committedAmount,
-                    committedPercentage = state.committedPercentage,
-                    discretionaryAmount = state.discretionaryAmount,
-                    discretionaryPercentage = state.discretionaryPercentage,
-                    currentCurrency = currentCurrency,
-                    exchangeRate = exchangeRate
-                )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // =============================================================
-                // 3. Top Spending Leak & Goal Link
-                // =============================================================
-                state.spendingLeak?.let { leak ->
-                    SpendingLeakCard(
-                        leak = leak,
-                        currentCurrency = currentCurrency,
-                        exchangeRate = exchangeRate
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-                // =============================================================
-                // 4. Burn Rate Velocity & Month-End Projection
-                // =============================================================
-                BurnRateCard(
-                    velocity = state.velocity,
-                    currentCurrency = currentCurrency,
-                    exchangeRate = exchangeRate
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // =============================================================
-                // 5. Category Breakdown Ranked Progress Bars
-                // =============================================================
-                CategoryBreakdownSection(
-                    categories = state.topCategories,
-                    currentCurrency = currentCurrency,
-                    exchangeRate = exchangeRate
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // =============================================================
-                // 6. Payment Channel Distribution
-                // =============================================================
-                PaymentChannelSection(
-                    channels = state.channelBreakdown,
-                    currentCurrency = currentCurrency,
-                    exchangeRate = exchangeRate
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(32.dp))
             }
+
+            CollapsingTitleBar(title = "Insights", collapsed = isCollapsed)
         }
     }
 }
 
 @Composable
-private fun CommittedVsDiscretionaryCard(
+private fun MonthSwitcher(
+    title: String,
+    canGoForward: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    ClarityCard(
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CircleIconButton(
+                icon = Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                contentDescription = "Previous month",
+                onClick = onPrevious,
+                diameter = 30.dp
+            )
+            Text(
+                text = title,
+                style = ClarityType.headline,
+                color = ClarityTheme.colors.label,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { liveRegion = LiveRegionMode.Polite }
+            )
+            CircleIconButton(
+                icon = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                contentDescription = "Next month",
+                onClick = onNext,
+                enabled = canGoForward,
+                diameter = 30.dp
+            )
+        }
+    }
+}
+
+@Composable
+private fun TotalSpentCard(
     totalOutflow: Double,
     committedAmount: Double,
     committedPercentage: Int,
     discretionaryAmount: Double,
     discretionaryPercentage: Int,
-    currentCurrency: String,
-    exchangeRate: Double
+    currency: String,
+    exchangeRate: Double,
+    modifier: Modifier = Modifier
 ) {
-    val totalFormatted = CurrencyFormatter.format(totalOutflow, currentCurrency, exchangeRate)
-    val committedFormatted = CurrencyFormatter.format(committedAmount, currentCurrency, exchangeRate)
-    val discretionaryFormatted = CurrencyFormatter.format(discretionaryAmount, currentCurrency, exchangeRate)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.2.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(12.dp))
-            .padding(16.dp)
-    ) {
-        Column {
+    val colors = ClarityTheme.colors
+    ClarityCard(modifier = modifier) {
+        Column(modifier = Modifier.semantics(mergeDescendants = true) {}) {
             Text(
-                text = "TOTAL MONTHLY OUTFLOW",
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "Total Spent",
+                style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                color = colors.secondaryLabel
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = totalFormatted,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                color = ClarityRed
+                text = CurrencyFormatter.format(totalOutflow, currency, exchangeRate),
+                style = ClarityType.amountHero,
+                color = colors.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Dual-segment ratio bar
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(16.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
-            ) {
-                Row(modifier = Modifier.fillMaxSize()) {
-                    if (committedPercentage > 0) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .weight((committedPercentage.coerceAtLeast(1)).toFloat())
-                                .background(ClarityBlue)
-                        )
-                    }
-                    if (discretionaryPercentage > 0) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .weight((discretionaryPercentage.coerceAtLeast(1)).toFloat())
-                                .background(ClarityRed)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Legend indicators
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Committed Legend
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .background(ClarityBlue, RoundedCornerShape(2.dp))
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Column {
-                        Text(
-                            text = "COMMITTED ($committedPercentage%)",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ClarityBlue
-                        )
-                        Text(
-                            text = committedFormatted,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                // Discretionary Legend
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .background(ClarityRed, RoundedCornerShape(2.dp))
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "DISCRETIONARY ($discretionaryPercentage%)",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ClarityRed
-                        )
-                        Text(
-                            text = discretionaryFormatted,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
         }
+        Spacer(modifier = Modifier.height(14.dp))
+        StackedBar(
+            segments = listOf(
+                committedAmount.toFloat() to colors.committed,
+                discretionaryAmount.toFloat() to colors.discretionary
+            )
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        LegendRow(
+            label = "Committed",
+            percentage = committedPercentage,
+            amount = CurrencyFormatter.format(committedAmount, currency, exchangeRate),
+            color = colors.committed
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        LegendRow(
+            label = "Discretionary",
+            percentage = discretionaryPercentage,
+            amount = CurrencyFormatter.format(discretionaryAmount, currency, exchangeRate),
+            color = colors.discretionary
+        )
     }
 }
 
 @Composable
 private fun SpendingLeakCard(
     leak: SpendingLeakAlert,
-    currentCurrency: String,
-    exchangeRate: Double
+    currency: String,
+    exchangeRate: Double,
+    modifier: Modifier = Modifier
 ) {
-    val formattedLeakAmount = CurrencyFormatter.format(leak.amount, currentCurrency, exchangeRate)
-    val isDark = LocalIsDarkTheme.current
-    val cardBg = if (isDark) Color(0xFF000000) else ClarityAmberLight
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(cardBg, RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.2.dp, ClarityAmber), RoundedCornerShape(12.dp))
-            .padding(16.dp)
-    ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "💡 TOP SPENDING LEAK DETECTED",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = ClarityAmber
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
+    val colors = ClarityTheme.colors
+    val amount = CurrencyFormatter.format(leak.amount, currency, exchangeRate)
+    ClarityCard(modifier = modifier.semantics(mergeDescendants = true) {}) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconTile(icon = Icons.Rounded.Lightbulb, background = colors.orange)
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = "${leak.categoryIcon} ${leak.categoryName} accounts for ${leak.percentageOfDiscretionary}% of your discretionary spending ($formattedLeakAmount).",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                text = "Biggest Spending Leak",
+                style = ClarityType.headline,
+                color = colors.label
             )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "${leak.categoryIcon} ${leak.categoryName} is ${leak.percentageOfDiscretionary}% of your discretionary spending ($amount).",
+            style = ClarityType.body,
+            color = colors.label
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = leak.recommendationText,
+            style = ClarityType.subheadline,
+            color = colors.secondaryLabel
+        )
+    }
+}
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = leak.recommendationText,
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                lineHeight = 16.sp
+@Composable
+private fun SpendingPaceCard(
+    velocity: VelocityMetrics,
+    currency: String,
+    exchangeRate: Double,
+    modifier: Modifier = Modifier
+) {
+    ClarityCard(modifier = modifier) {
+        Text(
+            text = "Spending Pace",
+            style = ClarityType.headline,
+            color = ClarityTheme.colors.label
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+            PaceStat(
+                label = "Daily Average",
+                value = CurrencyFormatter.format(velocity.dailyAverage, currency, exchangeRate),
+                caption = if (velocity.daysElapsed == 1) "Over 1 day" else "Over ${velocity.daysElapsed} days",
+                modifier = Modifier.weight(1f)
+            )
+            VerticalHairline(modifier = Modifier.fillMaxHeight())
+            PaceStat(
+                label = "Projected Month End",
+                value = CurrencyFormatter.format(velocity.projectedMonthEnd, currency, exchangeRate),
+                caption = "At the current pace",
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 14.dp)
             )
         }
     }
 }
 
 @Composable
-private fun BurnRateCard(
-    velocity: VelocityMetrics,
-    currentCurrency: String,
-    exchangeRate: Double
+private fun PaceStat(
+    label: String,
+    value: String,
+    caption: String,
+    modifier: Modifier = Modifier
 ) {
-    val dailyBurn = CurrencyFormatter.format(velocity.dailyAverage, currentCurrency, exchangeRate)
-    val projectedBurn = CurrencyFormatter.format(velocity.projectedMonthEnd, currentCurrency, exchangeRate)
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(12.dp))
-            .padding(14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Daily Average
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "DAILY AVERAGE BURN",
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "$dailyBurn / day",
-                    fontSize = 14.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = ClarityRed
-                )
-                Text(
-                    text = "Over ${velocity.daysElapsed} days elapsed",
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            // Month-End Projection
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "PROJECTED OUTFLOW",
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = projectedBurn,
-                    fontSize = 14.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "At current burn velocity",
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+    val colors = ClarityTheme.colors
+    Column(modifier = modifier.semantics(mergeDescendants = true) {}) {
+        Text(text = label, style = ClarityType.footnote, color = colors.secondaryLabel)
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = value,
+            style = ClarityType.amountCallout.copy(fontSize = ClarityType.title3.fontSize),
+            color = colors.label,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(text = caption, style = ClarityType.footnote, color = colors.secondaryLabel)
     }
 }
 
 @Composable
 private fun CategoryBreakdownSection(
     categories: List<CategorySpending>,
-    currentCurrency: String,
+    currency: String,
     exchangeRate: Double
 ) {
-    val isDark = LocalIsDarkTheme.current
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "SPENDING BY CATEGORY",
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        categories.forEach { category ->
-            val isCommitted = category.type == SpendingType.COMMITTED
-            val badgeColor = if (isCommitted) ClarityBlue else ClarityRed
-            val badgeBg = if (isDark) Color(0xFF000000) else if (isCommitted) ClarityBlueLight else ClarityRedLight
-            val badgeBorder = if (isDark) BorderStroke(1.dp, badgeColor) else BorderStroke(1.dp, badgeColor.copy(alpha = 0.3f))
-            val barColor = if (isCommitted) ClarityBlue else ClarityGreenBright
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .background(if (isDark) Color(0xFF000000) else MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
-                    .border(BorderStroke(1.dp, if (isDark) Color(0xFF333333) else MaterialTheme.colorScheme.outline), RoundedCornerShape(10.dp))
-                    .padding(12.dp)
-            ) {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = category.categoryIcon, fontSize = 16.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = category.categoryName,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(badgeBg, RoundedCornerShape(3.dp))
-                                    .border(badgeBorder, RoundedCornerShape(3.dp))
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            ) {
-                                Text(
-                                    text = if (isCommitted) "COMMITTED" else "DISCRETIONARY",
-                                    fontSize = 8.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isDark) Color(0xFFFFFFFF) else badgeColor
-                                )
-                            }
-                        }
-
-                        Text(
-                            text = "-${CurrencyFormatter.format(category.amount, currentCurrency, exchangeRate)}",
-                            fontSize = 13.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = ClarityRed
-                        )
-                    }
-
+    SectionTitle(title = "By Category")
+    Spacer(modifier = Modifier.height(4.dp))
+    GroupedSection {
+        categories.forEachIndexed { index, category ->
+            val typeColor = spendingTypeColor(category.type)
+            ListRow(
+                title = category.categoryName,
+                subtitle = "${category.type.displayName} · ${category.percentageOfTotal}% of spending",
+                leading = { EmojiBadge(emoji = category.categoryIcon, tint = typeColor) },
+                trailing = {
+                    Text(
+                        text = CurrencyFormatter.format(category.amount, currency, exchangeRate),
+                        style = ClarityType.amountBody,
+                        color = ClarityTheme.colors.label,
+                        maxLines = 1
+                    )
+                },
+                below = {
                     Spacer(modifier = Modifier.height(8.dp))
-
-                    // Progress bar
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth((category.percentageOfTotal / 100f).coerceIn(0.01f, 1f))
-                                    .background(barColor)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "${category.percentageOfTotal}%",
-                            fontSize = 10.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
+                    CapsuleProgressBar(
+                        progress = category.percentageOfTotal / 100f,
+                        color = typeColor,
+                        height = 4.dp
+                    )
+                },
+                showDivider = index < categories.lastIndex
+            )
         }
     }
 }
@@ -654,57 +451,40 @@ private fun CategoryBreakdownSection(
 @Composable
 private fun PaymentChannelSection(
     channels: List<PaymentChannelSpending>,
-    currentCurrency: String,
+    currency: String,
     exchangeRate: Double
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = "PAYMENT CHANNELS",
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            channels.forEach { channel ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-                        .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline), RoundedCornerShape(8.dp))
-                        .padding(10.dp)
-                ) {
-                    Column {
-                        Text(
-                            text = channel.channel.displayName.uppercase(Locale.US),
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = CurrencyFormatter.format(channel.amount, currentCurrency, exchangeRate),
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "${channel.percentageOfTotal}% of total",
-                            fontSize = 9.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
+    if (channels.isEmpty()) return
+    SectionTitle(title = "By Payment Method")
+    Spacer(modifier = Modifier.height(4.dp))
+    GroupedSection {
+        channels.forEachIndexed { index, channel ->
+            val (icon, tint) = channelAppearance(channel.channel)
+            ListRow(
+                title = channel.channel.displayName,
+                subtitle = "${channel.percentageOfTotal}% of spending",
+                leading = { IconTile(icon = icon, background = tint) },
+                trailing = {
+                    Text(
+                        text = CurrencyFormatter.format(channel.amount, currency, exchangeRate),
+                        style = ClarityType.amountBody,
+                        color = ClarityTheme.colors.label,
+                        maxLines = 1
+                    )
+                },
+                showDivider = index < channels.lastIndex
+            )
         }
+    }
+}
+
+@Composable
+private fun channelAppearance(method: PaymentMethod): Pair<ImageVector, Color> {
+    val colors = ClarityTheme.colors
+    return when (method) {
+        PaymentMethod.CASH -> Icons.Rounded.Payments to colors.green
+        PaymentMethod.CARD -> Icons.Rounded.CreditCard to colors.blue
+        PaymentMethod.SECONDARY -> Icons.Rounded.Smartphone to colors.indigo
+        PaymentMethod.ONLINE -> Icons.Rounded.SwapHoriz to colors.teal
     }
 }

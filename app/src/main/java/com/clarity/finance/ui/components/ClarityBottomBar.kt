@@ -1,223 +1,127 @@
 package com.clarity.finance.ui.components
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.EmojiEvents
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.clarity.finance.ui.theme.ClarityBorder
-import com.clarity.finance.ui.theme.ClarityGreen
-import com.clarity.finance.ui.theme.ClarityGreenBright
-import com.clarity.finance.ui.theme.ClarityTextMuted
-import com.clarity.finance.ui.theme.ClarityWhite
-import com.clarity.finance.ui.theme.LocalIsDarkTheme
+import com.clarity.finance.ui.theme.ClarityTheme
+import com.clarity.finance.ui.theme.ClarityType
 
-enum class ClarityNavTab {
-    HOME,
-    INCOME,
-    INSIGHTS,
-    GOAL
+enum class ClarityNavTab(val label: String, val icon: ImageVector) {
+    HOME("Home", Icons.Rounded.Home),
+    INCOME("Income", Icons.Rounded.AccountBalanceWallet),
+    INSIGHTS("Insights", Icons.Rounded.BarChart),
+    GOAL("Goal", Icons.Rounded.Flag)
 }
 
+/**
+ * iOS tab bar (HIG > Tab bars): bar material with a top hairline, filled glyphs, short labels
+ * and the app tint on the selected tab. Tab bars are for navigation only, so the add-expense
+ * action lives in each screen's header instead of a floating button in the bar.
+ */
 @Composable
 fun ClarityBottomBar(
     currentTab: ClarityNavTab,
     onTabSelected: (ClarityNavTab) -> Unit,
-    onAddClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDark = LocalIsDarkTheme.current
-    val barBackground = if (isDark) Color(0xFF000000) else Color(0xFFFFFFFF)
-    val barBorder = if (isDark) Color(0xFF333333) else ClarityBorder
-
-    // Total container height accommodates raised FAB and curved notch
-    Box(
+    val colors = ClarityTheme.colors
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(72.dp),
-        contentAlignment = Alignment.BottomCenter
+            .background(colors.barBackground)
     ) {
-        // 1. Bottom Bar Base Container
-        Box(
+        Hairline()
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp)
-                .background(barBackground)
-                .border(BorderStroke(1.dp, barBorder))
-                .padding(horizontal = 16.dp)
+                .navigationBarsPadding()
+                .height(54.dp)
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(58.dp),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left items
-                ClarityBottomNavItem(
-                    label = "HOME",
-                    selectedIcon = Icons.Filled.Home,
-                    unselectedIcon = Icons.Outlined.Home,
-                    isSelected = currentTab == ClarityNavTab.HOME,
-                    onClick = { onTabSelected(ClarityNavTab.HOME) },
-                    modifier = Modifier.weight(1f)
-                )
-
-                ClarityBottomNavItem(
-                    label = "INCOME",
-                    selectedIcon = Icons.Filled.AccountBalanceWallet,
-                    unselectedIcon = Icons.Outlined.AccountBalanceWallet,
-                    isSelected = currentTab == ClarityNavTab.INCOME,
-                    onClick = { onTabSelected(ClarityNavTab.INCOME) },
-                    modifier = Modifier.weight(1f)
-                )
-
-                // Space reserved for the raised + FAB cradle
-                Spacer(modifier = Modifier.width(60.dp))
-
-                // Right items
-                ClarityBottomNavItem(
-                    label = "INSIGHTS",
-                    selectedIcon = Icons.Filled.BarChart,
-                    unselectedIcon = Icons.Outlined.BarChart,
-                    isSelected = currentTab == ClarityNavTab.INSIGHTS,
-                    onClick = { onTabSelected(ClarityNavTab.INSIGHTS) },
-                    modifier = Modifier.weight(1f)
-                )
-
-                ClarityBottomNavItem(
-                    label = "GOAL",
-                    selectedIcon = Icons.Filled.EmojiEvents,
-                    unselectedIcon = Icons.Outlined.EmojiEvents,
-                    isSelected = currentTab == ClarityNavTab.GOAL,
-                    onClick = { onTabSelected(ClarityNavTab.GOAL) },
+            ClarityNavTab.entries.forEach { tab ->
+                TabBarItem(
+                    tab = tab,
+                    isSelected = tab == currentTab,
+                    onClick = { if (tab != currentTab) onTabSelected(tab) },
                     modifier = Modifier.weight(1f)
                 )
             }
-        }
-
-        // 2. Center Top Curved Cradle for the FAB
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 2.dp)
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(barBackground)
-                .border(BorderStroke(1.dp, barBorder), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            // Fill bottom portion to merge seamlessly with navbar background
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(28.dp)
-                    .background(barBackground)
-            )
-        }
-
-        // 3. Raised '+' Floating Action Button
-        FloatingActionButton(
-            onClick = onAddClick,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 6.dp)
-                .size(46.dp),
-            shape = CircleShape,
-            containerColor = ClarityGreenBright,
-            contentColor = ClarityWhite,
-            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp, pressedElevation = 6.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Add Expense",
-                modifier = Modifier.size(24.dp)
-            )
         }
     }
 }
 
 @Composable
-private fun ClarityBottomNavItem(
-    label: String,
-    selectedIcon: ImageVector,
-    unselectedIcon: ImageVector,
+private fun TabBarItem(
+    tab: ClarityNavTab,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isDark = LocalIsDarkTheme.current
-    val itemColor = if (isSelected) {
-        ClarityGreenBright
-    } else {
-        if (isDark) Color(0xFFFFFFFF) else ClarityTextMuted
-    }
+    val colors = ClarityTheme.colors
+    val tint by animateColorAsState(
+        targetValue = if (isSelected) colors.accent else colors.gray,
+        animationSpec = tween(durationMillis = 160),
+        label = "tabTint"
+    )
 
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
         modifier = modifier
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) { onClick() }
-            .padding(vertical = 4.dp)
+            .fillMaxHeight()
+            .selectable(
+                selected = isSelected,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = if (isSelected) selectedIcon else unselectedIcon,
-            contentDescription = label,
-            tint = itemColor,
-            modifier = Modifier.size(20.dp)
+            imageVector = tab.icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(26.dp)
         )
-
-        Spacer(modifier = Modifier.height(3.dp))
-
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = label,
-            fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            color = itemColor
+            text = tab.label,
+            style = ClarityType.caption2.copy(
+                fontSize = 10.sp,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+            ),
+            color = tint,
+            maxLines = 1
         )
     }
 }

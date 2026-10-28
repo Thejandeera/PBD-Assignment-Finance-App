@@ -1,72 +1,132 @@
 package com.clarity.finance.ui.theme
 
-import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
+import androidx.compose.ui.unit.dp
 
 val LocalIsDarkTheme = compositionLocalOf { false }
 
-private val DarkColorScheme = darkColorScheme(
-    primary = ClarityGreenBright,
-    onPrimary = Color(0xFF000000),
-    secondary = ClarityBlue,
-    onSecondary = ClarityWhite,
-    background = ClarityDarkBackground,
-    onBackground = ClarityDarkTextPrimary,
-    surface = ClarityDarkSurface,
-    onSurface = ClarityDarkTextPrimary,
-    surfaceVariant = ClarityDarkSurfaceVariant,
-    onSurfaceVariant = ClarityDarkTextSecondary,
-    outline = ClarityDarkBorder,
-    error = ClarityRed,
-    onError = ClarityWhite
+/** Entry point for the app's design tokens, mirroring how MaterialTheme is read. */
+object ClarityTheme {
+    val colors: ClarityColors
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalClarityColors.current
+}
+
+/** Continuous-looking corner radii used throughout (iOS inset-grouped cards use ~10–12pt). */
+object ClarityShapes {
+    val card = RoundedCornerShape(12.dp)
+    val control = RoundedCornerShape(10.dp)
+    val button = RoundedCornerShape(12.dp)
+    val sheet = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+    val alert = RoundedCornerShape(14.dp)
+}
+
+private val ClarityMaterialShapes = Shapes(
+    extraSmall = RoundedCornerShape(10.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(14.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(20.dp)
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = ClarityGreen,
-    onPrimary = ClarityWhite,
-    secondary = ClarityBlue,
-    onSecondary = ClarityWhite,
-    background = ClarityGrayBackground,
-    onBackground = ClarityTextPrimary,
-    surface = ClarityWhite,
-    onSurface = ClarityTextPrimary,
-    surfaceVariant = ClarityGrayBackground,
-    onSurfaceVariant = ClarityTextSecondary,
-    outline = ClarityBorder,
-    error = ClarityRed,
-    onError = ClarityWhite
-)
+private fun ClarityColors.toMaterialColorScheme(): ColorScheme {
+    val onAccentText = if (isDark) Color.Black else Color.White
+    return if (isDark) {
+        darkColorScheme(
+            primary = accent,
+            onPrimary = onAccentText,
+            primaryContainer = accentFill,
+            onPrimaryContainer = onAccent,
+            inversePrimary = LightClarityColors.accent,
+            secondary = blue,
+            onSecondary = Color.White,
+            tertiary = purple,
+            onTertiary = Color.White,
+            background = background,
+            onBackground = label,
+            surface = card,
+            onSurface = label,
+            surfaceVariant = elevatedCard,
+            onSurfaceVariant = secondaryLabel,
+            surfaceTint = Color.Transparent,
+            inverseSurface = toastBackground,
+            inverseOnSurface = Color.White,
+            error = redText,
+            onError = Color.Black,
+            outline = separator,
+            outlineVariant = separator,
+            scrim = Color.Black,
+            surfaceBright = elevatedCard,
+            surfaceContainer = elevatedCard,
+            surfaceContainerHigh = elevatedCard,
+            surfaceContainerHighest = elevatedCard,
+            surfaceContainerLow = card,
+            surfaceContainerLowest = background,
+            surfaceDim = background
+        )
+    } else {
+        lightColorScheme(
+            primary = accent,
+            onPrimary = onAccentText,
+            primaryContainer = accentFill,
+            onPrimaryContainer = onAccent,
+            inversePrimary = DarkClarityColors.accent,
+            secondary = blue,
+            onSecondary = Color.White,
+            tertiary = purple,
+            onTertiary = Color.White,
+            background = background,
+            onBackground = label,
+            surface = card,
+            onSurface = label,
+            surfaceVariant = background,
+            onSurfaceVariant = secondaryLabel,
+            surfaceTint = Color.Transparent,
+            inverseSurface = toastBackground,
+            inverseOnSurface = Color.White,
+            error = redText,
+            onError = Color.White,
+            outline = separator,
+            outlineVariant = separator,
+            scrim = Color.Black,
+            surfaceBright = card,
+            surfaceContainer = card,
+            surfaceContainerHigh = card,
+            surfaceContainerHighest = card,
+            surfaceContainerLow = card,
+            surfaceContainerLowest = card,
+            surfaceDim = background
+        )
+    }
+}
 
 @Composable
 fun ClarityFinanceTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
-        }
-    }
+    val colors = if (darkTheme) DarkClarityColors else LightClarityColors
 
-    CompositionLocalProvider(LocalIsDarkTheme provides darkTheme) {
+    CompositionLocalProvider(
+        LocalIsDarkTheme provides darkTheme,
+        LocalClarityColors provides colors
+    ) {
         MaterialTheme(
-            colorScheme = colorScheme,
+            colorScheme = colors.toMaterialColorScheme(),
             typography = Typography,
+            shapes = ClarityMaterialShapes,
             content = content
         )
     }
