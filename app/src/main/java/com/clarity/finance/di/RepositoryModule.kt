@@ -4,6 +4,8 @@ import com.clarity.finance.data.repository.DraftRepository
 import com.clarity.finance.data.repository.ExpenseRepository
 import com.clarity.finance.data.repository.FirestoreDraftRepository
 import com.clarity.finance.data.repository.FirestoreExpenseRepository
+import com.clarity.finance.data.repository.FirestoreGoalRepository
+import com.clarity.finance.data.repository.GoalRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -16,9 +18,19 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindExpenseRepository(impl: FirestoreExpenseRepository): ExpenseRepository
+    abstract fun bindExpenseRepository(
+        impl: FirestoreExpenseRepository
+    ): ExpenseRepository
 
     @Binds
     @Singleton
-    abstract fun bindDraftRepository(impl: FirestoreDraftRepository): DraftRepository
+    abstract fun bindDraftRepository(
+        impl: FirestoreDraftRepository
+    ): DraftRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindGoalRepository(
+        impl: FirestoreGoalRepository
+    ): GoalRepository
 }
