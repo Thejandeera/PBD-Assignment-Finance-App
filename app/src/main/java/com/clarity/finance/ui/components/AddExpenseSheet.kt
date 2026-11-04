@@ -539,9 +539,10 @@ private fun NewCategoryChip(onClick: () -> Unit) {
 
 /** Inline multi-line note field styled as a grouped-list row. */
 @Composable
-private fun NoteField(
+internal fun NoteField(
     value: String,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    placeholder: String = "Note (optional), e.g. Lunch at Bambalapitiya"
 ) {
     val colors = ClarityTheme.colors
     BasicTextField(
@@ -560,7 +561,7 @@ private fun NoteField(
             ) {
                 if (value.isEmpty()) {
                     Text(
-                        text = "Note (optional), e.g. Lunch at Bambalapitiya",
+                        text = placeholder,
                         style = ClarityType.body,
                         color = colors.placeholder,
                         maxLines = 1,
@@ -570,20 +571,5 @@ private fun NoteField(
                 innerTextField()
             }
         }
-    )
-}
-
-/** Shared "+" toolbar button that opens the add-expense sheet. */
-@Composable
-fun AddExpenseButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    CircleIconButton(
-        icon = Icons.Rounded.Add,
-        contentDescription = "Add expense",
-        onClick = onClick,
-        filled = true,
-        modifier = modifier
     )
 }
