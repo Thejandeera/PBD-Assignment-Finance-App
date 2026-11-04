@@ -31,7 +31,6 @@ import com.clarity.finance.ui.screens.LoginScreen
 import com.clarity.finance.ui.screens.RegisterScreen
 import com.clarity.finance.ui.screens.SettingsScreen
 import com.clarity.finance.viewmodel.AuthViewModel
-
 sealed class Screen(val route: String) {
     data object Login : Screen("login")
     data object Register : Screen("register")
