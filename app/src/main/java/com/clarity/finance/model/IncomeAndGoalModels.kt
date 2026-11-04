@@ -20,5 +20,20 @@ data class Goal(
     val name: String = "MacBook Pro M4",
     val targetAmount: Double = 490000.0,
     val startingAmount: Double = 11200.0,
-    val deadline: String = "2027-10-01"
+    val deadline: String = "2027-10-01",
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L
+)
+
+enum class GoalTransactionType {
+    DEPOSIT,
+    WITHDRAWAL
+}
+
+data class GoalTransaction(
+    val id: String = "",
+    val type: GoalTransactionType = GoalTransactionType.DEPOSIT,
+    val amount: Double = 0.0,
+    val note: String = "",
+    val createdAt: Long = System.currentTimeMillis()
 )
