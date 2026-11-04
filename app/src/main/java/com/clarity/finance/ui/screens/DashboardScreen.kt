@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.Expense
+import com.clarity.finance.model.Income
 import com.clarity.finance.ui.components.AddExpenseButton
 import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.CapsuleProgressBar
@@ -80,6 +81,7 @@ import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.DraftViewModel
 import com.clarity.finance.viewmodel.ExpenseMonthlyMetrics
 import com.clarity.finance.viewmodel.ExpenseViewModel
+import com.clarity.finance.viewmodel.IncomeViewModel
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -93,6 +95,7 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
     expenseViewModel: ExpenseViewModel = hiltViewModel(),
     draftViewModel: DraftViewModel = hiltViewModel(),
+    incomeViewModel: IncomeViewModel = hiltViewModel(),
     onNavigateToExpensesHistory: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
@@ -106,7 +109,7 @@ fun DashboardScreen(
     val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
     val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
     val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
-    val monthlyIncome by authViewModel.monthlyIncomeFlow.collectAsStateWithLifecycle()
+    val incomeState by incomeViewModel.uiState.collectAsStateWithLifecycle()
 
     var showAddExpenseSheet by remember { mutableStateOf(false) }
     var selectedExpense by remember { mutableStateOf<Expense?>(null) }
@@ -195,7 +198,7 @@ fun DashboardScreen(
                 )
 
                 BalanceCard(
-                    income = monthlyIncome,
+                    income = incomeState.receivedTotalLkr,
                     expenses = historyState.metrics.totalExpense,
                     currency = currentCurrency,
                     exchangeRate = exchangeRate,
@@ -224,7 +227,13 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                PendingPaymentsCard()
+                PendingPaymentsCard(
+                    pending = incomeState.pendingIncomes,
+                    pendingTotalLkr = incomeState.pendingTotalLkr,
+                    currency = currentCurrency,
+                    exchangeRate = exchangeRate,
+                    onClick = onNavigateToIncome
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -427,14 +436,49 @@ private fun SavingsGoalCard(
     }
 }
 
+/** Outstanding freelance payments (FR-17), linking to the Income tab to follow them up. */
 @Composable
-private fun PendingPaymentsCard() {
+private fun PendingPaymentsCard(
+    pending: List<Income>,
+    pendingTotalLkr: Double,
+    currency: String,
+    exchangeRate: Double,
+    onClick: () -> Unit
+) {
     val colors = ClarityTheme.colors
+    val count = pending.size
+    val subtitle = if (pending.isEmpty()) {
+        "Freelance invoices waiting for payment appear here"
+    } else {
+        val names = pending.take(2).joinToString(" · ") { income ->
+            "${income.title} ${CurrencyFormatter.formatOriginal(income.amount, income.currency.name)}"
+        }
+        if (count > 2) "$names · +${count - 2} more" else names
+    }
     GroupedSection {
         ListRow(
-            title = "2 Pending Payments",
-            subtitle = "Upwork \$180 · DevContract LKR 30k",
-            leading = { IconTile(icon = Icons.Rounded.Schedule, background = colors.teal) }
+            title = when (count) {
+                0 -> "No Pending Payments"
+                1 -> "1 Pending Payment"
+                else -> "$count Pending Payments"
+            },
+            subtitle = subtitle,
+            leading = { IconTile(icon = Icons.Rounded.Schedule, background = colors.teal) },
+            trailing = if (count > 0) {
+                {
+                    Text(
+                        text = CurrencyFormatter.format(pendingTotalLkr, currency, exchangeRate),
+                        style = ClarityType.amountCallout,
+                        color = colors.secondaryLabel,
+                        maxLines = 1
+                    )
+                }
+            } else {
+                null
+            },
+            showChevron = true,
+            onClick = onClick,
+            onClickLabel = "Open income"
         )
     }
 }
