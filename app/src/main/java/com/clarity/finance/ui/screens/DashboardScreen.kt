@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,7 +56,6 @@ import com.clarity.finance.ui.components.ClarityBottomBar
 import com.clarity.finance.ui.components.bottomPaddingBelowBump
 import com.clarity.finance.ui.components.ClarityCard
 import com.clarity.finance.ui.components.ClarityNavTab
-import com.clarity.finance.ui.components.CollapsingTitleBar
 import com.clarity.finance.ui.components.DisplayDates
 import com.clarity.finance.ui.components.EmptyStateView
 import com.clarity.finance.ui.components.ExpenseDetailSheet
@@ -71,7 +71,6 @@ import com.clarity.finance.ui.components.ProfileAvatar
 import com.clarity.finance.ui.components.SectionTitle
 import com.clarity.finance.ui.components.StackedBar
 import com.clarity.finance.ui.components.VerticalHairline
-import com.clarity.finance.ui.components.isScrolledPast
 import com.clarity.finance.ui.components.pressFade
 import com.clarity.finance.ui.theme.ClarityTheme
 import com.clarity.finance.ui.theme.ClarityType
@@ -122,7 +121,8 @@ fun DashboardScreen(
     val avatarBitmap = remember(photoPath) { ProfileImageManager.loadBitmap(photoPath) }
 
     val scrollState = rememberScrollState()
-    val isCollapsed = scrollState.isScrolledPast(52.dp)
+    // Shows a divider under the pinned balance card once content scrolls beneath it.
+    val isScrolled by remember { derivedStateOf { scrollState.value > 0 } }
 
     if (showAddExpenseSheet) {
         AddExpenseSheet(
@@ -165,16 +165,13 @@ fun DashboardScreen(
             )
         }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = innerPadding.bottomPaddingBelowBump())
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-            ) {
+            // Pinned: the greeting and the balance card stay put while the rest scrolls.
+            Column(modifier = Modifier.background(colors.background)) {
                 Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
                 LargeTitleHeader(
@@ -205,8 +202,20 @@ fun DashboardScreen(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
 
+                Spacer(modifier = Modifier.height(12.dp))
+                Hairline(color = if (isScrolled) colors.separator else Color.Transparent)
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+            ) {
+                Spacer(modifier = Modifier.height(4.dp))
+
                 AnimatedVisibility(visible = draftCount > 0) {
-                    GroupedSection(modifier = Modifier.padding(top = 16.dp)) {
+                    GroupedSection(modifier = Modifier.padding(bottom = 16.dp)) {
                         ListRow(
                             title = if (draftCount == 1) "1 bank SMS to review" else "$draftCount bank SMS to review",
                             subtitle = "Approve drafted transactions as expenses",
@@ -216,8 +225,6 @@ fun DashboardScreen(
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
 
                 SavingsGoalCard(
                     currency = currentCurrency,
@@ -257,8 +264,6 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
             }
-
-            CollapsingTitleBar(title = greeting, collapsed = isCollapsed)
         }
     }
 }
