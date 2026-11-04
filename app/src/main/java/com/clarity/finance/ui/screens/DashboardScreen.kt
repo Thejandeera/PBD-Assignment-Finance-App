@@ -49,10 +49,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.Expense
 import com.clarity.finance.model.Income
-import com.clarity.finance.ui.components.AddExpenseButton
 import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.CapsuleProgressBar
 import com.clarity.finance.ui.components.ClarityBottomBar
+import com.clarity.finance.ui.components.bottomPaddingBelowBump
 import com.clarity.finance.ui.components.ClarityCard
 import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.ui.components.CollapsingTitleBar
@@ -153,6 +153,7 @@ fun DashboardScreen(
         bottomBar = {
             ClarityBottomBar(
                 currentTab = ClarityNavTab.HOME,
+                onAddClick = { showAddExpenseSheet = true },
                 onTabSelected = { tab ->
                     when (tab) {
                         ClarityNavTab.HOME -> Unit
@@ -167,7 +168,7 @@ fun DashboardScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = innerPadding.calculateBottomPadding())
+                .padding(bottom = innerPadding.bottomPaddingBelowBump())
         ) {
             Column(
                 modifier = Modifier
@@ -180,7 +181,6 @@ fun DashboardScreen(
                     title = greeting,
                     eyebrow = DisplayDates.todayEyebrow(),
                     trailing = {
-                        AddExpenseButton(onClick = { showAddExpenseSheet = true })
                         Box(
                             modifier = Modifier
                                 .size(44.dp)

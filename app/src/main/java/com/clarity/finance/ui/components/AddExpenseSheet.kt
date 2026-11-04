@@ -573,18 +573,3 @@ internal fun NoteField(
         }
     )
 }
-
-/** Shared "+" toolbar button that opens the add-expense sheet. */
-@Composable
-fun AddExpenseButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    CircleIconButton(
-        icon = Icons.Rounded.Add,
-        contentDescription = "Add expense",
-        onClick = onClick,
-        filled = true,
-        modifier = modifier
-    )
-}

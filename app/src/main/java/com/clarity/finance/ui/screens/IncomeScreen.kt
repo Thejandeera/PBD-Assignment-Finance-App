@@ -38,9 +38,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.Income
 import com.clarity.finance.ui.components.ActivityIndicator
+import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.AddIncomeButton
 import com.clarity.finance.ui.components.AddIncomeSheet
 import com.clarity.finance.ui.components.ClarityBottomBar
+import com.clarity.finance.ui.components.bottomPaddingBelowBump
 import com.clarity.finance.ui.components.ClarityCard
 import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.ui.components.ClaritySnackbarHost
@@ -65,6 +67,7 @@ import com.clarity.finance.ui.theme.ClarityTheme
 import com.clarity.finance.ui.theme.ClarityType
 import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.viewmodel.AuthViewModel
+import com.clarity.finance.viewmodel.ExpenseViewModel
 import com.clarity.finance.viewmodel.IncomeSourceTotal
 import com.clarity.finance.viewmodel.IncomeUiState
 import com.clarity.finance.viewmodel.IncomeViewModel
@@ -78,6 +81,7 @@ fun IncomeScreen(
     onTabSelected: (ClarityNavTab) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: IncomeViewModel = hiltViewModel(),
+    expenseViewModel: ExpenseViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val colors = ClarityTheme.colors
@@ -87,6 +91,7 @@ fun IncomeScreen(
     val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
 
     var showAddIncomeSheet by remember { mutableStateOf(false) }
+    var showAddExpenseSheet by remember { mutableStateOf(false) }
     var selectedIncome by remember { mutableStateOf<Income?>(null) }
     var incomeToDelete by remember { mutableStateOf<Income?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -106,6 +111,13 @@ fun IncomeScreen(
         AddIncomeSheet(
             viewModel = viewModel,
             onDismiss = { showAddIncomeSheet = false }
+        )
+    }
+
+    if (showAddExpenseSheet) {
+        AddExpenseSheet(
+            viewModel = expenseViewModel,
+            onDismiss = { showAddExpenseSheet = false }
         )
     }
 
@@ -137,13 +149,17 @@ fun IncomeScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { ClaritySnackbarHost(snackbarHostState) },
         bottomBar = {
-            ClarityBottomBar(currentTab = ClarityNavTab.INCOME, onTabSelected = onTabSelected)
+            ClarityBottomBar(
+                currentTab = ClarityNavTab.INCOME,
+                onTabSelected = onTabSelected,
+                onAddClick = { showAddExpenseSheet = true }
+            )
         }
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = innerPadding.calculateBottomPadding())
+                .padding(bottom = innerPadding.bottomPaddingBelowBump())
         ) {
             Column(
                 modifier = Modifier
