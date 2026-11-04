@@ -12,16 +12,34 @@ enum class PaymentMethod(val displayName: String) {
     ONLINE("Online Transfer")
 }
 
-enum class IncomeSource(val displayName: String, val icon: String) {
-    SALARY("Salary", "💼"),
-    FREELANCE("Freelance", "💻"),
-    ADSENSE("AdSense", "📈"),
-    CRYPTO("Crypto", "🪙")
+/**
+ * Kavindu's four income streams. [defaultCurrency] is pre-selected when the source is picked,
+ * but the user can still change it (e.g. a freelance client paying in USD).
+ */
+enum class IncomeSource(
+    val displayName: String,
+    val icon: String,
+    val defaultCurrency: CurrencyType
+) {
+    SALARY("Salary", "💼", CurrencyType.LKR),
+    FREELANCE("Freelance", "💻", CurrencyType.LKR),
+    ADSENSE("AdSense", "📈", CurrencyType.USD),
+    CRYPTO("Crypto", "🪙", CurrencyType.USDT);
+
+    /** Only freelance invoices can be outstanding (mirrors firestore.rules). */
+    val canBePending: Boolean get() = this == FREELANCE
+
+    /** Crypto is recorded as a net position, so a month can end in a loss. */
+    val allowsLoss: Boolean get() = this == CRYPTO
 }
 
+/** USDT is pegged to the US dollar, so both convert with the LKR-per-USD rate. */
 enum class CurrencyType { LKR, USD, USDT }
 
-enum class IncomeStatus { RECEIVED, PENDING }
+enum class IncomeStatus(val displayName: String) {
+    RECEIVED("Received"),
+    PENDING("Pending")
+}
 
 enum class ExpenseCategory(
     val title: String,
