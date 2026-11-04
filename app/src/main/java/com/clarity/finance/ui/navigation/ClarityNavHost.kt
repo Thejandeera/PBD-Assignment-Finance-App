@@ -26,6 +26,7 @@ import com.clarity.finance.ui.screens.ComingSoonScreen
 import com.clarity.finance.ui.screens.DashboardScreen
 import com.clarity.finance.ui.screens.DraftsScreen
 import com.clarity.finance.ui.screens.ExpensesHistoryScreen
+import com.clarity.finance.ui.screens.IncomeScreen
 import com.clarity.finance.ui.screens.InsightsScreen
 import com.clarity.finance.ui.screens.LoginScreen
 import com.clarity.finance.ui.screens.RegisterScreen
@@ -270,10 +271,8 @@ fun ClarityNavHost(
         }
 
         composable(Screen.Income.route) { entry ->
-            ComingSoonScreen(
-                tab = ClarityNavTab.INCOME,
-                title = "Income Tracking Is Coming",
-                message = "Salary, freelance, AdSense and crypto income will be tracked here and converted to LKR.",
+            IncomeScreen(
+                authViewModel = authViewModel,
                 onTabSelected = { tab -> entry.ifResumed { navController.navigateToTab(tab) } }
             )
         }

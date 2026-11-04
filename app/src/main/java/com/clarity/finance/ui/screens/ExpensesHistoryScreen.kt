@@ -393,7 +393,7 @@ private fun DayHeader(
 }
 
 /** Rounds only the outer corners so consecutive rows read as one inset-grouped card. */
-private fun groupedItemShape(index: Int, count: Int): Shape {
+internal fun groupedItemShape(index: Int, count: Int): Shape {
     val radius = 12.dp
     return when {
         count == 1 -> RoundedCornerShape(radius)

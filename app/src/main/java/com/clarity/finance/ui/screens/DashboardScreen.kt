@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,13 +49,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.Expense
-import com.clarity.finance.ui.components.AddExpenseButton
+import com.clarity.finance.model.Income
 import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.CapsuleProgressBar
 import com.clarity.finance.ui.components.ClarityBottomBar
+import com.clarity.finance.ui.components.bottomPaddingBelowBump
 import com.clarity.finance.ui.components.ClarityCard
 import com.clarity.finance.ui.components.ClarityNavTab
-import com.clarity.finance.ui.components.CollapsingTitleBar
 import com.clarity.finance.ui.components.DisplayDates
 import com.clarity.finance.ui.components.EmptyStateView
 import com.clarity.finance.ui.components.ExpenseDetailSheet
@@ -70,7 +71,6 @@ import com.clarity.finance.ui.components.ProfileAvatar
 import com.clarity.finance.ui.components.SectionTitle
 import com.clarity.finance.ui.components.StackedBar
 import com.clarity.finance.ui.components.VerticalHairline
-import com.clarity.finance.ui.components.isScrolledPast
 import com.clarity.finance.ui.components.pressFade
 import com.clarity.finance.ui.theme.ClarityTheme
 import com.clarity.finance.ui.theme.ClarityType
@@ -80,6 +80,7 @@ import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.DraftViewModel
 import com.clarity.finance.viewmodel.ExpenseMonthlyMetrics
 import com.clarity.finance.viewmodel.ExpenseViewModel
+import com.clarity.finance.viewmodel.IncomeViewModel
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -93,6 +94,7 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
     expenseViewModel: ExpenseViewModel = hiltViewModel(),
     draftViewModel: DraftViewModel = hiltViewModel(),
+    incomeViewModel: IncomeViewModel = hiltViewModel(),
     onNavigateToExpensesHistory: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
@@ -106,7 +108,7 @@ fun DashboardScreen(
     val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
     val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
     val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
-    val monthlyIncome by authViewModel.monthlyIncomeFlow.collectAsStateWithLifecycle()
+    val incomeState by incomeViewModel.uiState.collectAsStateWithLifecycle()
 
     var showAddExpenseSheet by remember { mutableStateOf(false) }
     var selectedExpense by remember { mutableStateOf<Expense?>(null) }
@@ -119,7 +121,8 @@ fun DashboardScreen(
     val avatarBitmap = remember(photoPath) { ProfileImageManager.loadBitmap(photoPath) }
 
     val scrollState = rememberScrollState()
-    val isCollapsed = scrollState.isScrolledPast(52.dp)
+    // Shows a divider under the pinned balance card once content scrolls beneath it.
+    val isScrolled by remember { derivedStateOf { scrollState.value > 0 } }
 
     if (showAddExpenseSheet) {
         AddExpenseSheet(
@@ -150,6 +153,7 @@ fun DashboardScreen(
         bottomBar = {
             ClarityBottomBar(
                 currentTab = ClarityNavTab.HOME,
+                onAddClick = { showAddExpenseSheet = true },
                 onTabSelected = { tab ->
                     when (tab) {
                         ClarityNavTab.HOME -> Unit
@@ -161,23 +165,19 @@ fun DashboardScreen(
             )
         }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = innerPadding.calculateBottomPadding())
+                .padding(bottom = innerPadding.bottomPaddingBelowBump())
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-            ) {
+            // Pinned: the greeting and the balance card stay put while the rest scrolls.
+            Column(modifier = Modifier.background(colors.background)) {
                 Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
                 LargeTitleHeader(
                     title = greeting,
                     eyebrow = DisplayDates.todayEyebrow(),
                     trailing = {
-                        AddExpenseButton(onClick = { showAddExpenseSheet = true })
                         Box(
                             modifier = Modifier
                                 .size(44.dp)
@@ -195,15 +195,27 @@ fun DashboardScreen(
                 )
 
                 BalanceCard(
-                    income = monthlyIncome,
+                    income = incomeState.receivedTotalLkr,
                     expenses = historyState.metrics.totalExpense,
                     currency = currentCurrency,
                     exchangeRate = exchangeRate,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
 
+                Spacer(modifier = Modifier.height(12.dp))
+                Hairline(color = if (isScrolled) colors.separator else Color.Transparent)
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+            ) {
+                Spacer(modifier = Modifier.height(4.dp))
+
                 AnimatedVisibility(visible = draftCount > 0) {
-                    GroupedSection(modifier = Modifier.padding(top = 16.dp)) {
+                    GroupedSection(modifier = Modifier.padding(bottom = 16.dp)) {
                         ListRow(
                             title = if (draftCount == 1) "1 bank SMS to review" else "$draftCount bank SMS to review",
                             subtitle = "Approve drafted transactions as expenses",
@@ -214,8 +226,6 @@ fun DashboardScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
                 SavingsGoalCard(
                     currency = currentCurrency,
                     exchangeRate = exchangeRate,
@@ -224,7 +234,13 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                PendingPaymentsCard()
+                PendingPaymentsCard(
+                    pending = incomeState.pendingIncomes,
+                    pendingTotalLkr = incomeState.pendingTotalLkr,
+                    currency = currentCurrency,
+                    exchangeRate = exchangeRate,
+                    onClick = onNavigateToIncome
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -248,8 +264,6 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
             }
-
-            CollapsingTitleBar(title = greeting, collapsed = isCollapsed)
         }
     }
 }
@@ -427,14 +441,49 @@ private fun SavingsGoalCard(
     }
 }
 
+/** Outstanding freelance payments (FR-17), linking to the Income tab to follow them up. */
 @Composable
-private fun PendingPaymentsCard() {
+private fun PendingPaymentsCard(
+    pending: List<Income>,
+    pendingTotalLkr: Double,
+    currency: String,
+    exchangeRate: Double,
+    onClick: () -> Unit
+) {
     val colors = ClarityTheme.colors
+    val count = pending.size
+    val subtitle = if (pending.isEmpty()) {
+        "Freelance invoices waiting for payment appear here"
+    } else {
+        val names = pending.take(2).joinToString(" · ") { income ->
+            "${income.title} ${CurrencyFormatter.formatOriginal(income.amount, income.currency.name)}"
+        }
+        if (count > 2) "$names · +${count - 2} more" else names
+    }
     GroupedSection {
         ListRow(
-            title = "2 Pending Payments",
-            subtitle = "Upwork \$180 · DevContract LKR 30k",
-            leading = { IconTile(icon = Icons.Rounded.Schedule, background = colors.teal) }
+            title = when (count) {
+                0 -> "No Pending Payments"
+                1 -> "1 Pending Payment"
+                else -> "$count Pending Payments"
+            },
+            subtitle = subtitle,
+            leading = { IconTile(icon = Icons.Rounded.Schedule, background = colors.teal) },
+            trailing = if (count > 0) {
+                {
+                    Text(
+                        text = CurrencyFormatter.format(pendingTotalLkr, currency, exchangeRate),
+                        style = ClarityType.amountCallout,
+                        color = colors.secondaryLabel,
+                        maxLines = 1
+                    )
+                }
+            } else {
+                null
+            },
+            showChevron = true,
+            onClick = onClick,
+            onClickLabel = "Open income"
         )
     }
 }
