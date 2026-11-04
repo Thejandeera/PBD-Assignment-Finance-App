@@ -187,12 +187,6 @@ class AuthViewModel @Inject constructor(
         fetchLiveExchangeRate()
     }
 
-    val monthlyIncomeFlow: StateFlow<Double> = userPreferencesRepository.monthlyIncomeFlow
-
-    fun setMonthlyIncome(amount: Double) {
-        userPreferencesRepository.monthlyIncome = amount
-    }
-
     fun updateSessionActivity() {
         userPreferencesRepository.lastActiveTimestamp = System.currentTimeMillis()
     }
