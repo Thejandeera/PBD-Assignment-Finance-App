@@ -52,11 +52,11 @@ import com.clarity.finance.model.PaymentMethod
 import com.clarity.finance.model.SpendingLeakAlert
 import com.clarity.finance.model.VelocityMetrics
 import com.clarity.finance.ui.components.ActivityIndicator
-import com.clarity.finance.ui.components.AddExpenseButton
 import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.CapsuleProgressBar
 import com.clarity.finance.ui.components.CircleIconButton
 import com.clarity.finance.ui.components.ClarityBottomBar
+import com.clarity.finance.ui.components.bottomPaddingBelowBump
 import com.clarity.finance.ui.components.ClarityCard
 import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.ui.components.CollapsingTitleBar
@@ -111,6 +111,7 @@ fun InsightsScreen(
         bottomBar = {
             ClarityBottomBar(
                 currentTab = ClarityNavTab.INSIGHTS,
+                onAddClick = { showAddExpenseSheet = true },
                 onTabSelected = { tab ->
                     when (tab) {
                         ClarityNavTab.HOME -> onNavigateToDashboard()
@@ -125,7 +126,7 @@ fun InsightsScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = innerPadding.calculateBottomPadding())
+                .padding(bottom = innerPadding.bottomPaddingBelowBump())
         ) {
             Column(
                 modifier = Modifier
@@ -134,10 +135,7 @@ fun InsightsScreen(
             ) {
                 Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
 
-                LargeTitleHeader(
-                    title = "Insights",
-                    trailing = { AddExpenseButton(onClick = { showAddExpenseSheet = true }) }
-                )
+                LargeTitleHeader(title = "Insights")
 
                 MonthSwitcher(
                     title = state.displayMonthHeader,
@@ -231,7 +229,7 @@ fun InsightsScreen(
 }
 
 @Composable
-private fun MonthSwitcher(
+internal fun MonthSwitcher(
     title: String,
     canGoForward: Boolean,
     onPrevious: () -> Unit,

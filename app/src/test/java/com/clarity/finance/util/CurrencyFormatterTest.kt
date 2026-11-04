@@ -50,4 +50,18 @@ class CurrencyFormatterTest {
         assertEquals("\$", CurrencyFormatter.getSymbol("USD"))
         assertEquals("LKR", CurrencyFormatter.getSymbol("LKR"))
     }
+
+    @Test
+    fun formatOriginal_showsAmountInTheCurrencyItWasPaidIn() {
+        assertEquals("185,000 LKR", CurrencyFormatter.formatOriginal(185000.0, "LKR"))
+        assertEquals("\$180", CurrencyFormatter.formatOriginal(180.0, "USD"))
+        assertEquals("\$120.50", CurrencyFormatter.formatOriginal(120.5, "USD"))
+        assertEquals("1,250 USDT", CurrencyFormatter.formatOriginal(1250.0, "USDT"))
+    }
+
+    @Test
+    fun formatOriginal_putsTheMinusSignBeforeTheCurrency() {
+        assertEquals("-\$12", CurrencyFormatter.formatOriginal(-12.0, "USD"))
+        assertEquals("-40 USDT", CurrencyFormatter.formatOriginal(-40.0, "USDT"))
+    }
 }
