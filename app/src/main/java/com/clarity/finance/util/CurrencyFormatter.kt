@@ -2,6 +2,7 @@ package com.clarity.finance.util
 
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.abs
 
 object CurrencyFormatter {
     /** Fallback LKR-per-USD rate if live fetch fails. */
@@ -41,6 +42,24 @@ object CurrencyFormatter {
             } else {
                 String.format(Locale.US, "%.0f", amountInLkr)
             }
+        }
+    }
+
+    /**
+     * Format an [amount] that is already in [currencyCode] (LKR, USD or USDT) — used to show
+     * income in the currency it was paid in. Negative values (crypto losses) get a minus sign.
+     */
+    fun formatOriginal(amount: Double, currencyCode: String): String {
+        val formatter = NumberFormat.getNumberInstance(Locale.US).apply {
+            minimumFractionDigits = if (amount % 1.0 == 0.0) 0 else 2
+            maximumFractionDigits = 2
+        }
+        val sign = if (amount < 0) "-" else ""
+        val digits = formatter.format(abs(amount))
+        return when (currencyCode.uppercase(Locale.US)) {
+            "USD" -> "$sign\$$digits"
+            "LKR" -> "$sign$digits LKR"
+            else -> "$sign$digits ${currencyCode.uppercase(Locale.US)}"
         }
     }
 
