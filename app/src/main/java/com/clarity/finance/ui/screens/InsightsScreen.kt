@@ -231,7 +231,7 @@ fun InsightsScreen(
 }
 
 @Composable
-private fun MonthSwitcher(
+internal fun MonthSwitcher(
     title: String,
     canGoForward: Boolean,
     onPrevious: () -> Unit,
