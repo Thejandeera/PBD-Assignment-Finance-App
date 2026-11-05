@@ -1,9 +1,20 @@
 package com.clarity.finance.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +39,7 @@ import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.ArrowDropUp
-import androidx.compose.material.icons.rounded.ArrowForwardIos
+import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
@@ -67,11 +78,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clarity.finance.model.Goal
 import com.clarity.finance.model.GoalTransaction
 import com.clarity.finance.model.GoalTransactionType
+import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.ClarityBottomBar
 import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.ui.theme.ClarityTheme
+import com.clarity.finance.util.CurrencyFormatter
+import com.clarity.finance.viewmodel.AuthViewModel
+import com.clarity.finance.viewmodel.ExpenseViewModel
 import com.clarity.finance.viewmodel.GoalMilestone
 import com.clarity.finance.viewmodel.GoalViewModel
 import java.text.NumberFormat
@@ -97,6 +113,8 @@ private val GoalRed =
 fun GoalScreen(
     modifier: Modifier = Modifier,
     viewModel: GoalViewModel = hiltViewModel(),
+    expenseViewModel: ExpenseViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel(),
     onNavigateToHome: () -> Unit = {},
     onNavigateToIncome: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {}
@@ -106,6 +124,12 @@ fun GoalScreen(
 
     val actionError by
     viewModel.actionError.collectAsStateWithLifecycle()
+
+    val currentCurrency by
+    authViewModel.currencyFlow.collectAsStateWithLifecycle()
+
+    val exchangeRate by
+    authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
 
     var showDepositDialog by remember {
         mutableStateOf(false)
@@ -127,8 +151,19 @@ fun GoalScreen(
         mutableStateOf(false)
     }
 
+    var showAddExpenseSheet by remember {
+        mutableStateOf(false)
+    }
+
     val colors =
         ClarityTheme.colors
+
+    if (showAddExpenseSheet) {
+        AddExpenseSheet(
+            viewModel = expenseViewModel,
+            onDismiss = { showAddExpenseSheet = false }
+        )
+    }
 
     Scaffold(
         modifier =
@@ -141,6 +176,10 @@ fun GoalScreen(
             ClarityBottomBar(
                 currentTab =
                     ClarityNavTab.GOAL,
+
+                onAddClick = {
+                    showAddExpenseSheet = true
+                },
 
                 onTabSelected = { tab ->
                     when (tab) {
@@ -211,10 +250,41 @@ fun GoalScreen(
                     val goal =
                         uiState.goal!!
 
+                    if (uiState.goals.size > 1) {
+                        item {
+                            GoalListSection(
+                                goals =
+                                    uiState.goals,
+
+                                selectedGoalId =
+                                    uiState.goal?.id,
+
+                                onSelectGoal =
+                                    viewModel::selectGoal,
+
+                                onSetPrimary =
+                                    viewModel::setPrimaryGoal,
+
+                                currency =
+                                    currentCurrency,
+
+                                exchangeRate =
+                                    exchangeRate
+                            )
+                        }
+                    }
+
                     item {
                         GoalProgressCard(
                             goalName =
                                 goal.name,
+
+                            isPrimary =
+                                goal.isPrimary,
+
+                            onSetPrimary = {
+                                viewModel.setPrimaryGoal(goal.id)
+                            },
 
                             currentSavings =
                                 uiState.currentSavings,
@@ -237,15 +307,6 @@ fun GoalScreen(
                             achievementMessage =
                                 uiState.achievementMessage,
 
-                            showSwitchButtons =
-                                uiState.goals.size > 1,
-
-                            onPrevious =
-                                viewModel::selectPreviousGoal,
-
-                            onNext =
-                                viewModel::selectNextGoal,
-
                             onEdit = {
                                 viewModel.clearActionError()
                                 showEditGoalDialog = true
@@ -254,7 +315,13 @@ fun GoalScreen(
                             onDelete = {
                                 viewModel.clearActionError()
                                 showDeleteGoalDialog = true
-                            }
+                            },
+
+                            currency =
+                                currentCurrency,
+
+                            exchangeRate =
+                                exchangeRate
                         )
                     }
 
@@ -276,7 +343,13 @@ fun GoalScreen(
                                             .ofPattern(
                                                 "dd MMM yyyy"
                                             )
-                                    )
+                                    ),
+
+                            currency =
+                                currentCurrency,
+
+                            exchangeRate =
+                                exchangeRate
                         )
                     }
 
@@ -300,7 +373,13 @@ fun GoalScreen(
                     item {
                         SavingsHistoryCard(
                             transactions =
-                                uiState.transactions
+                                uiState.transactions,
+
+                            currency =
+                                currentCurrency,
+
+                            exchangeRate =
+                                exchangeRate
                         )
                     }
                 }
@@ -310,6 +389,9 @@ fun GoalScreen(
 
     if (showAddGoalDialog) {
         AddGoalDialog(
+            currency =
+                currentCurrency,
+
             errorMessage =
                 actionError,
 
@@ -345,6 +427,7 @@ fun GoalScreen(
             initialTarget = if (currentGoal.targetAmount > 0) currentGoal.targetAmount.toLong().toString() else "",
             initialDeadline = currentGoal.deadline.ifBlank { LocalDate.now().plusYears(1).toString() },
             isEdit = true,
+            currency = currentCurrency,
             errorMessage = actionError,
             onDismiss = {
                 viewModel.clearActionError()
@@ -413,6 +496,9 @@ fun GoalScreen(
             accentColor =
                 goalAccent(),
 
+            currency =
+                currentCurrency,
+
             errorMessage =
                 actionError,
 
@@ -446,13 +532,18 @@ fun GoalScreen(
             accentColor =
                 GoalRed,
 
+            currency =
+                currentCurrency,
+
             errorMessage =
                 actionError,
 
             helperText =
                 "Available: ${
                     formatLkr(
-                        uiState.currentSavings
+                        uiState.currentSavings,
+                        currentCurrency,
+                        exchangeRate
                     )
                 }",
 
@@ -562,6 +653,107 @@ private fun GoalHeader(
 }
 
 @Composable
+private fun GoalListSection(
+    goals: List<Goal>,
+    selectedGoalId: String?,
+    onSelectGoal: (String) -> Unit,
+    onSetPrimary: (String) -> Unit,
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
+) {
+    val colors = ClarityTheme.colors
+    val accent = goalAccent()
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = "Your Goals (${goals.size})",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = colors.label
+        )
+
+        for (goal in goals) {
+            val isSelected = goal.id == selectedGoalId
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) accent else colors.separator.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .background(if (isSelected) accent.copy(alpha = 0.08f) else colors.card)
+                    .clickable { onSelectGoal(goal.id) }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = goal.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.label,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        if (goal.isPrimary) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(accent.copy(alpha = 0.15f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "★ Primary",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = accent,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Target: ${formatLkr(goal.targetAmount, currency, exchangeRate)}" +
+                            if (goal.deadline.isNotBlank()) " · Due ${goal.deadline}" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.secondaryLabel
+                    )
+                }
+
+                if (!goal.isPrimary) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onSetPrimary(goal.id) }
+                            .background(colors.secondaryLabel.copy(alpha = 0.12f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "Set Primary",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.secondaryLabel,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun GoalProgressCard(
     goalName: String,
     currentSavings: Double,
@@ -571,11 +763,12 @@ private fun GoalProgressCard(
     milestones: List<GoalMilestone>,
     nextMilestone: GoalMilestone?,
     achievementMessage: String?,
-    showSwitchButtons: Boolean,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
+    isPrimary: Boolean = false,
+    onSetPrimary: () -> Unit = {},
     onEdit: () -> Unit = {},
-    onDelete: () -> Unit = {}
+    onDelete: () -> Unit = {},
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
 ) {
     val colors =
         ClarityTheme.colors
@@ -596,62 +789,21 @@ private fun GoalProgressCard(
                 .padding(18.dp)
     ) {
 
-        // ---------------------------------------------------------
-        // CLEAN GOAL NAME + ARROWS
-        // ---------------------------------------------------------
-
         Row(
             modifier =
                 Modifier.fillMaxWidth(),
-
             verticalAlignment =
                 Alignment.CenterVertically,
-
             horizontalArrangement =
-                Arrangement.Center
+                Arrangement.SpaceBetween
         ) {
-
-            IconButton(
-                onClick =
-                    onPrevious,
-
-                enabled =
-                    showSwitchButtons,
-
-                modifier =
-                    Modifier.size(38.dp)
-            ) {
-                Icon(
-                    imageVector =
-                        Icons.Rounded.ArrowBackIosNew,
-
-                    contentDescription =
-                        "Previous goal",
-
-                    tint =
-                        if (showSwitchButtons) {
-                            accent
-                        } else {
-                            colors.secondaryLabel
-                                .copy(alpha = 0.25f)
-                        },
-
-                    modifier =
-                        Modifier.size(17.dp)
-                )
-            }
-
             Row(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .padding(
-                            horizontal = 8.dp
-                        ),
+                        .padding(end = 8.dp),
                 verticalAlignment =
-                    Alignment.CenterVertically,
-                horizontalArrangement =
-                    Arrangement.Center
+                    Alignment.CenterVertically
             ) {
                 Text(
                     text =
@@ -677,15 +829,67 @@ private fun GoalProgressCard(
 
                 Spacer(
                     modifier =
-                        Modifier.width(4.dp)
+                        Modifier.width(8.dp)
                 )
 
+                if (isPrimary) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(accent.copy(alpha = 0.15f))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text =
+                                "★ Primary",
+
+                            style =
+                                MaterialTheme.typography.labelSmall,
+
+                            color =
+                                accent,
+
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(colors.secondaryLabel.copy(alpha = 0.12f))
+                                .clickable { onSetPrimary() }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text =
+                                "Set Primary",
+
+                            style =
+                                MaterialTheme.typography.labelSmall,
+
+                            color =
+                                colors.secondaryLabel,
+
+                            fontWeight =
+                                FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Row(
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
                 IconButton(
                     onClick =
                         onEdit,
 
                     modifier =
-                        Modifier.size(30.dp)
+                        Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector =
@@ -707,7 +911,7 @@ private fun GoalProgressCard(
                         onDelete,
 
                     modifier =
-                        Modifier.size(30.dp)
+                        Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector =
@@ -723,36 +927,6 @@ private fun GoalProgressCard(
                             Modifier.size(16.dp)
                     )
                 }
-            }
-
-            IconButton(
-                onClick =
-                    onNext,
-
-                enabled =
-                    showSwitchButtons,
-
-                modifier =
-                    Modifier.size(38.dp)
-            ) {
-                Icon(
-                    imageVector =
-                        Icons.Rounded.ArrowForwardIos,
-
-                    contentDescription =
-                        "Next goal",
-
-                    tint =
-                        if (showSwitchButtons) {
-                            accent
-                        } else {
-                            colors.secondaryLabel
-                                .copy(alpha = 0.25f)
-                        },
-
-                    modifier =
-                        Modifier.size(17.dp)
-                )
             }
         }
 
@@ -817,7 +991,9 @@ private fun GoalProgressCard(
                 Text(
                     text =
                         formatLkr(
-                            currentSavings
+                            currentSavings,
+                            currency,
+                            exchangeRate
                         ),
 
                     color =
@@ -848,7 +1024,9 @@ private fun GoalProgressCard(
                 Text(
                     text =
                         formatLkr(
-                            targetAmount
+                            targetAmount,
+                            currency,
+                            exchangeRate
                         ),
 
                     color =
@@ -907,306 +1085,180 @@ private fun GoalProgressCard(
 @Composable
 private fun MilestoneProgressRing(
     progress: Float,
-    milestones: List<GoalMilestone>,
+    @Suppress("UNUSED_PARAMETER") milestones: List<GoalMilestone>,
     nextMilestone: GoalMilestone?
 ) {
-    val colors =
-        ClarityTheme.colors
+    val colors = ClarityTheme.colors
+    val accent = goalAccent()
+    val isDark = colors.isDark
 
-    val accent =
-        goalAccent()
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+        label = "goalProgressAnimation"
+    )
 
-    Box(
-        modifier =
-            Modifier.fillMaxWidth(),
+    val trackColor = if (isDark) Color(0xFF2C2C2E) else Color(0xFFE5E5EA)
+    val glowColor = accent.copy(alpha = if (isDark) 0.35f else 0.20f)
+    val completeColor = GoalGreen
 
-        contentAlignment =
-            Alignment.Center
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier =
-                Modifier.size(190.dp),
-
-            contentAlignment =
-                Alignment.Center
+            modifier = Modifier
+                .size(200.dp)
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(
-                progress = {
-                    progress
-                },
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidth = 14.dp.toPx()
+                val radius = (size.minDimension - strokeWidth) / 2f
+                val centerOffset = Offset(size.width / 2f, size.height / 2f)
 
-                modifier =
-                    Modifier.size(150.dp),
+                // 1. Smooth background track
+                drawCircle(
+                    color = trackColor,
+                    radius = radius,
+                    center = centerOffset,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
 
-                color =
-                    accent,
+                // 2. Soft outer glow behind the progress arc
+                if (animatedProgress > 0.01f) {
+                    drawArc(
+                        color = glowColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f * animatedProgress,
+                        useCenter = false,
+                        topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                        size = Size(radius * 2, radius * 2),
+                        style = Stroke(width = strokeWidth + 6.dp.toPx(), cap = StrokeCap.Round)
+                    )
 
-                trackColor =
-                    if (colors.isDark) {
-                        Color(0xFF3A3A3C)
+                    // 3. Main gradient progress arc
+                    val ringColors = if (animatedProgress >= 1f) {
+                        listOf(completeColor.copy(alpha = 0.8f), completeColor, Color(0xFF86EFAC))
                     } else {
-                        Color(0xFFE5E5EA)
-                    },
+                        listOf(accent.copy(alpha = 0.8f), accent, Color(0xFFC084FC))
+                    }
+                    val sweepGradient = Brush.sweepGradient(
+                        colors = ringColors,
+                        center = centerOffset
+                    )
 
-                strokeWidth =
-                    12.dp
-            )
-
-            Column(
-                horizontalAlignment =
-                    Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text =
-                        "${(progress * 100).toInt()}%",
-
-                    color =
-                        colors.label,
-
-                    fontWeight =
-                        FontWeight.Bold,
-
-                    style =
-                        MaterialTheme
-                            .typography
-                            .headlineMedium
-                )
-
-                Text(
-                    text =
-                        "completed",
-
-                    color =
-                        colors.secondaryLabel,
-
-                    style =
-                        MaterialTheme
-                            .typography
-                            .bodySmall
-                )
-            }
-
-            // Correct ring mapping:
-            // Start / 100% = TOP
-            // 25% = RIGHT
-            // 50% = BOTTOM
-            // 75% = LEFT
-
-            milestones
-                .firstOrNull {
-                    it.percentage == 100
-                }
-                ?.let { milestone ->
-
-                    MilestoneBubble(
-                        milestone =
-                            milestone,
-
-                        isNext =
-                            nextMilestone
-                                ?.percentage == 100,
-
-                        modifier =
-                            Modifier.align(
-                                Alignment.TopCenter
-                            )
+                    drawArc(
+                        brush = sweepGradient,
+                        startAngle = -90f,
+                        sweepAngle = 360f * animatedProgress,
+                        useCenter = false,
+                        topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                        size = Size(radius * 2, radius * 2),
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                     )
                 }
 
-            milestones
-                .firstOrNull {
-                    it.percentage == 25
-                }
-                ?.let { milestone ->
+                // 4. Milestone checkpoint markers (25%, 50%, 75%, 100%)
+                listOf(25, 50, 75, 100).forEach { pct ->
+                    val angleDeg = -90f + (360f * (pct / 100f))
+                    val rad = Math.toRadians(angleDeg.toDouble())
+                    val markerX = centerOffset.x + radius * cos(rad).toFloat()
+                    val markerY = centerOffset.y + radius * sin(rad).toFloat()
+                    val isReached = animatedProgress >= (pct / 100f)
 
-                    MilestoneBubble(
-                        milestone =
-                            milestone,
-
-                        isNext =
-                            nextMilestone
-                                ?.percentage == 25,
-
-                        modifier =
-                            Modifier.align(
-                                Alignment.CenterEnd
-                            )
-                    )
-                }
-
-            milestones
-                .firstOrNull {
-                    it.percentage == 50
-                }
-                ?.let { milestone ->
-
-                    MilestoneBubble(
-                        milestone =
-                            milestone,
-
-                        isNext =
-                            nextMilestone
-                                ?.percentage == 50,
-
-                        modifier =
-                            Modifier.align(
-                                Alignment.BottomCenter
-                            )
-                    )
-                }
-
-            milestones
-                .firstOrNull {
-                    it.percentage == 75
-                }
-                ?.let { milestone ->
-
-                    MilestoneBubble(
-                        milestone =
-                            milestone,
-
-                        isNext =
-                            nextMilestone
-                                ?.percentage == 75,
-
-                        modifier =
-                            Modifier.align(
-                                Alignment.CenterStart
-                            )
-                    )
-                }
-        }
-    }
-
-    if (
-        progress < 1f &&
-        nextMilestone != null
-    ) {
-        Spacer(
-            modifier =
-                Modifier.height(6.dp)
-        )
-
-        Text(
-            text =
-                "Next milestone · ${nextMilestone.percentage}% ${nextMilestone.title}",
-
-            modifier =
-                Modifier.fillMaxWidth(),
-
-            color =
-                colors.secondaryLabel,
-
-            textAlign =
-                TextAlign.Center,
-
-            style =
-                MaterialTheme
-                    .typography
-                    .bodySmall
-        )
-    }
-}
-
-@Composable
-private fun MilestoneBubble(
-    milestone: GoalMilestone,
-    isNext: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val colors =
-        ClarityTheme.colors
-
-    val accent =
-        goalAccent()
-
-    val background =
-        when {
-            milestone.isReached ->
-                GoalGreen
-
-            isNext ->
-                accent
-
-            else ->
-                if (colors.isDark) {
-                    Color(0xFF303033)
-                } else {
-                    Color(0xFFF2F2F7)
-                }
-        }
-
-    Box(
-        modifier =
-            modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(background)
-                .then(
-                    if (
-                        isNext &&
-                        !milestone.isReached
-                    ) {
-                        Modifier.border(
-                            width =
-                                2.dp,
-
-                            color =
-                                Color.White
-                                    .copy(
-                                        alpha = 0.35f
-                                    ),
-
-                            shape =
-                                CircleShape
+                    if (isReached) {
+                        // Reached: White dot inside accent/green circle with border
+                        drawCircle(
+                            color = if (pct == 100) completeColor else accent,
+                            radius = 6.dp.toPx(),
+                            center = Offset(markerX, markerY)
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 2.5.dp.toPx(),
+                            center = Offset(markerX, markerY)
                         )
                     } else {
-                        Modifier
+                        // Unreached: Subtle checkpoint marker on track
+                        drawCircle(
+                            color = if (isDark) Color(0xFF48484A) else Color(0xFFC7C7CC),
+                            radius = 3.5.dp.toPx(),
+                            center = Offset(markerX, markerY)
+                        )
                     }
-                ),
+                }
+            }
 
-        contentAlignment =
-            Alignment.Center
-    ) {
-        if (milestone.isReached) {
-            Icon(
-                imageVector =
-                    Icons.Rounded.Check,
+            // Central animated percentage & status
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "${(animatedProgress * 100).toInt()}%",
+                    color = colors.label,
+                    fontWeight = FontWeight.Black,
+                    style = MaterialTheme.typography.displaySmall
+                )
 
-                contentDescription =
-                    "${milestone.percentage}% achieved",
+                Spacer(modifier = Modifier.height(2.dp))
 
-                tint =
-                    Color.White,
+                if (animatedProgress >= 1f) {
+                    Text(
+                        text = "ACHIEVED",
+                        color = completeColor,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                } else {
+                    Text(
+                        text = "completed",
+                        color = colors.secondaryLabel,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
 
-                modifier =
-                    Modifier.size(18.dp)
-            )
-        } else {
-            Text(
-                text =
-                    milestone.percentage
-                        .toString(),
+        Spacer(modifier = Modifier.height(10.dp))
 
-                color =
-                    if (isNext) {
-                        if (colors.isDark) {
-                            Color.Black
-                        } else {
-                            Color.White
+        // Sleek milestone pills below the ring
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf(25, 50, 75, 100).forEach { pct ->
+                val reached = animatedProgress >= (pct / 100f)
+                val isTargetNext = nextMilestone?.percentage == pct && !reached
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            when {
+                                reached -> completeColor.copy(alpha = 0.15f)
+                                isTargetNext -> accent.copy(alpha = 0.15f)
+                                else -> colors.background
+                            }
+                        )
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (reached) "✓ $pct%" else "$pct%",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (reached || isTargetNext) FontWeight.Bold else FontWeight.Medium,
+                        color = when {
+                            reached -> completeColor
+                            isTargetNext -> accent
+                            else -> colors.secondaryLabel
                         }
-                    } else {
-                        colors.secondaryLabel
-                    },
-
-                fontWeight =
-                    FontWeight.Bold,
-
-                style =
-                    MaterialTheme
-                        .typography
-                        .labelSmall
-            )
+                    )
+                }
+            }
         }
     }
 }
@@ -1217,9 +1269,6 @@ private fun ProgressMessageCard(
     goalName: String,
     achievementMessage: String?
 ) {
-    val colors =
-        ClarityTheme.colors
-
     val percent =
         (progress * 100)
             .toInt()
@@ -1307,7 +1356,9 @@ private fun GoalMetricsSection(
     remainingAmount: Double,
     requiredMonthlySaving: Double,
     monthsRemaining: Long,
-    predictDeadline: String?
+    predictDeadline: String?,
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
 ) {
     val colors =
         ClarityTheme.colors
@@ -1340,7 +1391,9 @@ private fun GoalMetricsSection(
 
                 value =
                     formatLkr(
-                        remainingAmount
+                        remainingAmount,
+                        currency,
+                        exchangeRate
                     ),
 
                 modifier =
@@ -1353,7 +1406,9 @@ private fun GoalMetricsSection(
 
                 value =
                     formatLkr(
-                        requiredMonthlySaving
+                        requiredMonthlySaving,
+                        currency,
+                        exchangeRate
                     ),
 
                 modifier =
@@ -1569,7 +1624,9 @@ private fun GoalActionButtons(
 
 @Composable
 private fun SavingsHistoryCard(
-    transactions: List<GoalTransaction>
+    transactions: List<GoalTransaction>,
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
 ) {
     val colors =
         ClarityTheme.colors
@@ -1753,7 +1810,13 @@ private fun SavingsHistoryCard(
 
                         SavingsHistoryRow(
                             transaction =
-                                transaction
+                                transaction,
+
+                            currency =
+                                currency,
+
+                            exchangeRate =
+                                exchangeRate
                         )
 
                         if (
@@ -1802,7 +1865,9 @@ private fun SavingsHistoryCard(
 
 @Composable
 private fun SavingsHistoryRow(
-    transaction: GoalTransaction
+    transaction: GoalTransaction,
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
 ) {
     val colors =
         ClarityTheme.colors
@@ -1918,13 +1983,17 @@ private fun SavingsHistoryRow(
                 if (isDeposit) {
                     "+${
                         formatLkr(
-                            transaction.amount
+                            transaction.amount,
+                            currency,
+                            exchangeRate
                         )
                     }"
                 } else {
                     "-${
                         formatLkr(
-                            transaction.amount
+                            transaction.amount,
+                            currency,
+                            exchangeRate
                         )
                     }"
                 },
@@ -1957,6 +2026,7 @@ private fun AddGoalDialog(
     initialStarting: String = "",
     initialDeadline: String = LocalDate.now().plusYears(1).toString(),
     isEdit: Boolean = false,
+    currency: String = "LKR",
     errorMessage: String?,
     onDismiss: () -> Unit,
     onDelete: (() -> Unit)? = null,
@@ -2051,7 +2121,7 @@ private fun AddGoalDialog(
 
                     prefix = {
                         Text(
-                            "LKR "
+                            "${CurrencyFormatter.getSymbol(currency)} "
                         )
                     },
 
@@ -2086,7 +2156,7 @@ private fun AddGoalDialog(
 
                         prefix = {
                             Text(
-                                "LKR "
+                                "${CurrencyFormatter.getSymbol(currency)} "
                             )
                         },
 
@@ -2330,6 +2400,7 @@ private fun GoalTransactionDialog(
     accentColor: Color,
     errorMessage: String?,
     helperText: String? = null,
+    currency: String = "LKR",
     onDismiss: () -> Unit,
     onConfirm: (
         Double,
@@ -2395,7 +2466,7 @@ private fun GoalTransactionDialog(
 
                     prefix = {
                         Text(
-                            "LKR "
+                            "${CurrencyFormatter.getSymbol(currency)} "
                         )
                     },
 
@@ -2677,19 +2748,9 @@ private fun sanitizeAmountInput(
 }
 
 private fun formatLkr(
-    amount: Double
+    amount: Double,
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
 ): String {
-    val formatter =
-        NumberFormat.getNumberInstance(
-            Locale.US
-        )
-
-    formatter.maximumFractionDigits =
-        0
-
-    return "LKR ${
-        formatter.format(
-            amount
-        )
-    }"
+    return CurrencyFormatter.format(amount, currency, exchangeRate)
 }

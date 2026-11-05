@@ -966,4 +966,22 @@ class GoalViewModelTest {
                     .value
             )
         }
+
+    @Test
+    fun `selectGoal updates selectedGoalId`() =
+        runTest {
+            viewModel.selectGoal("goal_2")
+            assertEquals("goal_2", viewModel.selectedGoalId.value)
+        }
+
+    @Test
+    fun `setPrimaryGoal updates repository primary goal`() =
+        runTest {
+            var callbackInvoked = false
+            viewModel.setPrimaryGoal("primary_goal") {
+                callbackInvoked = true
+            }
+            advanceUntilIdle()
+            assertTrue(callbackInvoked)
+        }
 }

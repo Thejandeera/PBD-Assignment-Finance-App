@@ -201,6 +201,16 @@ class FakeGoalRepository(
         )
     }
 
+    override suspend fun setPrimaryGoal(
+        goalId: String
+    ): Result<Unit> {
+        val current = goalFlow.value
+        if (current != null) {
+            goalFlow.value = current.copy(isPrimary = (current.id == goalId))
+        }
+        return Result.success(Unit)
+    }
+
     fun setGoal(
         goal: Goal?
     ) {

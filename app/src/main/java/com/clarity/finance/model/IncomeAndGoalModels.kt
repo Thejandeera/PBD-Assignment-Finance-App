@@ -74,12 +74,32 @@ data class Income(
     val title: String get() = projectName.ifBlank { sourceName }
 }
 
+/**
+ * A monthly recurring income (e.g. Salary on the 7th of every month).
+ * [dayOfMonth] is 1..31.
+ * [lastCommittedMonth] tracks "YYYY-MM" to auto-commit on that day once per month.
+ */
+data class RecurringIncome(
+    val id: String = "",
+    val name: String = "",
+    val sourceId: String = IncomeSource.SALARY.name,
+    val sourceName: String = IncomeSource.SALARY.displayName,
+    val sourceIcon: String = IncomeSource.SALARY.icon,
+    val amount: Double = 0.0,
+    val currency: CurrencyType = CurrencyType.LKR,
+    val dayOfMonth: Int = 1,
+    val lastCommittedMonth: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+
 data class Goal(
     val id: String = "",
     val name: String = "",
     val targetAmount: Double = 0.0,
     val startingAmount: Double = 0.0,
     val deadline: String = "",
+    val isPrimary: Boolean = false,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 )
