@@ -66,10 +66,10 @@ private val CurrencyOptions = CurrencyType.entries
 private const val SOURCES_PER_ROW = 4
 
 /**
- * Add-income sheet (wireframe 12.2): amount first, then source (built-in or the user's own,
- * with "New" to create one), currency with an editable LKR rate, and — for invoiced work —
+ * Add / edit income sheet (wireframe 12.2): amount first, then source (built-in or the user's
+ * own, with "New" to create one), currency with an editable LKR rate, and — for invoiced work —
  * whether the payment is received or still pending. The common case (salary in LKR, received
- * today) needs only an amount and "Add".
+ * today) needs only an amount and "Add". Call [IncomeViewModel.startEditing] first to edit.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +97,8 @@ fun AddIncomeSheet(
     val canSubmit = (formState.amountInput.toDoubleOrNull() ?: 0.0) > 0.0
     val canBePending = formState.source.canBePending
     val isPending = formState.status == IncomeStatus.PENDING
+    // An edited entry may use a custom source that no longer exists; keep it selectable.
+    val shownSources = if (sources.none { it.id == formState.source.id }) sources + formState.source else sources
 
     ClaritySheet(
         onDismissRequest = {
@@ -127,7 +129,7 @@ fun AddIncomeSheet(
                     .padding(start = 4.dp)
             )
             Text(
-                text = "New Income",
+                text = if (formState.isEditing) "Edit Income" else "New Income",
                 style = ClarityType.headline,
                 color = colors.label,
                 modifier = Modifier
@@ -144,7 +146,7 @@ fun AddIncomeSheet(
                     ActivityIndicator(size = 20.dp, modifier = Modifier.padding(horizontal = 14.dp))
                 } else {
                     TextLinkButton(
-                        text = "Add",
+                        text = if (formState.isEditing) "Save" else "Add",
                         enabled = canSubmit,
                         onClick = {
                             dismissKeyboard()
@@ -235,7 +237,7 @@ fun AddIncomeSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // A null entry is the trailing "New" tile.
-                (sources + null).chunked(SOURCES_PER_ROW).forEach { rowItems ->
+                (shownSources + null).chunked(SOURCES_PER_ROW).forEach { rowItems ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         rowItems.forEach { source ->
                             if (source == null) {

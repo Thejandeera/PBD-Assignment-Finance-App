@@ -127,6 +127,11 @@ fun IncomeScreen(
             currency = currentCurrency,
             exchangeRate = exchangeRate,
             onDismiss = { selectedIncome = null },
+            onEdit = {
+                selectedIncome = null
+                viewModel.startEditing(income)
+                showAddIncomeSheet = true
+            },
             onMarkReceived = { viewModel.markAsReceived(income) },
             onDelete = { viewModel.deleteIncome(income) }
         )
@@ -170,7 +175,12 @@ fun IncomeScreen(
 
                 LargeTitleHeader(
                     title = "Income",
-                    trailing = { AddIncomeButton(onClick = { showAddIncomeSheet = true }) }
+                    trailing = {
+                        AddIncomeButton(onClick = {
+                            viewModel.resetFormState()
+                            showAddIncomeSheet = true
+                        })
+                    }
                 )
 
                 MonthSwitcher(
@@ -206,7 +216,10 @@ fun IncomeScreen(
                         monthTitle = monthTitle,
                         currency = currentCurrency,
                         exchangeRate = exchangeRate,
-                        onAddClick = { showAddIncomeSheet = true },
+                        onAddClick = {
+                            viewModel.resetFormState()
+                            showAddIncomeSheet = true
+                        },
                         onIncomeClick = { selectedIncome = it },
                         onDeleteRequest = { incomeToDelete = it }
                     )

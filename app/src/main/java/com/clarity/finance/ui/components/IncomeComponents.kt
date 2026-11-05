@@ -182,8 +182,8 @@ fun DeleteIncomeAlert(
 }
 
 /**
- * Income detail sheet: original amount, LKR equivalent and the stored rate snapshot. Pending
- * payments get a "Mark as Received" action so they can be closed off when paid.
+ * Income detail sheet: original amount, LKR equivalent and the stored rate snapshot, with Edit
+ * in the navigation row. Pending payments get a "Mark as Received" action for when they're paid.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -192,6 +192,7 @@ fun IncomeDetailSheet(
     currency: String,
     exchangeRate: Double,
     onDismiss: () -> Unit,
+    onEdit: () -> Unit,
     onMarkReceived: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -220,6 +221,13 @@ fun IncomeDetailSheet(
                     .height(48.dp)
                     .padding(horizontal = 8.dp)
             ) {
+                TextLinkButton(
+                    text = "Edit",
+                    onClick = { hideThen(onEdit) },
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 4.dp)
+                )
                 Text(
                     text = "Income",
                     style = ClarityType.headline,

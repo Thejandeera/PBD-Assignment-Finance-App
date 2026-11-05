@@ -27,12 +27,13 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
  * Income tracking (FR-03 – FR-06, FR-12): records multi-source, multi-currency income from
  * built-in or user-defined sources, keeps an LKR equivalent for monthly totals, and follows
- * pending payments until paid.
+ * pending payments until paid. Saved entries can be edited in full.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -112,8 +113,32 @@ class IncomeViewModel @Inject constructor(
     }
 
     // =========================================================================
-    // Add Income form
+    // Add / Edit Income form
     // =========================================================================
+
+    /** Loads a saved entry into the form so every field can be changed. */
+    fun startEditing(income: Income) {
+        val source = sources.value.firstOrNull { it.id == income.sourceId } ?: IncomeSourceItem(
+            id = income.sourceId,
+            name = income.sourceName,
+            icon = income.sourceIcon,
+            defaultCurrency = income.currency,
+            isCustom = income.isCustomSource
+        )
+        _formState.value = IncomeFormState(
+            source = source,
+            currency = income.currency,
+            amountInput = formatInput(abs(income.amount)),
+            isLoss = income.amount < 0 && source.allowsLoss,
+            rateInput = if (income.isForeignCurrency) formatInput(income.exchangeRate) else "",
+            status = if (source.canBePending) income.status else IncomeStatus.RECEIVED,
+            date = income.date,
+            projectName = income.projectName,
+            note = income.note,
+            editingIncomeId = income.id,
+            editingCreatedAt = income.createdAt
+        )
+    }
 
     /** Picking a source applies its usual currency and clears options it doesn't support. */
     fun onSourceSelected(source: IncomeSourceItem) {
@@ -213,7 +238,7 @@ class IncomeViewModel @Inject constructor(
 
         val signedAmount = if (state.isLoss && state.source.allowsLoss) -amount else amount
         val income = Income(
-            id = UUID.randomUUID().toString(),
+            id = state.editingIncomeId ?: UUID.randomUUID().toString(),
             sourceId = state.source.id,
             sourceName = state.source.name,
             sourceIcon = state.source.icon,
@@ -226,13 +251,19 @@ class IncomeViewModel @Inject constructor(
             month = state.date.take(7),
             projectName = projectName,
             note = state.note.trim(),
-            createdAt = System.currentTimeMillis()
+            createdAt = state.editingCreatedAt ?: System.currentTimeMillis()
         )
 
         viewModelScope.launch {
             _formState.update { it.copy(isSubmitting = true, errorMessage = null) }
-            incomeRepository.addIncome(income)
+            val result = if (state.isEditing) {
+                incomeRepository.updateIncome(income)
+            } else {
+                incomeRepository.addIncome(income)
+            }
+            result
                 .onSuccess {
+                    if (state.isEditing) _userMessage.value = "${income.title} updated"
                     onSuccess?.invoke()
                     resetFormState()
                 }
@@ -255,6 +286,11 @@ class IncomeViewModel @Inject constructor(
 
     private fun defaultRateInput(): String =
         _liveRate.value?.let { String.format(Locale.US, "%.2f", it) }.orEmpty()
+
+    /** "1500" for whole numbers, otherwise up to two decimals without trailing zeros. */
+    private fun formatInput(value: Double): String =
+        if (value % 1.0 == 0.0) value.toLong().toString()
+        else String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
 
     private fun sanitizeDecimal(input: String): String {
         val filtered = input.filter { it.isDigit() || it == '.' }

@@ -11,8 +11,8 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
 /**
- * State of the Add Income sheet (wireframe 12.2). Amounts are typed as positive numbers; a
- * crypto loss is expressed with [isLoss] instead of a minus sign.
+ * State of the Add / Edit Income sheet (wireframe 12.2). Amounts are typed as positive
+ * numbers; a crypto loss is expressed with [isLoss] instead of a minus sign.
  */
 data class IncomeFormState(
     val source: IncomeSourceItem = IncomeSource.SALARY.toItem(),
@@ -30,8 +30,13 @@ data class IncomeFormState(
     val dateError: String? = null,
     val projectError: String? = null,
     val isSubmitting: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    /** Set while an existing entry is being edited; null when adding a new one. */
+    val editingIncomeId: String? = null,
+    val editingCreatedAt: Long? = null
 ) {
+    val isEditing: Boolean get() = editingIncomeId != null
+
     val isForeignCurrency: Boolean get() = currency != CurrencyType.LKR
 
     /** Signed LKR equivalent of the typed amount, or null until amount (and rate) are valid. */

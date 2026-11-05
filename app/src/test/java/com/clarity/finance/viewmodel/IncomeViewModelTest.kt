@@ -312,6 +312,75 @@ class IncomeViewModelTest {
         job.cancel()
     }
 
+    // -------------------------------------------------------------------------
+    // Editing saved income
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun startEditing_loadsEveryFieldIntoTheForm() {
+        val saved = Income(
+            id = "inv-7",
+            sourceId = IncomeSource.FREELANCE.name,
+            sourceName = "Freelance",
+            sourceIcon = IncomeSource.FREELANCE.icon,
+            amount = 180.5,
+            currency = CurrencyType.USD,
+            exchangeRate = 298.75,
+            amountLKR = 180.5 * 298.75,
+            status = IncomeStatus.PENDING,
+            date = "$thisMonth-01",
+            month = thisMonth,
+            projectName = "Upwork",
+            note = "Logo redesign",
+            createdAt = 1234L
+        )
+
+        viewModel.startEditing(saved)
+
+        val form = viewModel.formState.value
+        assertTrue(form.isEditing)
+        assertEquals(IncomeSource.FREELANCE.name, form.source.id)
+        assertEquals("180.5", form.amountInput)
+        assertEquals(CurrencyType.USD, form.currency)
+        assertEquals("298.75", form.rateInput)
+        assertEquals(IncomeStatus.PENDING, form.status)
+        assertEquals("$thisMonth-01", form.date)
+        assertEquals("Upwork", form.projectName)
+        assertEquals("Logo redesign", form.note)
+    }
+
+    @Test
+    fun savingAnEdit_updatesTheSameEntryInPlace() {
+        val original = income("e1", IncomeSource.SALARY, 150_000.0).copy(createdAt = 42L, note = "Base")
+        repository.setIncomes(listOf(original))
+
+        viewModel.startEditing(original)
+        viewModel.onSourceSelected(IncomeSource.FREELANCE.toItem())
+        viewModel.onAmountChanged("165000")
+        viewModel.onNoteChanged("Base + bonus")
+        viewModel.submitIncome()
+
+        val updated = repository.incomesState.value.single()
+        assertEquals("e1", updated.id)
+        assertEquals(42L, updated.createdAt)
+        assertEquals(IncomeSource.FREELANCE.name, updated.sourceId)
+        assertEquals(165_000.0, updated.amountLKR, 0.001)
+        assertEquals("Base + bonus", updated.note)
+        assertEquals("Freelance updated", viewModel.userMessage.value)
+        assertTrue(!viewModel.formState.value.isEditing)
+    }
+
+    @Test
+    fun editingACryptoLoss_showsPositiveAmountWithLossSelected() {
+        val loss = income("c1", IncomeSource.CRYPTO, -12_000.0)
+
+        viewModel.startEditing(loss)
+
+        val form = viewModel.formState.value
+        assertEquals("12000", form.amountInput)
+        assertTrue(form.isLoss)
+    }
+
     private fun income(
         id: String,
         source: IncomeSource,
