@@ -22,7 +22,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.clarity.finance.ui.components.ClarityNavTab
-import com.clarity.finance.ui.screens.ComingSoonScreen
+import com.clarity.finance.ui.screens.GoalScreen
 import com.clarity.finance.ui.screens.DashboardScreen
 import com.clarity.finance.ui.screens.DraftsScreen
 import com.clarity.finance.ui.screens.ExpensesHistoryScreen
@@ -32,7 +32,6 @@ import com.clarity.finance.ui.screens.LoginScreen
 import com.clarity.finance.ui.screens.RegisterScreen
 import com.clarity.finance.ui.screens.SettingsScreen
 import com.clarity.finance.viewmodel.AuthViewModel
-
 sealed class Screen(val route: String) {
     data object Login : Screen("login")
     data object Register : Screen("register")
@@ -278,11 +277,16 @@ fun ClarityNavHost(
         }
 
         composable(Screen.Goal.route) { entry ->
-            ComingSoonScreen(
-                tab = ClarityNavTab.GOAL,
-                title = "Goals Are Coming",
-                message = "Follow your MacBook Pro M4 savings goal and see how much to set aside each month.",
-                onTabSelected = { tab -> entry.ifResumed { navController.navigateToTab(tab) } }
+            GoalScreen(
+                onNavigateToHome = {
+                    entry.ifResumed { navController.navigateToTab(ClarityNavTab.HOME) }
+                },
+                onNavigateToIncome = {
+                    entry.ifResumed { navController.navigateToTab(ClarityNavTab.INCOME) }
+                },
+                onNavigateToInsights = {
+                    entry.ifResumed { navController.navigateToTab(ClarityNavTab.INSIGHTS) }
+                }
             )
         }
 
