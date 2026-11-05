@@ -37,7 +37,12 @@ class ExpenseViewModel @Inject constructor(
     // =========================================================================
 
     private val _formState = MutableStateFlow(
-        ExpenseFormState(selectedCategory = getDefaultCategories().firstOrNull())
+        getDefaultCategories().firstOrNull().let { defaultCategory ->
+            ExpenseFormState(
+                selectedCategory = defaultCategory,
+                spendingType = defaultCategory?.defaultType ?: SpendingType.DISCRETIONARY
+            )
+        }
     )
     val formState: StateFlow<ExpenseFormState> = _formState.asStateFlow()
 
@@ -120,8 +125,10 @@ class ExpenseViewModel @Inject constructor(
 
     fun resetFormState() {
         val today = LocalDate.now()
+        val defaultCategory = categories.value.firstOrNull() ?: getDefaultCategories().firstOrNull()
         _formState.value = ExpenseFormState(
-            selectedCategory = categories.value.firstOrNull() ?: getDefaultCategories().firstOrNull(),
+            selectedCategory = defaultCategory,
+            spendingType = defaultCategory?.defaultType ?: SpendingType.DISCRETIONARY,
             date = today.toString(),
             formattedDateDisplay = "Today, ${today.format(DateTimeFormatter.ofPattern("dd MMM yyyy"))}"
         )

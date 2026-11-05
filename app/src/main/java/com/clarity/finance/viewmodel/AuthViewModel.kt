@@ -5,13 +5,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clarity.finance.data.local.UserPreferencesRepository
 import com.clarity.finance.data.repository.AuthRepository
+import com.clarity.finance.data.repository.ExchangeRateRepository
 import com.clarity.finance.model.AuthUser
+import com.clarity.finance.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import com.clarity.finance.util.ProfileImageManager
+import android.net.Uri
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -26,7 +30,9 @@ sealed interface AuthUiState {
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val profileImageManager: ProfileImageManager,
+    private val exchangeRateRepository: ExchangeRateRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
@@ -34,6 +40,10 @@ class AuthViewModel @Inject constructor(
 
     private val _canUseBiometrics = MutableStateFlow(userPreferencesRepository.canUseBiometrics())
     val canUseBiometrics: StateFlow<Boolean> = _canUseBiometrics.asStateFlow()
+
+    /** Live LKR-per-USD exchange rate. Starts at fallback (330) and updates async. */
+    private val _exchangeRate = MutableStateFlow(CurrencyFormatter.FALLBACK_LKR_PER_USD)
+    val exchangeRateFlow: StateFlow<Double> = _exchangeRate.asStateFlow()
 
     val savedUserEmail: String?
         get() = userPreferencesRepository.getSavedEmail()
@@ -47,6 +57,17 @@ class AuthViewModel @Inject constructor(
 
     val isUserLoggedIn: Boolean
         get() = authRepository.currentUser != null
+
+    init {
+        fetchLiveExchangeRate()
+    }
+
+    private fun fetchLiveExchangeRate() {
+        viewModelScope.launch {
+            val rate = exchangeRateRepository.getLkrPerUsdRate()
+            _exchangeRate.value = rate
+        }
+    }
 
     fun checkBiometricStatus() {
         _canUseBiometrics.value = userPreferencesRepository.canUseBiometrics()
@@ -82,7 +103,7 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun signUp(name: String, email: String, password: String, confirmPassword: String) {
+    fun signUp(name: String, email: String, password: String, confirmPassword: String, photoUri: Uri? = null) {
         val trimmedName = name.trim()
         val trimmedEmail = email.trim()
 
@@ -109,8 +130,15 @@ class AuthViewModel @Inject constructor(
 
         _uiState.value = AuthUiState.Loading
         viewModelScope.launch {
-            authRepository.signUp(trimmedName, trimmedEmail, password)
-                .onSuccess {
+            val tempId = java.util.UUID.randomUUID().toString()
+            val initialSavedPath = photoUri?.let { profileImageManager.saveProfileImage(tempId, it) }
+
+            authRepository.signUp(trimmedName, trimmedEmail, password, initialSavedPath)
+                .onSuccess { user ->
+                    if (photoUri != null) {
+                        val permanentPath = profileImageManager.saveProfileImage(user.uid, photoUri)
+                        userPreferencesRepository.profilePhotoPath = permanentPath
+                    }
                     // Sign out immediately so user must perform their first login on LoginScreen
                     authRepository.signOut()
                     _uiState.value = AuthUiState.RegisteredSuccess(
@@ -121,6 +149,72 @@ class AuthViewModel @Inject constructor(
                     _uiState.value = AuthUiState.Error(mapFirebaseError(error))
                 }
         }
+    }
+
+    fun updateProfile(name: String, photoUri: Uri? = null, onResult: ((Boolean) -> Unit)? = null) {
+        val user = authRepository.currentUser ?: return
+        viewModelScope.launch {
+            val newPath = photoUri?.let { profileImageManager.saveProfileImage(user.uid, it) }
+                ?: userPreferencesRepository.profilePhotoPath
+            val result = authRepository.updateProfile(name.trim(), newPath)
+            if (result.isSuccess) {
+                userPreferencesRepository.profilePhotoPath = newPath
+            }
+            onResult?.invoke(result.isSuccess)
+        }
+    }
+
+    val profilePhotoPath: String?
+        get() = userPreferencesRepository.profilePhotoPath
+
+    val themeMode: String
+        get() = userPreferencesRepository.themeMode
+
+    val themeModeFlow: StateFlow<String> = userPreferencesRepository.themeModeFlow
+
+    fun setThemeMode(mode: String) {
+        userPreferencesRepository.themeMode = mode
+    }
+
+    val currency: String
+        get() = userPreferencesRepository.currency
+
+    val currencyFlow: StateFlow<String> = userPreferencesRepository.currencyFlow
+
+    fun setCurrency(newCurrency: String) {
+        userPreferencesRepository.currency = newCurrency
+        // Refresh exchange rate whenever currency changes
+        fetchLiveExchangeRate()
+    }
+
+    fun updateSessionActivity() {
+        userPreferencesRepository.lastActiveTimestamp = System.currentTimeMillis()
+    }
+
+    fun isSessionExpired(): Boolean {
+        val last = userPreferencesRepository.lastActiveTimestamp
+        if (last == 0L) return false
+        // 1 hour = 3600_000 ms
+        return (System.currentTimeMillis() - last) > 3_600_000L
+    }
+
+    val isSmsScanEnabled: Boolean
+        get() = userPreferencesRepository.isSmsScanEnabled
+
+    fun setSmsScanEnabled(enabled: Boolean) {
+        userPreferencesRepository.isSmsScanEnabled = enabled
+    }
+
+    val isDailyReminderEnabled: Boolean
+        get() = userPreferencesRepository.isDailyReminderEnabled
+
+    fun setDailyReminderEnabled(enabled: Boolean) {
+        userPreferencesRepository.isDailyReminderEnabled = enabled
+    }
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        userPreferencesRepository.isBiometricEnabled = enabled
+        _canUseBiometrics.value = userPreferencesRepository.canUseBiometrics()
     }
 
     /**

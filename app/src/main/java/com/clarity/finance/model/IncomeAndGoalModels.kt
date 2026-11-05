@@ -1,5 +1,16 @@
 package com.clarity.finance.model
 
+/**
+ * One income entry. The original [amount] and [currency] are kept alongside an [exchangeRate]
+ * snapshot and the derived [amountLKR], so past months never change when the live rate moves.
+ *
+ * @property amount Value in [currency]. Negative only for a crypto net loss.
+ * @property exchangeRate LKR per one unit of [currency]; always 1 for LKR.
+ * @property amountLKR [amount] × [exchangeRate], used for every monthly total.
+ * @property date "YYYY-MM-DD" — the day it was received, or the invoice date while pending.
+ * @property month "YYYY-MM", denormalised from [date] for monthly queries.
+ * @property projectName Client or project for freelance work, so pending invoices can be chased.
+ */
 data class Income(
     val id: String = "",
     val source: IncomeSource = IncomeSource.SALARY,
@@ -13,12 +24,34 @@ data class Income(
     val projectName: String = "",
     val note: String = "",
     val createdAt: Long = System.currentTimeMillis()
-)
+) {
+    val isPending: Boolean get() = status == IncomeStatus.PENDING
+
+    val isForeignCurrency: Boolean get() = currency != CurrencyType.LKR
+
+    /** Row title: the client/project when known, otherwise the source name. */
+    val title: String get() = projectName.ifBlank { source.displayName }
+}
 
 data class Goal(
     val id: String = "primary_goal",
     val name: String = "MacBook Pro M4",
     val targetAmount: Double = 490000.0,
     val startingAmount: Double = 11200.0,
-    val deadline: String = "2027-10-01"
+    val deadline: String = "2027-10-01",
+    val createdAt: Long = 0L,
+    val updatedAt: Long = 0L
+)
+
+enum class GoalTransactionType {
+    DEPOSIT,
+    WITHDRAWAL
+}
+
+data class GoalTransaction(
+    val id: String = "",
+    val type: GoalTransactionType = GoalTransactionType.DEPOSIT,
+    val amount: Double = 0.0,
+    val note: String = "",
+    val createdAt: Long = System.currentTimeMillis()
 )
