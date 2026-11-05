@@ -361,6 +361,15 @@ class FirestoreGoalRepository @Inject constructor(
             Unit
         }
 
+    override suspend fun deleteGoal(
+        goalId: String
+    ): Result<Unit> =
+        runCatching {
+            require(goalId.isNotBlank()) { "Goal ID cannot be empty" }
+            goalDocument(goalId).delete().await()
+            Unit
+        }
+
     override suspend fun deposit(
         goalId: String,
         amount: Double,

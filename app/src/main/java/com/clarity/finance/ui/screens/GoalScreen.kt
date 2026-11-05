@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.AlertDialog
@@ -119,6 +120,10 @@ fun GoalScreen(
     }
 
     var showEditGoalDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var showDeleteGoalDialog by remember {
         mutableStateOf(false)
     }
 
@@ -244,6 +249,11 @@ fun GoalScreen(
                             onEdit = {
                                 viewModel.clearActionError()
                                 showEditGoalDialog = true
+                            },
+
+                            onDelete = {
+                                viewModel.clearActionError()
+                                showDeleteGoalDialog = true
                             }
                         )
                     }
@@ -340,6 +350,11 @@ fun GoalScreen(
                 viewModel.clearActionError()
                 showEditGoalDialog = false
             },
+            onDelete = {
+                viewModel.deleteGoal {
+                    showEditGoalDialog = false
+                }
+            },
             onConfirm = { name, target, _, deadline ->
                 viewModel.updateGoal(
                     name = name,
@@ -347,6 +362,41 @@ fun GoalScreen(
                     deadline = deadline
                 ) {
                     showEditGoalDialog = false
+                }
+            }
+        )
+    }
+
+    if (showDeleteGoalDialog && uiState.goal != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showDeleteGoalDialog = false
+            },
+            title = {
+                Text("Delete Goal")
+            },
+            text = {
+                Text("Are you sure you want to delete \"${uiState.goal?.name}\"? All its transaction history will be removed.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteGoal {
+                            showDeleteGoalDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GoalRed)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteGoalDialog = false
+                    }
+                ) {
+                    Text("Cancel")
                 }
             }
         )
@@ -524,7 +574,8 @@ private fun GoalProgressCard(
     showSwitchButtons: Boolean,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onEdit: () -> Unit = {}
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {}
 ) {
     val colors =
         ClarityTheme.colors
@@ -645,6 +696,28 @@ private fun GoalProgressCard(
 
                         tint =
                             accent,
+
+                        modifier =
+                            Modifier.size(16.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick =
+                        onDelete,
+
+                    modifier =
+                        Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        imageVector =
+                            Icons.Rounded.Delete,
+
+                        contentDescription =
+                            "Delete goal",
+
+                        tint =
+                            GoalRed,
 
                         modifier =
                             Modifier.size(16.dp)
@@ -1886,6 +1959,7 @@ private fun AddGoalDialog(
     isEdit: Boolean = false,
     errorMessage: String?,
     onDismiss: () -> Unit,
+    onDelete: (() -> Unit)? = null,
     onConfirm: (
         String,
         Double,
@@ -2122,13 +2196,25 @@ private fun AddGoalDialog(
         },
 
         dismissButton = {
-            TextButton(
-                onClick =
-                    onDismiss
-            ) {
-                Text(
-                    "Cancel"
-                )
+            Row {
+                if (isEdit && onDelete != null) {
+                    TextButton(
+                        onClick = onDelete
+                    ) {
+                        Text(
+                            "Delete",
+                            color = GoalRed
+                        )
+                    }
+                }
+                TextButton(
+                    onClick =
+                        onDismiss
+                ) {
+                    Text(
+                        "Cancel"
+                    )
+                }
             }
         }
     )
