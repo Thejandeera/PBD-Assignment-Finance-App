@@ -34,6 +34,15 @@ service cloud.firestore {
         allow create, update: if isOwner(uid) && isValidIncome(request.resource.data);
       }
 
+      // User-defined income sources. Built-in sources (SALARY, FREELANCE, ADSENSE, CRYPTO)
+      // live in the app, so those ids can't be taken by a custom source.
+      match /incomeSources/{sourceId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && !(sourceId in ['SALARY', 'FREELANCE', 'ADSENSE', 'CRYPTO'])
+          && isValidIncomeSource(request.resource.data);
+      }
+
       // Expense entries (Member B)
       match /expenses/{expenseId} {
         allow read, delete: if isOwner(uid);
@@ -63,10 +72,12 @@ service cloud.firestore {
     function isValidIncome(data) {
       return data.keys().hasAll(['source', 'amount', 'currency', 'exchangeRate',
                                  'amountLKR', 'status', 'date', 'month'])
-        && data.keys().hasOnly(['source', 'amount', 'currency', 'exchangeRate',
-                                'amountLKR', 'status', 'date', 'month',
+        && data.keys().hasOnly(['source', 'sourceName', 'sourceIcon', 'amount', 'currency',
+                                'exchangeRate', 'amountLKR', 'status', 'date', 'month',
                                 'projectName', 'note', 'createdAt'])
-        && data.source in ['SALARY', 'FREELANCE', 'ADSENSE', 'CRYPTO']
+        // A built-in source id or a custom source's document id.
+        && data.source is string && data.source.size() > 0 && data.source.size() <= 64
+        && (!('sourceName' in data) || (data.sourceName is string && data.sourceName.size() <= 40))
         && data.currency in ['LKR', 'USD', 'USDT']
         && data.status in ['RECEIVED', 'PENDING']
         && data.amount is number
@@ -79,12 +90,20 @@ service cloud.firestore {
             || (data.currency != 'LKR' && data.exchangeRate > 0))
         // The stored LKR value must match amount x rate (small rounding tolerance).
         && math.abs(data.amountLKR - data.amount * data.exchangeRate) < 0.01
-        // Only freelance invoices can be waiting for payment.
-        && (data.status == 'RECEIVED' || data.source == 'FREELANCE')
+        // Salary, AdSense and crypto are recorded when received; freelance and custom
+        // sources can be invoiced and waiting for payment.
+        && (data.status == 'RECEIVED' || !(data.source in ['SALARY', 'ADSENSE', 'CRYPTO']))
         // month is the denormalised "YYYY-MM" part of date.
         && isDate(data.date)
         && isMonth(data.month)
         && data.date.matches(data.month + '-[0-9]{2}');
+    }
+
+    function isValidIncomeSource(data) {
+      return data.keys().hasAll(['name', 'defaultCurrency'])
+        && data.keys().hasOnly(['name', 'icon', 'defaultCurrency', 'createdAt'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 40
+        && data.defaultCurrency in ['LKR', 'USD', 'USDT'];
     }
 
     function isValidExpense(data) {

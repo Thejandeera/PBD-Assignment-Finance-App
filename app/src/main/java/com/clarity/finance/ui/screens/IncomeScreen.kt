@@ -365,7 +365,7 @@ private fun ReceivedSummaryCard(
         Spacer(modifier = Modifier.height(14.dp))
         StackedBar(
             segments = state.sourceTotals.map { total ->
-                total.amountLkr.coerceAtLeast(0.0).toFloat() to incomeSourceColor(total.source)
+                total.amountLkr.coerceAtLeast(0.0).toFloat() to incomeSourceColor(total.source.id)
             }
         )
         Spacer(modifier = Modifier.height(14.dp))
@@ -398,16 +398,27 @@ private fun SourceLegendRow(
             .semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically
     ) {
-        LegendDot(color = incomeSourceColor(total.source), size = 10.dp)
+        LegendDot(color = incomeSourceColor(total.source.id), size = 10.dp)
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text = total.source.displayName, style = ClarityType.subheadline, color = colors.label)
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = if (total.amountLkr < 0) "Net loss" else "${total.percentage}%",
-            style = ClarityType.subheadline,
-            color = if (total.amountLkr < 0) colors.redText else colors.secondaryLabel,
-            modifier = Modifier.weight(1f)
-        )
+        // Name and share fill the space before the amount; a long custom name truncates.
+        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = total.source.name,
+                style = ClarityType.subheadline,
+                color = colors.label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (total.amountLkr < 0) "Net loss" else "${total.percentage}%",
+                style = ClarityType.subheadline,
+                color = if (total.amountLkr < 0) colors.redText else colors.secondaryLabel,
+                maxLines = 1
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = CurrencyFormatter.format(total.amountLkr, currency, exchangeRate),
             style = ClarityType.amountCallout,
