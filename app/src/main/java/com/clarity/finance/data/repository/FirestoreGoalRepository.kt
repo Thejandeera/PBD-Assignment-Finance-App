@@ -10,9 +10,13 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -55,95 +59,60 @@ class FirestoreGoalRepository @Inject constructor(
     // ============================================================
 
     override fun observeGoal(): Flow<Goal?> =
-        callbackFlow {
+        observeGoals().map { it.firstOrNull() }
 
-            val uid =
-                auth.currentUser?.uid
-
-            if (uid == null) {
-                trySend(null)
-                close()
-                return@callbackFlow
-            }
-
-            val listener =
-                firestore
-                    .collection(
-                        FirestorePaths.USERS
-                    )
-                    .document(uid)
-                    .collection(
-                        FirestorePaths.GOALS
-                    )
-                    .document(
-                        FirestorePaths.PRIMARY_GOAL_ID
-                    )
-                    .addSnapshotListener {
-                            snapshot,
-                            error ->
-
-                        if (error != null) {
-
-                            Log.e(
-                                "FirestoreGoalRepo",
-                                "Primary goal stream error: ${error.message}",
-                                error
-                            )
-
-                            trySend(null)
-                            return@addSnapshotListener
-                        }
-
-                        trySend(
-                            snapshot?.toGoal()
-                        )
-                    }
-
-            awaitClose {
-                listener.remove()
-            }
-        }
-
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeTransactions():
             Flow<List<GoalTransaction>> =
-        observeTransactions(
-            FirestorePaths.PRIMARY_GOAL_ID
-        )
+        observeGoals().flatMapLatest { goals ->
+            val firstId = goals.firstOrNull()?.id
+            if (firstId != null) {
+                observeTransactions(firstId)
+            } else {
+                flowOf(emptyList())
+            }
+        }
 
     override suspend fun updateGoal(
         name: String,
         targetAmount: Double,
         deadline: String
-    ): Result<Unit> =
-        updateGoal(
-            goalId =
-                FirestorePaths.PRIMARY_GOAL_ID,
+    ): Result<Unit> {
+        val firstId = goalsCollection().get().await().documents.firstOrNull()?.id
+            ?: return Result.failure(IllegalStateException("No goal found to update"))
+        return updateGoal(
+            goalId = firstId,
             name = name,
             targetAmount = targetAmount,
             deadline = deadline
         )
+    }
 
     override suspend fun deposit(
         amount: Double,
         note: String
-    ): Result<Unit> =
-        deposit(
-            goalId =
-                FirestorePaths.PRIMARY_GOAL_ID,
+    ): Result<Unit> {
+        val firstId = goalsCollection().get().await().documents.firstOrNull()?.id
+            ?: return Result.failure(IllegalStateException("No goal found for deposit"))
+        return deposit(
+            goalId = firstId,
             amount = amount,
             note = note
         )
+    }
 
     override suspend fun withdraw(
         amount: Double,
         note: String
-    ): Result<Unit> =
-        withdraw(
-            goalId =
-                FirestorePaths.PRIMARY_GOAL_ID,
+    ): Result<Unit> {
+        val firstId = goalsCollection().get().await().documents.firstOrNull()?.id
+            ?: return Result.failure(IllegalStateException("No goal found for withdrawal"))
+        return withdraw(
+            goalId = firstId,
             amount = amount,
             note = note
         )
+    }
 
     // ============================================================
     // Multi-goal support
@@ -499,7 +468,7 @@ class FirestoreGoalRepository @Inject constructor(
 
             name =
                 getString("name")
-                    ?: "Savings Goal",
+                    .orEmpty(),
 
             targetAmount =
                 getDouble(
