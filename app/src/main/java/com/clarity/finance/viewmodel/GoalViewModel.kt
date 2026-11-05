@@ -617,6 +617,31 @@ class GoalViewModel @Inject constructor(
         }
     }
 
+    fun deleteGoal(
+        goalId: String? = null,
+        onSuccess: () -> Unit = {}
+    ) {
+        val targetId = goalId ?: uiState.value.goal?.id
+        if (targetId.isNullOrBlank()) {
+            _actionError.value = "Select a goal first."
+            return
+        }
+        _actionError.value = null
+        viewModelScope.launch {
+            goalRepository.deleteGoal(targetId)
+                .onSuccess {
+                    if (_selectedGoalId.value == targetId) {
+                        _selectedGoalId.value = null
+                    }
+                    onSuccess()
+                }
+                .onFailure { error ->
+                    _actionError.value =
+                        error.message ?: "Goal could not be deleted."
+                }
+        }
+    }
+
     fun deposit(
         amount: Double,
         note: String = ""

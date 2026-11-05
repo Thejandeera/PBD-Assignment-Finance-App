@@ -102,26 +102,7 @@ class FirebaseAuthRepository @Inject constructor(
             "createdAt" to FieldValue.serverTimestamp()
         )
 
-        // A new user has saved nothing in the app yet, so startingAmount is 0.
-        // The goal name and target are only a starting point the user edits on the Goal screen.
-        val defaultGoal = Goal(
-            startingAmount = 0.0,
-            deadline = LocalDate.now().plusYears(1).toString()
-        )
-        val goalData = mapOf(
-            "name" to defaultGoal.name,
-            "targetAmount" to defaultGoal.targetAmount,
-            "startingAmount" to defaultGoal.startingAmount,
-            "deadline" to defaultGoal.deadline,
-            "createdAt" to FieldValue.serverTimestamp()
-        )
-        val goalDoc = userDoc.collection(FirestorePaths.GOALS).document(FirestorePaths.PRIMARY_GOAL_ID)
-
-        firestore.batch()
-            .set(userDoc, profileData)
-            .set(goalDoc, goalData)
-            .commit()
-            .await()
+        userDoc.set(profileData).await()
     }
 
     private fun FirebaseUser.toAuthUser() = AuthUser(
