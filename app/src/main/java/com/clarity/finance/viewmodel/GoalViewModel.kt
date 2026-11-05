@@ -260,31 +260,21 @@ class GoalViewModel @Inject constructor(
 
         val deadlineDate =
             runCatching {
-                LocalDate.parse(
-                    deadline
-                )
+                LocalDate.parse(deadline)
             }.getOrNull()
                 ?: return 0L
 
-        val currentMonth =
-            YearMonth.now()
+        val today =
+            LocalDate.now()
 
-        val deadlineMonth =
-            YearMonth.from(
-                deadlineDate
-            )
-
-        if (
-            deadlineMonth <
-            currentMonth
-        ) {
+        if (deadlineDate.isBefore(today)) {
             return 0L
         }
 
         return ChronoUnit.MONTHS.between(
-            currentMonth,
-            deadlineMonth
-        ) + 1L
+            YearMonth.from(today),
+            YearMonth.from(deadlineDate)
+        )
     }
 
     private fun calculateMonthlyDepositAverage(
