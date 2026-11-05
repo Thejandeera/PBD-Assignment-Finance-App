@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -113,6 +115,10 @@ fun GoalScreen(
     }
 
     var showAddGoalDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var showEditGoalDialog by remember {
         mutableStateOf(false)
     }
 
@@ -233,7 +239,12 @@ fun GoalScreen(
                                 viewModel::selectPreviousGoal,
 
                             onNext =
-                                viewModel::selectNextGoal
+                                viewModel::selectNextGoal,
+
+                            onEdit = {
+                                viewModel.clearActionError()
+                                showEditGoalDialog = true
+                            }
                         )
                     }
 
@@ -310,6 +321,32 @@ fun GoalScreen(
                     deadline = deadline
                 ) {
                     showAddGoalDialog = false
+                }
+            }
+        )
+    }
+
+    if (showEditGoalDialog && uiState.goal != null) {
+        val currentGoal = uiState.goal!!
+        AddGoalDialog(
+            title = "Edit Goal",
+            confirmLabel = "Save Changes",
+            initialName = currentGoal.name,
+            initialTarget = if (currentGoal.targetAmount > 0) currentGoal.targetAmount.toLong().toString() else "",
+            initialDeadline = currentGoal.deadline.ifBlank { LocalDate.now().plusYears(1).toString() },
+            isEdit = true,
+            errorMessage = actionError,
+            onDismiss = {
+                viewModel.clearActionError()
+                showEditGoalDialog = false
+            },
+            onConfirm = { name, target, _, deadline ->
+                viewModel.updateGoal(
+                    name = name,
+                    targetAmount = target,
+                    deadline = deadline
+                ) {
+                    showEditGoalDialog = false
                 }
             }
         )
@@ -486,7 +523,8 @@ private fun GoalProgressCard(
     achievementMessage: String?,
     showSwitchButtons: Boolean,
     onPrevious: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    onEdit: () -> Unit = {}
 ) {
     val colors =
         ClarityTheme.colors
@@ -552,37 +590,67 @@ private fun GoalProgressCard(
                 )
             }
 
-            Text(
-                text =
-                    goalName,
-
+            Row(
                 modifier =
                     Modifier
                         .weight(1f)
                         .padding(
-                            horizontal = 12.dp
+                            horizontal = 8.dp
                         ),
+                verticalAlignment =
+                    Alignment.CenterVertically,
+                horizontalArrangement =
+                    Arrangement.Center
+            ) {
+                Text(
+                    text =
+                        goalName,
 
-                textAlign =
-                    TextAlign.Center,
+                    color =
+                        colors.label,
 
-                color =
-                    colors.label,
+                    fontWeight =
+                        FontWeight.Bold,
 
-                fontWeight =
-                    FontWeight.Bold,
+                    maxLines =
+                        1,
 
-                maxLines =
-                    1,
+                    overflow =
+                        TextOverflow.Ellipsis,
 
-                overflow =
-                    TextOverflow.Ellipsis,
+                    style =
+                        MaterialTheme
+                            .typography
+                            .titleLarge
+                )
 
-                style =
-                    MaterialTheme
-                        .typography
-                        .titleLarge
-            )
+                Spacer(
+                    modifier =
+                        Modifier.width(4.dp)
+                )
+
+                IconButton(
+                    onClick =
+                        onEdit,
+
+                    modifier =
+                        Modifier.size(30.dp)
+                ) {
+                    Icon(
+                        imageVector =
+                            Icons.Rounded.Edit,
+
+                        contentDescription =
+                            "Edit goal",
+
+                        tint =
+                            accent,
+
+                        modifier =
+                            Modifier.size(16.dp)
+                    )
+                }
+            }
 
             IconButton(
                 onClick =
@@ -1809,6 +1877,13 @@ private fun SavingsHistoryRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddGoalDialog(
+    title: String = "Add New Goal",
+    confirmLabel: String = "Create Goal",
+    initialName: String = "",
+    initialTarget: String = "",
+    initialStarting: String = "",
+    initialDeadline: String = LocalDate.now().plusYears(1).toString(),
+    isEdit: Boolean = false,
     errorMessage: String?,
     onDismiss: () -> Unit,
     onConfirm: (
@@ -1819,27 +1894,23 @@ private fun AddGoalDialog(
     ) -> Unit
 ) {
     var name by
-    remember {
-        mutableStateOf("")
+    remember(initialName) {
+        mutableStateOf(initialName)
     }
 
     var targetText by
-    remember {
-        mutableStateOf("")
+    remember(initialTarget) {
+        mutableStateOf(initialTarget)
     }
 
     var startingText by
-    remember {
-        mutableStateOf("")
+    remember(initialStarting) {
+        mutableStateOf(initialStarting)
     }
 
     var deadline by
-    remember {
-        mutableStateOf(
-            LocalDate.now()
-                .plusYears(1)
-                .toString()
-        )
+    remember(initialDeadline) {
+        mutableStateOf(initialDeadline)
     }
 
     var showDatePicker by
@@ -1853,7 +1924,7 @@ private fun AddGoalDialog(
 
         title = {
             Text(
-                "Add New Goal"
+                title
             )
         },
 
@@ -1923,39 +1994,41 @@ private fun AddGoalDialog(
                         Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
-                    value =
-                        startingText,
+                if (!isEdit) {
+                    OutlinedTextField(
+                        value =
+                            startingText,
 
-                    onValueChange = {
-                        startingText =
-                            sanitizeAmountInput(it)
-                    },
+                        onValueChange = {
+                            startingText =
+                                sanitizeAmountInput(it)
+                        },
 
-                    label = {
-                        Text(
-                            "Starting Savings"
-                        )
-                    },
+                        label = {
+                            Text(
+                                "Starting Savings"
+                            )
+                        },
 
-                    prefix = {
-                        Text(
-                            "LKR "
-                        )
-                    },
+                        prefix = {
+                            Text(
+                                "LKR "
+                            )
+                        },
 
-                    keyboardOptions =
-                        KeyboardOptions(
-                            keyboardType =
-                                KeyboardType.Decimal
-                        ),
+                        keyboardOptions =
+                            KeyboardOptions(
+                                keyboardType =
+                                    KeyboardType.Decimal
+                            ),
 
-                    singleLine =
-                        true,
+                        singleLine =
+                            true,
 
-                    modifier =
-                        Modifier.fillMaxWidth()
-                )
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+                }
 
                 OutlinedTextField(
                     value =
@@ -2043,7 +2116,7 @@ private fun AddGoalDialog(
                                     ) > 0.0
             ) {
                 Text(
-                    "Create Goal"
+                    confirmLabel
                 )
             }
         },
