@@ -53,7 +53,6 @@ import com.clarity.finance.model.Income
 import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.CapsuleProgressBar
 import com.clarity.finance.ui.components.ClarityBottomBar
-import com.clarity.finance.ui.components.bottomPaddingBelowBump
 import com.clarity.finance.ui.components.ClarityCard
 import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.ui.components.DisplayDates
@@ -71,6 +70,7 @@ import com.clarity.finance.ui.components.ProfileAvatar
 import com.clarity.finance.ui.components.SectionTitle
 import com.clarity.finance.ui.components.StackedBar
 import com.clarity.finance.ui.components.VerticalHairline
+import com.clarity.finance.ui.components.bottomPaddingBelowBump
 import com.clarity.finance.ui.components.pressFade
 import com.clarity.finance.ui.theme.ClarityTheme
 import com.clarity.finance.ui.theme.ClarityType
@@ -80,21 +80,28 @@ import com.clarity.finance.viewmodel.AuthViewModel
 import com.clarity.finance.viewmodel.DraftViewModel
 import com.clarity.finance.viewmodel.ExpenseMonthlyMetrics
 import com.clarity.finance.viewmodel.ExpenseViewModel
+import com.clarity.finance.viewmodel.GoalViewModel
 import com.clarity.finance.viewmodel.IncomeViewModel
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * Home tab. [onSignOutSuccess] is kept for API compatibility; signing out now lives in Settings.
+ * Home tab.
+ * [onSignOutSuccess] is kept for API compatibility;
+ * signing out now lives in Settings.
  */
 @Composable
 fun DashboardScreen(
     authViewModel: AuthViewModel,
-    @Suppress("UNUSED_PARAMETER") onSignOutSuccess: () -> Unit,
+    @Suppress("UNUSED_PARAMETER")
+    onSignOutSuccess: () -> Unit,
     modifier: Modifier = Modifier,
     expenseViewModel: ExpenseViewModel = hiltViewModel(),
     draftViewModel: DraftViewModel = hiltViewModel(),
     incomeViewModel: IncomeViewModel = hiltViewModel(),
+    goalViewModel: GoalViewModel = hiltViewModel(),
     onNavigateToExpensesHistory: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
@@ -103,31 +110,73 @@ fun DashboardScreen(
     onNavigateToGoal: () -> Unit = {}
 ) {
     val colors = ClarityTheme.colors
-    val currentUser by authViewModel.currentUserFlow.collectAsStateWithLifecycle()
-    val historyState by expenseViewModel.historyState.collectAsStateWithLifecycle()
-    val draftCount by draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
-    val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
-    val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
-    val incomeState by incomeViewModel.uiState.collectAsStateWithLifecycle()
 
-    var showAddExpenseSheet by remember { mutableStateOf(false) }
-    var selectedExpense by remember { mutableStateOf<Expense?>(null) }
+    val currentUser by
+    authViewModel.currentUserFlow.collectAsStateWithLifecycle()
 
-    val displayName = currentUser?.displayName?.ifBlank { "User" } ?: "User"
-    val firstName = displayName.trim().substringBefore(' ').ifBlank { displayName }
+    val historyState by
+    expenseViewModel.historyState.collectAsStateWithLifecycle()
+
+    val draftCount by
+    draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
+
+    val currentCurrency by
+    authViewModel.currencyFlow.collectAsStateWithLifecycle()
+
+    val exchangeRate by
+    authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
+
+    val incomeState by
+    incomeViewModel.uiState.collectAsStateWithLifecycle()
+
+    val goalState by
+    goalViewModel.uiState.collectAsStateWithLifecycle()
+
+    var showAddExpenseSheet by remember {
+        mutableStateOf(false)
+    }
+
+    var selectedExpense by remember {
+        mutableStateOf<Expense?>(null)
+    }
+
+    val displayName =
+        currentUser
+            ?.displayName
+            ?.ifBlank { "User" }
+            ?: "User"
+
+    val firstName =
+        displayName
+            .trim()
+            .substringBefore(' ')
+            .ifBlank { displayName }
+
     val greeting = "Hi, $firstName"
 
-    val photoPath = authViewModel.profilePhotoPath
-    val avatarBitmap = remember(photoPath) { ProfileImageManager.loadBitmap(photoPath) }
+    val photoPath =
+        authViewModel.profilePhotoPath
 
-    val scrollState = rememberScrollState()
-    // Shows a divider under the pinned balance card once content scrolls beneath it.
-    val isScrolled by remember { derivedStateOf { scrollState.value > 0 } }
+    val avatarBitmap =
+        remember(photoPath) {
+            ProfileImageManager.loadBitmap(photoPath)
+        }
+
+    val scrollState =
+        rememberScrollState()
+
+    val isScrolled by remember {
+        derivedStateOf {
+            scrollState.value > 0
+        }
+    }
 
     if (showAddExpenseSheet) {
         AddExpenseSheet(
             viewModel = expenseViewModel,
-            onDismiss = { showAddExpenseSheet = false },
+            onDismiss = {
+                showAddExpenseSheet = false
+            },
             onNavigateToDrafts = {
                 showAddExpenseSheet = false
                 onNavigateToDrafts()
@@ -141,69 +190,138 @@ fun DashboardScreen(
             expense = expense,
             currency = currentCurrency,
             exchangeRate = exchangeRate,
-            onDismiss = { selectedExpense = null },
-            onDelete = { expenseViewModel.deleteExpense(expense.id) }
+            onDismiss = {
+                selectedExpense = null
+            },
+            onDelete = {
+                expenseViewModel.deleteExpense(
+                    expense.id
+                )
+            }
         )
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = colors.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        contentWindowInsets =
+            WindowInsets(
+                0,
+                0,
+                0,
+                0
+            ),
         bottomBar = {
             ClarityBottomBar(
-                currentTab = ClarityNavTab.HOME,
-                onAddClick = { showAddExpenseSheet = true },
+                currentTab =
+                    ClarityNavTab.HOME,
+                onAddClick = {
+                    showAddExpenseSheet = true
+                },
                 onTabSelected = { tab ->
                     when (tab) {
-                        ClarityNavTab.HOME -> Unit
-                        ClarityNavTab.INCOME -> onNavigateToIncome()
-                        ClarityNavTab.INSIGHTS -> onNavigateToInsights()
-                        ClarityNavTab.GOAL -> onNavigateToGoal()
+                        ClarityNavTab.HOME ->
+                            Unit
+
+                        ClarityNavTab.INCOME ->
+                            onNavigateToIncome()
+
+                        ClarityNavTab.INSIGHTS ->
+                            onNavigateToInsights()
+
+                        ClarityNavTab.GOAL ->
+                            onNavigateToGoal()
                     }
                 }
             )
         }
     ) { innerPadding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = innerPadding.bottomPaddingBelowBump())
+                .padding(
+                    bottom =
+                        innerPadding
+                            .bottomPaddingBelowBump()
+                )
         ) {
-            // Pinned: the greeting and the balance card stay put while the rest scrolls.
-            Column(modifier = Modifier.background(colors.background)) {
-                Spacer(modifier = Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
+
+            // Pinned top area.
+            Column(
+                modifier =
+                    Modifier.background(
+                        colors.background
+                    )
+            ) {
+                Spacer(
+                    modifier =
+                        Modifier.windowInsetsTopHeight(
+                            WindowInsets.statusBars
+                        )
+                )
 
                 LargeTitleHeader(
                     title = greeting,
-                    eyebrow = DisplayDates.todayEyebrow(),
+                    eyebrow =
+                        DisplayDates.todayEyebrow(),
                     trailing = {
                         Box(
                             modifier = Modifier
                                 .size(44.dp)
-                                .pressFade(onClickLabel = "Open settings", onClick = onNavigateToSettings),
-                            contentAlignment = Alignment.Center
+                                .pressFade(
+                                    onClickLabel =
+                                        "Open settings",
+                                    onClick =
+                                        onNavigateToSettings
+                                ),
+                            contentAlignment =
+                                Alignment.Center
                         ) {
                             ProfileAvatar(
-                                bitmap = avatarBitmap,
-                                name = displayName,
+                                bitmap =
+                                    avatarBitmap,
+                                name =
+                                    displayName,
                                 size = 36.dp,
-                                contentDescription = "Profile and settings"
+                                contentDescription =
+                                    "Profile and settings"
                             )
                         }
                     }
                 )
 
                 BalanceCard(
-                    income = incomeState.receivedTotalLkr,
-                    expenses = historyState.metrics.totalExpense,
-                    currency = currentCurrency,
-                    exchangeRate = exchangeRate,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    income =
+                        incomeState
+                            .receivedTotalLkr,
+                    expenses =
+                        historyState
+                            .metrics
+                            .totalExpense,
+                    currency =
+                        currentCurrency,
+                    exchangeRate =
+                        exchangeRate,
+                    modifier =
+                        Modifier.padding(
+                            horizontal = 16.dp
+                        )
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-                Hairline(color = if (isScrolled) colors.separator else Color.Transparent)
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+                Hairline(
+                    color =
+                        if (isScrolled) {
+                            colors.separator
+                        } else {
+                            Color.Transparent
+                        }
+                )
             }
 
             Column(
@@ -212,57 +330,138 @@ fun DashboardScreen(
                     .weight(1f)
                     .verticalScroll(scrollState)
             ) {
-                Spacer(modifier = Modifier.height(4.dp))
 
-                AnimatedVisibility(visible = draftCount > 0) {
-                    GroupedSection(modifier = Modifier.padding(bottom = 16.dp)) {
+                Spacer(
+                    modifier =
+                        Modifier.height(4.dp)
+                )
+
+                AnimatedVisibility(
+                    visible =
+                        draftCount > 0
+                ) {
+                    GroupedSection(
+                        modifier =
+                            Modifier.padding(
+                                bottom = 16.dp
+                            )
+                    ) {
                         ListRow(
-                            title = if (draftCount == 1) "1 bank SMS to review" else "$draftCount bank SMS to review",
-                            subtitle = "Approve drafted transactions as expenses",
-                            leading = { IconTile(icon = Icons.Rounded.Sms, background = colors.indigo) },
+                            title =
+                                if (draftCount == 1) {
+                                    "1 bank SMS to review"
+                                } else {
+                                    "$draftCount bank SMS to review"
+                                },
+                            subtitle =
+                                "Approve drafted transactions as expenses",
+                            leading = {
+                                IconTile(
+                                    icon =
+                                        Icons.Rounded.Sms,
+                                    background =
+                                        colors.indigo
+                                )
+                            },
                             showChevron = true,
-                            onClick = onNavigateToDrafts
+                            onClick =
+                                onNavigateToDrafts
                         )
                     }
                 }
 
                 SavingsGoalCard(
-                    currency = currentCurrency,
-                    exchangeRate = exchangeRate,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    goalName =
+                        goalState.goal
+                            ?.name
+                            ?: "MacBook Pro M4",
+                    savedInLkr =
+                        goalState.currentSavings,
+                    targetInLkr =
+                        goalState.goal
+                            ?.targetAmount
+                            ?: 0.0,
+                    monthlyTargetInLkr =
+                        goalState
+                            .requiredMonthlySaving,
+                    deadline =
+                        goalState.goal
+                            ?.deadline
+                            .orEmpty(),
+                    currency =
+                        currentCurrency,
+                    exchangeRate =
+                        exchangeRate,
+                    modifier =
+                        Modifier.padding(
+                            horizontal = 16.dp
+                        )
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(
+                    modifier =
+                        Modifier.height(16.dp)
+                )
 
                 PendingPaymentsCard(
-                    pending = incomeState.pendingIncomes,
-                    pendingTotalLkr = incomeState.pendingTotalLkr,
-                    currency = currentCurrency,
-                    exchangeRate = exchangeRate,
-                    onClick = onNavigateToIncome
+                    pending =
+                        incomeState
+                            .pendingIncomes,
+                    pendingTotalLkr =
+                        incomeState
+                            .pendingTotalLkr,
+                    currency =
+                        currentCurrency,
+                    exchangeRate =
+                        exchangeRate,
+                    onClick =
+                        onNavigateToIncome
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(
+                    modifier =
+                        Modifier.height(16.dp)
+                )
 
                 SpendingMixCard(
-                    metrics = historyState.metrics,
-                    currency = currentCurrency,
-                    exchangeRate = exchangeRate,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    metrics =
+                        historyState.metrics,
+                    currency =
+                        currentCurrency,
+                    exchangeRate =
+                        exchangeRate,
+                    modifier =
+                        Modifier.padding(
+                            horizontal = 16.dp
+                        )
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(
+                    modifier =
+                        Modifier.height(24.dp)
+                )
 
                 RecentTransactionsSection(
-                    expenses = historyState.expenses,
-                    currency = currentCurrency,
-                    exchangeRate = exchangeRate,
-                    onSeeAllClick = onNavigateToExpensesHistory,
-                    onExpenseClick = { selectedExpense = it },
-                    onAddClick = { showAddExpenseSheet = true }
+                    expenses =
+                        historyState.expenses,
+                    currency =
+                        currentCurrency,
+                    exchangeRate =
+                        exchangeRate,
+                    onSeeAllClick =
+                        onNavigateToExpensesHistory,
+                    onExpenseClick = {
+                        selectedExpense = it
+                    },
+                    onAddClick = {
+                        showAddExpenseSheet = true
+                    }
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(
+                    modifier =
+                        Modifier.height(32.dp)
+                )
             }
         }
     }
@@ -276,68 +475,173 @@ private fun BalanceCard(
     exchangeRate: Double,
     modifier: Modifier = Modifier
 ) {
-    val colors = ClarityTheme.colors
-    val available = (income - expenses).coerceAtLeast(0.0)
-    val spentRatio = if (income > 0.0) (expenses / income).toFloat() else 0f
-    val spentPercent = (spentRatio * 100).roundToInt()
-    val progressColor = when {
-        spentRatio > 1f -> colors.red
-        spentRatio >= 0.75f -> colors.orange
-        else -> colors.green
-    }
+    val colors =
+        ClarityTheme.colors
 
-    ClarityCard(modifier = modifier) {
-        Column(modifier = Modifier.semantics(mergeDescendants = true) {}) {
+    val available =
+        (income - expenses)
+            .coerceAtLeast(0.0)
+
+    val spentRatio =
+        if (income > 0.0) {
+            (expenses / income)
+                .toFloat()
+        } else {
+            0f
+        }
+
+    val spentPercent =
+        (spentRatio * 100)
+            .roundToInt()
+
+    val progressColor =
+        when {
+            spentRatio > 1f ->
+                colors.red
+
+            spentRatio >= 0.75f ->
+                colors.orange
+
+            else ->
+                colors.green
+        }
+
+    ClarityCard(
+        modifier = modifier
+    ) {
+        Column(
+            modifier =
+                Modifier.semantics(
+                    mergeDescendants = true
+                ) {}
+        ) {
             Text(
-                text = "Available to Spend",
-                style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                color = colors.secondaryLabel
+                text =
+                    "Available to Spend",
+                style =
+                    ClarityType
+                        .subheadline
+                        .copy(
+                            fontWeight =
+                                FontWeight.SemiBold
+                        ),
+                color =
+                    colors.secondaryLabel
             )
-            Spacer(modifier = Modifier.height(2.dp))
+
+            Spacer(
+                modifier =
+                    Modifier.height(2.dp)
+            )
+
             Text(
-                text = CurrencyFormatter.format(available, currency, exchangeRate),
-                style = ClarityType.amountHero,
-                color = colors.label,
+                text =
+                    CurrencyFormatter.format(
+                        available,
+                        currency,
+                        exchangeRate
+                    ),
+                style =
+                    ClarityType.amountHero,
+                color =
+                    colors.label,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow =
+                    TextOverflow.Ellipsis
             )
+
             if (income > 0.0) {
-                Spacer(modifier = Modifier.height(12.dp))
-                CapsuleProgressBar(progress = spentRatio, color = progressColor, height = 6.dp)
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+                CapsuleProgressBar(
+                    progress =
+                        spentRatio,
+                    color =
+                        progressColor,
+                    height = 6.dp
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(6.dp)
+                )
+
                 Text(
-                    text = if (spentRatio > 1f) {
-                        "Spending is above this month's income"
-                    } else {
-                        "$spentPercent% of this month's income spent"
-                    },
-                    style = ClarityType.footnote,
-                    color = colors.secondaryLabel
+                    text =
+                        if (spentRatio > 1f) {
+                            "Spending is above this month's income"
+                        } else {
+                            "$spentPercent% of this month's income spent"
+                        },
+                    style =
+                        ClarityType.footnote,
+                    color =
+                        colors.secondaryLabel
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
-        Hairline()
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(
+            modifier =
+                Modifier.height(14.dp)
+        )
 
-        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+        Hairline()
+
+        Spacer(
+            modifier =
+                Modifier.height(14.dp)
+        )
+
+        Row(
+            modifier =
+                Modifier.height(
+                    IntrinsicSize.Min
+                )
+        ) {
             BalanceStat(
                 label = "Income",
-                amount = CurrencyFormatter.format(income, currency, exchangeRate),
-                icon = Icons.Rounded.ArrowDownward,
-                tint = colors.income,
-                modifier = Modifier.weight(1f)
+                amount =
+                    CurrencyFormatter.format(
+                        income,
+                        currency,
+                        exchangeRate
+                    ),
+                icon =
+                    Icons.Rounded
+                        .ArrowDownward,
+                tint =
+                    colors.income,
+                modifier =
+                    Modifier.weight(1f)
             )
-            VerticalHairline(modifier = Modifier.fillMaxHeight())
+
+            VerticalHairline(
+                modifier =
+                    Modifier.fillMaxHeight()
+            )
+
             BalanceStat(
                 label = "Expenses",
-                amount = CurrencyFormatter.format(expenses, currency, exchangeRate),
-                icon = Icons.Rounded.ArrowUpward,
-                tint = colors.outflow,
+                amount =
+                    CurrencyFormatter.format(
+                        expenses,
+                        currency,
+                        exchangeRate
+                    ),
+                icon =
+                    Icons.Rounded
+                        .ArrowUpward,
+                tint =
+                    colors.outflow,
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 14.dp)
+                    .padding(
+                        start = 14.dp
+                    )
             )
         }
     }
@@ -351,34 +655,67 @@ private fun BalanceStat(
     tint: Color,
     modifier: Modifier = Modifier
 ) {
-    val colors = ClarityTheme.colors
+    val colors =
+        ClarityTheme.colors
+
     Row(
-        modifier = modifier.semantics(mergeDescendants = true) {},
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            modifier.semantics(
+                mergeDescendants = true
+            ) {},
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
+
         Box(
             modifier = Modifier
                 .size(28.dp)
                 .clip(CircleShape)
-                .background(tint.copy(alpha = if (colors.isDark) 0.24f else 0.14f)),
-            contentAlignment = Alignment.Center
+                .background(
+                    tint.copy(
+                        alpha =
+                            if (colors.isDark) {
+                                0.24f
+                            } else {
+                                0.14f
+                            }
+                    )
+                ),
+            contentAlignment =
+                Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(16.dp)
+                modifier =
+                    Modifier.size(16.dp)
             )
         }
-        Spacer(modifier = Modifier.width(10.dp))
+
+        Spacer(
+            modifier =
+                Modifier.width(10.dp)
+        )
+
         Column {
-            Text(text = label, style = ClarityType.footnote, color = colors.secondaryLabel)
+            Text(
+                text = label,
+                style =
+                    ClarityType.footnote,
+                color =
+                    colors.secondaryLabel
+            )
+
             Text(
                 text = amount,
-                style = ClarityType.amountCallout,
-                color = colors.label,
+                style =
+                    ClarityType.amountCallout,
+                color =
+                    colors.label,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow =
+                    TextOverflow.Ellipsis
             )
         }
     }
@@ -386,62 +723,214 @@ private fun BalanceStat(
 
 @Composable
 private fun SavingsGoalCard(
+    goalName: String,
+    savedInLkr: Double,
+    targetInLkr: Double,
+    monthlyTargetInLkr: Double,
+    deadline: String,
     currency: String,
     exchangeRate: Double,
     modifier: Modifier = Modifier
 ) {
-    val colors = ClarityTheme.colors
-    val savedInLkr = 11_200.0
-    val targetInLkr = 490_000.0
-    val monthlyTargetInLkr = 39_900.0
-    val progress = (savedInLkr / targetInLkr).toFloat()
+    val colors =
+        ClarityTheme.colors
 
-    ClarityCard(modifier = modifier) {
+    val progress =
+        if (targetInLkr > 0.0) {
+            (savedInLkr / targetInLkr)
+                .toFloat()
+                .coerceIn(
+                    0f,
+                    1f
+                )
+        } else {
+            0f
+        }
+
+    val formattedDeadline =
+        if (deadline.isBlank()) {
+            "your target date"
+        } else {
+            runCatching {
+                LocalDate
+                    .parse(deadline)
+                    .format(
+                        DateTimeFormatter
+                            .ofPattern(
+                                "MMMM yyyy",
+                                Locale.US
+                            )
+                    )
+            }.getOrDefault(
+                deadline
+            )
+        }
+
+    ClarityCard(
+        modifier = modifier
+    ) {
+
         Row(
-            modifier = Modifier.semantics(mergeDescendants = true) {},
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier.semantics(
+                    mergeDescendants = true
+                ) {},
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
-            IconTile(icon = Icons.Rounded.LaptopMac, background = colors.goal, size = 40.dp)
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "MacBook Pro M4", style = ClarityType.headline, color = colors.label)
-                Text(text = "Primary savings goal", style = ClarityType.subheadline, color = colors.secondaryLabel)
+
+            IconTile(
+                icon =
+                    Icons.Rounded
+                        .LaptopMac,
+                background =
+                    colors.goal,
+                size = 40.dp
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.width(12.dp)
+            )
+
+            Column(
+                modifier =
+                    Modifier.weight(1f)
+            ) {
+                Text(
+                    text =
+                        goalName,
+                    style =
+                        ClarityType.headline,
+                    color =
+                        colors.label
+                )
+
+                Text(
+                    text =
+                        "Primary savings goal",
+                    style =
+                        ClarityType.subheadline,
+                    color =
+                        colors.secondaryLabel
+                )
             }
+
             Text(
-                text = String.format(Locale.US, "%.1f%%", progress * 100),
-                style = ClarityType.headline,
-                color = colors.purpleText
+                text =
+                    String.format(
+                        Locale.US,
+                        "%.1f%%",
+                        progress * 100
+                    ),
+                style =
+                    ClarityType.headline,
+                color =
+                    colors.purpleText
             )
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
-        CapsuleProgressBar(progress = progress, color = colors.goal, height = 8.dp)
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(
+            modifier =
+                Modifier.height(14.dp)
+        )
 
-        Row(modifier = Modifier.fillMaxWidth()) {
+        CapsuleProgressBar(
+            progress =
+                progress,
+            color =
+                colors.goal,
+            height = 8.dp
+        )
+
+        Spacer(
+            modifier =
+                Modifier.height(8.dp)
+        )
+
+        Row(
+            modifier =
+                Modifier.fillMaxWidth()
+        ) {
+
             Text(
-                text = "${CurrencyFormatter.format(savedInLkr, currency, exchangeRate)} saved",
-                style = ClarityType.footnote,
-                color = colors.secondaryLabel,
-                modifier = Modifier.weight(1f)
+                text =
+                    "${
+                        CurrencyFormatter
+                            .format(
+                                savedInLkr,
+                                currency,
+                                exchangeRate
+                            )
+                    } saved",
+                style =
+                    ClarityType.footnote,
+                color =
+                    colors.secondaryLabel,
+                modifier =
+                    Modifier.weight(1f)
             )
+
             Text(
-                text = "of ${CurrencyFormatter.format(targetInLkr, currency, exchangeRate)}",
-                style = ClarityType.footnote,
-                color = colors.secondaryLabel
+                text =
+                    "of ${
+                        CurrencyFormatter
+                            .format(
+                                targetInLkr,
+                                currency,
+                                exchangeRate
+                            )
+                    }",
+                style =
+                    ClarityType.footnote,
+                color =
+                    colors.secondaryLabel
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(
+            modifier =
+                Modifier.height(12.dp)
+        )
+
+        val infoText =
+            when {
+                targetInLkr <= 0.0 ->
+                    "Set a savings goal to start tracking your progress."
+
+                progress >= 1f ->
+                    "Congratulations! You reached your savings goal."
+
+                monthlyTargetInLkr > 0.0 ->
+                    "Save ${
+                        CurrencyFormatter
+                            .format(
+                                monthlyTargetInLkr,
+                                currency,
+                                exchangeRate
+                            )
+                    } a month to reach it by $formattedDeadline."
+
+                else ->
+                    "Add savings to calculate your monthly target."
+            }
+
         InfoNote(
-            text = "Save ${CurrencyFormatter.format(monthlyTargetInLkr, currency, exchangeRate)} a month to reach it by October 2027.",
-            icon = Icons.Rounded.TrackChanges,
-            iconTint = colors.goal
+            text =
+                infoText,
+            icon =
+                Icons.Rounded
+                    .TrackChanges,
+            iconTint =
+                colors.goal
         )
     }
 }
 
-/** Outstanding freelance payments (FR-17), linking to the Income tab to follow them up. */
+/**
+ * Outstanding freelance payments (FR-17),
+ * linking to the Income tab to follow them up.
+ */
 @Composable
 private fun PendingPaymentsCard(
     pending: List<Income>,
@@ -450,40 +939,88 @@ private fun PendingPaymentsCard(
     exchangeRate: Double,
     onClick: () -> Unit
 ) {
-    val colors = ClarityTheme.colors
-    val count = pending.size
-    val subtitle = if (pending.isEmpty()) {
-        "Freelance invoices waiting for payment appear here"
-    } else {
-        val names = pending.take(2).joinToString(" · ") { income ->
-            "${income.title} ${CurrencyFormatter.formatOriginal(income.amount, income.currency.name)}"
+    val colors =
+        ClarityTheme.colors
+
+    val count =
+        pending.size
+
+    val subtitle =
+        if (pending.isEmpty()) {
+            "Freelance invoices waiting for payment appear here"
+        } else {
+            val names =
+                pending
+                    .take(2)
+                    .joinToString(
+                        " · "
+                    ) { income ->
+                        "${income.title} ${
+                            CurrencyFormatter
+                                .formatOriginal(
+                                    income.amount,
+                                    income.currency.name
+                                )
+                        }"
+                    }
+
+            if (count > 2) {
+                "$names · +${count - 2} more"
+            } else {
+                names
+            }
         }
-        if (count > 2) "$names · +${count - 2} more" else names
-    }
+
     GroupedSection {
         ListRow(
-            title = when (count) {
-                0 -> "No Pending Payments"
-                1 -> "1 Pending Payment"
-                else -> "$count Pending Payments"
+            title =
+                when (count) {
+                    0 ->
+                        "No Pending Payments"
+
+                    1 ->
+                        "1 Pending Payment"
+
+                    else ->
+                        "$count Pending Payments"
+                },
+            subtitle =
+                subtitle,
+            leading = {
+                IconTile(
+                    icon =
+                        Icons.Rounded
+                            .Schedule,
+                    background =
+                        colors.teal
+                )
             },
-            subtitle = subtitle,
-            leading = { IconTile(icon = Icons.Rounded.Schedule, background = colors.teal) },
-            trailing = if (count > 0) {
-                {
-                    Text(
-                        text = CurrencyFormatter.format(pendingTotalLkr, currency, exchangeRate),
-                        style = ClarityType.amountCallout,
-                        color = colors.secondaryLabel,
-                        maxLines = 1
-                    )
-                }
-            } else {
-                null
-            },
+            trailing =
+                if (count > 0) {
+                    {
+                        Text(
+                            text =
+                                CurrencyFormatter
+                                    .format(
+                                        pendingTotalLkr,
+                                        currency,
+                                        exchangeRate
+                                    ),
+                            style =
+                                ClarityType
+                                    .amountCallout,
+                            color =
+                                colors.secondaryLabel,
+                            maxLines = 1
+                        )
+                    }
+                } else {
+                    null
+                },
             showChevron = true,
             onClick = onClick,
-            onClickLabel = "Open income"
+            onClickLabel =
+                "Open income"
         )
     }
 }
@@ -495,46 +1032,116 @@ private fun SpendingMixCard(
     exchangeRate: Double,
     modifier: Modifier = Modifier
 ) {
-    val colors = ClarityTheme.colors
-    val hasSpending = metrics.totalExpense > 0.0
+    val colors =
+        ClarityTheme.colors
 
-    ClarityCard(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    val hasSpending =
+        metrics.totalExpense > 0.0
+
+    ClarityCard(
+        modifier = modifier
+    ) {
+
+        Row(
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
             Text(
-                text = "Spending Mix",
-                style = ClarityType.headline,
-                color = colors.label,
-                modifier = Modifier.weight(1f)
+                text =
+                    "Spending Mix",
+                style =
+                    ClarityType.headline,
+                color =
+                    colors.label,
+                modifier =
+                    Modifier.weight(1f)
             )
-            Text(text = "Target 60 / 40", style = ClarityType.footnote, color = colors.secondaryLabel)
+
+            Text(
+                text =
+                    "Target 60 / 40",
+                style =
+                    ClarityType.footnote,
+                color =
+                    colors.secondaryLabel
+            )
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        StackedBar(
-            segments = listOf(
-                metrics.committedTotal.toFloat() to colors.committed,
-                metrics.discretionaryTotal.toFloat() to colors.discretionary
-            )
+
+        Spacer(
+            modifier =
+                Modifier.height(12.dp)
         )
-        Spacer(modifier = Modifier.height(14.dp))
+
+        StackedBar(
+            segments =
+                listOf(
+                    metrics
+                        .committedTotal
+                        .toFloat() to
+                            colors.committed,
+
+                    metrics
+                        .discretionaryTotal
+                        .toFloat() to
+                            colors.discretionary
+                )
+        )
+
+        Spacer(
+            modifier =
+                Modifier.height(14.dp)
+        )
+
         if (hasSpending) {
             LegendRow(
-                label = "Committed",
-                percentage = metrics.committedPercentage,
-                amount = CurrencyFormatter.format(metrics.committedTotal, currency, exchangeRate),
-                color = colors.committed
+                label =
+                    "Committed",
+                percentage =
+                    metrics
+                        .committedPercentage,
+                amount =
+                    CurrencyFormatter
+                        .format(
+                            metrics
+                                .committedTotal,
+                            currency,
+                            exchangeRate
+                        ),
+                color =
+                    colors.committed
             )
-            Spacer(modifier = Modifier.height(8.dp))
+
+            Spacer(
+                modifier =
+                    Modifier.height(8.dp)
+            )
+
             LegendRow(
-                label = "Discretionary",
-                percentage = metrics.discretionaryPercentage,
-                amount = CurrencyFormatter.format(metrics.discretionaryTotal, currency, exchangeRate),
-                color = colors.discretionary
+                label =
+                    "Discretionary",
+                percentage =
+                    metrics
+                        .discretionaryPercentage,
+                amount =
+                    CurrencyFormatter
+                        .format(
+                            metrics
+                                .discretionaryTotal,
+                            currency,
+                            exchangeRate
+                        ),
+                color =
+                    colors.discretionary
             )
+
         } else {
             Text(
-                text = "No spending recorded this month yet.",
-                style = ClarityType.footnote,
-                color = colors.secondaryLabel
+                text =
+                    "No spending recorded this month yet.",
+                style =
+                    ClarityType.footnote,
+                color =
+                    colors.secondaryLabel
             )
         }
     }
@@ -548,24 +1155,62 @@ internal fun LegendRow(
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    val colors = ClarityTheme.colors
+    val colors =
+        ClarityTheme.colors
+
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .semantics(mergeDescendants = true) {},
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .semantics(
+                    mergeDescendants = true
+                ) {},
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
-        LegendDot(color = color, size = 10.dp)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = label, style = ClarityType.subheadline, color = colors.label)
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = "$percentage%",
-            style = ClarityType.subheadline,
-            color = colors.secondaryLabel,
-            modifier = Modifier.weight(1f)
+
+        LegendDot(
+            color = color,
+            size = 10.dp
         )
-        Text(text = amount, style = ClarityType.amountCallout, color = colors.label, maxLines = 1)
+
+        Spacer(
+            modifier =
+                Modifier.width(8.dp)
+        )
+
+        Text(
+            text = label,
+            style =
+                ClarityType.subheadline,
+            color =
+                colors.label
+        )
+
+        Spacer(
+            modifier =
+                Modifier.width(6.dp)
+        )
+
+        Text(
+            text =
+                "$percentage%",
+            style =
+                ClarityType.subheadline,
+            color =
+                colors.secondaryLabel,
+            modifier =
+                Modifier.weight(1f)
+        )
+
+        Text(
+            text = amount,
+            style =
+                ClarityType.amountCallout,
+            color =
+                colors.label,
+            maxLines = 1
+        )
     }
 }
 
@@ -579,30 +1224,64 @@ private fun RecentTransactionsSection(
     onAddClick: () -> Unit
 ) {
     SectionTitle(
-        title = "Recent Transactions",
-        actionLabel = if (expenses.isNotEmpty()) "See All" else null,
-        onAction = onSeeAllClick
+        title =
+            "Recent Transactions",
+        actionLabel =
+            if (expenses.isNotEmpty()) {
+                "See All"
+            } else {
+                null
+            },
+        onAction =
+            onSeeAllClick
     )
-    Spacer(modifier = Modifier.height(4.dp))
+
+    Spacer(
+        modifier =
+            Modifier.height(4.dp)
+    )
 
     GroupedSection {
+
         if (expenses.isEmpty()) {
+
             EmptyStateView(
-                icon = Icons.Rounded.Receipt,
-                title = "No Expenses Yet",
-                message = "Expenses you log this month will appear here.",
-                actionLabel = "Add Expense",
-                onAction = onAddClick
+                icon =
+                    Icons.Rounded.Receipt,
+                title =
+                    "No Expenses Yet",
+                message =
+                    "Expenses you log this month will appear here.",
+                actionLabel =
+                    "Add Expense",
+                onAction =
+                    onAddClick
             )
+
         } else {
-            val recent = expenses.take(4)
-            recent.forEachIndexed { index, expense ->
+
+            val recent =
+                expenses.take(4)
+
+            recent.forEachIndexed {
+                    index,
+                    expense ->
+
                 ExpenseRow(
-                    expense = expense,
-                    currency = currency,
-                    exchangeRate = exchangeRate,
-                    showDivider = index < recent.lastIndex,
-                    onClick = { onExpenseClick(expense) }
+                    expense =
+                        expense,
+                    currency =
+                        currency,
+                    exchangeRate =
+                        exchangeRate,
+                    showDivider =
+                        index <
+                                recent.lastIndex,
+                    onClick = {
+                        onExpenseClick(
+                            expense
+                        )
+                    }
                 )
             }
         }
