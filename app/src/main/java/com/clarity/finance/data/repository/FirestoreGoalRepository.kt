@@ -1,10 +1,13 @@
 package com.clarity.finance.data.repository
 
+import android.util.Log
 import com.clarity.finance.data.remote.FirestorePaths
 import com.clarity.finance.model.Goal
 import com.clarity.finance.model.GoalTransaction
 import com.clarity.finance.model.GoalTransactionType
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
@@ -20,70 +23,138 @@ class FirestoreGoalRepository @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : GoalRepository {
 
-    private fun requireUid(): String {
-        return auth.currentUser?.uid
+    private fun requireUid(): String =
+        auth.currentUser?.uid
             ?: error("No authenticated user")
-    }
 
-    private fun goalDocument() =
+    private fun goalsCollection() =
         firestore
             .collection(FirestorePaths.USERS)
             .document(requireUid())
             .collection(FirestorePaths.GOALS)
-            .document(FirestorePaths.PRIMARY_GOAL_ID)
 
-    private fun transactionsCollection() =
-        goalDocument().collection("transactions")
+    private fun goalDocument(
+        goalId: String
+    ) =
+        goalsCollection()
+            .document(goalId)
 
-    override fun observeGoal(): Flow<Goal?> = callbackFlow {
+    private fun primaryGoalDocument() =
+        goalDocument(
+            FirestorePaths.PRIMARY_GOAL_ID
+        )
 
-        val uid = auth.currentUser?.uid
+    private fun transactionsCollection(
+        goalId: String
+    ) =
+        goalDocument(goalId)
+            .collection("transactions")
 
-        if (uid == null) {
-            trySend(null)
-            close()
-            return@callbackFlow
-        }
+    // ============================================================
+    // Primary goal - backward compatibility
+    // ============================================================
 
-        val listener = firestore
-            .collection(FirestorePaths.USERS)
-            .document(uid)
-            .collection(FirestorePaths.GOALS)
-            .document(FirestorePaths.PRIMARY_GOAL_ID)
-            .addSnapshotListener { snapshot, error ->
-
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-
-                if (snapshot == null || !snapshot.exists()) {
-                    trySend(null)
-                    return@addSnapshotListener
-                }
-
-                val goal = Goal(
-                    id = snapshot.id,
-                    name = snapshot.getString("name") ?: "MacBook Pro M4",
-                    targetAmount = snapshot.getDouble("targetAmount") ?: 490000.0,
-                    startingAmount = snapshot.getDouble("startingAmount") ?: 0.0,
-                    deadline = snapshot.getString("deadline").orEmpty(),
-                    createdAt = snapshot.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
-                    updatedAt = snapshot.getTimestamp("updatedAt")?.toDate()?.time ?: 0L
-                )
-
-                trySend(goal)
-            }
-
-        awaitClose {
-            listener.remove()
-        }
-    }
-
-    override fun observeTransactions(): Flow<List<GoalTransaction>> =
+    override fun observeGoal(): Flow<Goal?> =
         callbackFlow {
 
-            val uid = auth.currentUser?.uid
+            val uid =
+                auth.currentUser?.uid
+
+            if (uid == null) {
+                trySend(null)
+                close()
+                return@callbackFlow
+            }
+
+            val listener =
+                firestore
+                    .collection(
+                        FirestorePaths.USERS
+                    )
+                    .document(uid)
+                    .collection(
+                        FirestorePaths.GOALS
+                    )
+                    .document(
+                        FirestorePaths.PRIMARY_GOAL_ID
+                    )
+                    .addSnapshotListener {
+                            snapshot,
+                            error ->
+
+                        if (error != null) {
+
+                            Log.e(
+                                "FirestoreGoalRepo",
+                                "Primary goal stream error: ${error.message}",
+                                error
+                            )
+
+                            trySend(null)
+                            return@addSnapshotListener
+                        }
+
+                        trySend(
+                            snapshot?.toGoal()
+                        )
+                    }
+
+            awaitClose {
+                listener.remove()
+            }
+        }
+
+    override fun observeTransactions():
+            Flow<List<GoalTransaction>> =
+        observeTransactions(
+            FirestorePaths.PRIMARY_GOAL_ID
+        )
+
+    override suspend fun updateGoal(
+        name: String,
+        targetAmount: Double,
+        deadline: String
+    ): Result<Unit> =
+        updateGoal(
+            goalId =
+                FirestorePaths.PRIMARY_GOAL_ID,
+            name = name,
+            targetAmount = targetAmount,
+            deadline = deadline
+        )
+
+    override suspend fun deposit(
+        amount: Double,
+        note: String
+    ): Result<Unit> =
+        deposit(
+            goalId =
+                FirestorePaths.PRIMARY_GOAL_ID,
+            amount = amount,
+            note = note
+        )
+
+    override suspend fun withdraw(
+        amount: Double,
+        note: String
+    ): Result<Unit> =
+        withdraw(
+            goalId =
+                FirestorePaths.PRIMARY_GOAL_ID,
+            amount = amount,
+            note = note
+        )
+
+    // ============================================================
+    // Multi-goal support
+    // ============================================================
+
+    override fun observeGoals():
+            Flow<List<Goal>> =
+        callbackFlow {
+
+            val uid =
+                auth.currentUser?.uid
 
             if (uid == null) {
                 trySend(emptyList())
@@ -91,125 +162,432 @@ class FirestoreGoalRepository @Inject constructor(
                 return@callbackFlow
             }
 
-            val listener = firestore
-                .collection(FirestorePaths.USERS)
-                .document(uid)
-                .collection(FirestorePaths.GOALS)
-                .document(FirestorePaths.PRIMARY_GOAL_ID)
-                .collection("transactions")
-                .orderBy("createdAt", Query.Direction.DESCENDING)
-                .addSnapshotListener { snapshot, error ->
+            val listener =
+                firestore
+                    .collection(
+                        FirestorePaths.USERS
+                    )
+                    .document(uid)
+                    .collection(
+                        FirestorePaths.GOALS
+                    )
+                    .addSnapshotListener {
+                            snapshot,
+                            error ->
 
-                    if (error != null) {
-                        close(error)
-                        return@addSnapshotListener
-                    }
+                        if (error != null) {
 
-                    val transactions = snapshot
-                        ?.documents
-                        ?.mapNotNull { document ->
-
-                            val typeString =
-                                document.getString("type")
-                                    ?: return@mapNotNull null
-
-                            val type = runCatching {
-                                GoalTransactionType.valueOf(typeString)
-                            }.getOrDefault(GoalTransactionType.DEPOSIT)
-
-                            GoalTransaction(
-                                id = document.id,
-                                type = type,
-                                amount = document.getDouble("amount") ?: 0.0,
-                                note = document.getString("note").orEmpty(),
-                                createdAt = document
-                                    .getTimestamp("createdAt")
-                                    ?.toDate()
-                                    ?.time
-                                    ?: 0L
+                            Log.e(
+                                "FirestoreGoalRepo",
+                                "Goals stream error: ${error.message}",
+                                error
                             )
-                        }
-                        .orEmpty()
 
-                    trySend(transactions)
-                }
+                            trySend(emptyList())
+                            return@addSnapshotListener
+                        }
+
+                        val goals =
+                            snapshot
+                                ?.documents
+                                ?.mapNotNull {
+                                    it.toGoal()
+                                }
+                                ?.sortedWith(
+                                    compareBy<Goal> {
+                                        it.id !=
+                                                FirestorePaths
+                                                    .PRIMARY_GOAL_ID
+                                    }.thenBy {
+                                        it.createdAt
+                                    }
+                                )
+                                .orEmpty()
+
+                        trySend(goals)
+                    }
 
             awaitClose {
                 listener.remove()
             }
         }
 
+    override fun observeTransactions(
+        goalId: String
+    ): Flow<List<GoalTransaction>> =
+        callbackFlow {
+
+            val uid =
+                auth.currentUser?.uid
+
+            if (uid == null) {
+                trySend(emptyList())
+                close()
+                return@callbackFlow
+            }
+
+            val listener =
+                firestore
+                    .collection(
+                        FirestorePaths.USERS
+                    )
+                    .document(uid)
+                    .collection(
+                        FirestorePaths.GOALS
+                    )
+                    .document(goalId)
+                    .collection("transactions")
+                    .orderBy(
+                        "createdAt",
+                        Query.Direction.DESCENDING
+                    )
+                    .addSnapshotListener {
+                            snapshot,
+                            error ->
+
+                        if (error != null) {
+
+                            Log.e(
+                                "FirestoreGoalRepo",
+                                "Transactions stream error: ${error.message}",
+                                error
+                            )
+
+                            trySend(emptyList())
+                            return@addSnapshotListener
+                        }
+
+                        val transactions =
+                            snapshot
+                                ?.documents
+                                ?.mapNotNull {
+                                        document ->
+
+                                    document
+                                        .toGoalTransaction()
+                                }
+                                .orEmpty()
+
+                        trySend(
+                            transactions
+                        )
+                    }
+
+            awaitClose {
+                listener.remove()
+            }
+        }
+
+    override suspend fun addGoal(
+        name: String,
+        targetAmount: Double,
+        startingAmount: Double,
+        deadline: String
+    ): Result<String> =
+        runCatching {
+
+            require(
+                name.isNotBlank()
+            ) {
+                "Goal name cannot be empty"
+            }
+
+            require(
+                targetAmount > 0
+            ) {
+                "Target amount must be greater than zero"
+            }
+
+            require(
+                startingAmount >= 0
+            ) {
+                "Starting amount cannot be negative"
+            }
+
+            require(
+                startingAmount <=
+                        targetAmount
+            ) {
+                "Starting amount cannot exceed the target amount"
+            }
+
+            val document =
+                goalsCollection()
+                    .document()
+
+            document
+                .set(
+                    mapOf(
+                        "name" to
+                                name.trim(),
+
+                        "targetAmount" to
+                                targetAmount,
+
+                        "startingAmount" to
+                                startingAmount,
+
+                        "deadline" to
+                                deadline,
+
+                        "createdAt" to
+                                FieldValue
+                                    .serverTimestamp(),
+
+                        "updatedAt" to
+                                FieldValue
+                                    .serverTimestamp()
+                    )
+                )
+                .await()
+
+            document.id
+        }
+
     override suspend fun updateGoal(
+        goalId: String,
         name: String,
         targetAmount: Double,
         deadline: String
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> =
+        runCatching {
 
-        require(targetAmount > 0) {
-            "Target amount must be greater than zero"
-        }
+            require(
+                goalId.isNotBlank()
+            ) {
+                "Goal ID cannot be empty"
+            }
 
-        require(name.isNotBlank()) {
-            "Goal name cannot be empty"
-        }
+            require(
+                name.isNotBlank()
+            ) {
+                "Goal name cannot be empty"
+            }
 
-        goalDocument()
-            .update(
-                mapOf(
-                    "name" to name.trim(),
-                    "targetAmount" to targetAmount,
-                    "deadline" to deadline,
-                    "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
+            require(
+                targetAmount > 0
+            ) {
+                "Target amount must be greater than zero"
+            }
+
+            goalDocument(goalId)
+                .update(
+                    mapOf(
+                        "name" to
+                                name.trim(),
+
+                        "targetAmount" to
+                                targetAmount,
+
+                        "deadline" to
+                                deadline,
+
+                        "updatedAt" to
+                                FieldValue
+                                    .serverTimestamp()
+                    )
                 )
-            )
-            .await()
+                .await()
 
-        Unit
-    }
+            Unit
+        }
 
     override suspend fun deposit(
+        goalId: String,
         amount: Double,
         note: String
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> =
+        runCatching {
 
-        require(amount > 0) {
-            "Deposit amount must be greater than zero"
-        }
+            require(
+                goalId.isNotBlank()
+            ) {
+                "Goal ID cannot be empty"
+            }
 
-        transactionsCollection()
-            .add(
-                mapOf(
-                    "type" to GoalTransactionType.DEPOSIT.name,
-                    "amount" to amount,
-                    "note" to note.trim(),
-                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                )
+            require(
+                amount > 0
+            ) {
+                "Deposit amount must be greater than zero"
+            }
+
+            transactionsCollection(
+                goalId
             )
-            .await()
+                .add(
+                    mapOf(
+                        "type" to
+                                GoalTransactionType
+                                    .DEPOSIT
+                                    .name,
 
-        Unit
-    }
+                        "amount" to
+                                amount,
+
+                        "note" to
+                                note.trim(),
+
+                        "createdAt" to
+                                FieldValue
+                                    .serverTimestamp()
+                    )
+                )
+                .await()
+
+            Unit
+        }
 
     override suspend fun withdraw(
+        goalId: String,
         amount: Double,
         note: String
-    ): Result<Unit> = runCatching {
+    ): Result<Unit> =
+        runCatching {
 
-        require(amount > 0) {
-            "Withdrawal amount must be greater than zero"
+            require(
+                goalId.isNotBlank()
+            ) {
+                "Goal ID cannot be empty"
+            }
+
+            require(
+                amount > 0
+            ) {
+                "Withdrawal amount must be greater than zero"
+            }
+
+            transactionsCollection(
+                goalId
+            )
+                .add(
+                    mapOf(
+                        "type" to
+                                GoalTransactionType
+                                    .WITHDRAWAL
+                                    .name,
+
+                        "amount" to
+                                amount,
+
+                        "note" to
+                                note.trim(),
+
+                        "createdAt" to
+                                FieldValue
+                                    .serverTimestamp()
+                    )
+                )
+                .await()
+
+            Unit
         }
 
-        transactionsCollection()
-            .add(
-                mapOf(
-                    "type" to GoalTransactionType.WITHDRAWAL.name,
-                    "amount" to amount,
-                    "note" to note.trim(),
-                    "createdAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-                )
-            )
-            .await()
+    // ============================================================
+    // Mapping
+    // ============================================================
 
-        Unit
+    private fun DocumentSnapshot.toGoal():
+            Goal? {
+
+        if (!exists()) {
+            return null
+        }
+
+        return Goal(
+            id =
+                id,
+
+            name =
+                getString("name")
+                    ?: "Savings Goal",
+
+            targetAmount =
+                getDouble(
+                    "targetAmount"
+                )
+                    ?: 0.0,
+
+            startingAmount =
+                getDouble(
+                    "startingAmount"
+                )
+                    ?: 0.0,
+
+            deadline =
+                getString(
+                    "deadline"
+                )
+                    .orEmpty(),
+
+            createdAt =
+                getTimestamp(
+                    "createdAt"
+                )
+                    ?.toDate()
+                    ?.time
+                    ?: 0L,
+
+            updatedAt =
+                getTimestamp(
+                    "updatedAt"
+                )
+                    ?.toDate()
+                    ?.time
+                    ?: 0L
+        )
+    }
+
+    private fun DocumentSnapshot
+            .toGoalTransaction():
+            GoalTransaction? {
+
+        if (!exists()) {
+            return null
+        }
+
+        val typeString =
+            getString("type")
+                ?: return null
+
+        val type =
+            runCatching {
+
+                GoalTransactionType
+                    .valueOf(
+                        typeString
+                    )
+
+            }.getOrDefault(
+                GoalTransactionType
+                    .DEPOSIT
+            )
+
+        return GoalTransaction(
+            id =
+                id,
+
+            type =
+                type,
+
+            amount =
+                getDouble(
+                    "amount"
+                )
+                    ?: 0.0,
+
+            note =
+                getString(
+                    "note"
+                )
+                    .orEmpty(),
+
+            createdAt =
+                getTimestamp(
+                    "createdAt"
+                )
+                    ?.toDate()
+                    ?.time
+                    ?: 0L
+        )
     }
 }

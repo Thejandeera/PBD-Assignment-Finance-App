@@ -7,12 +7,15 @@ import com.clarity.finance.model.Goal
 import com.clarity.finance.model.GoalTransaction
 import com.clarity.finance.model.GoalTransactionType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -23,68 +26,171 @@ import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 import kotlin.math.ceil
 
+@OptIn(
+    ExperimentalCoroutinesApi::class
+)
 @HiltViewModel
 class GoalViewModel @Inject constructor(
-    private val goalRepository: GoalRepository
+    private val goalRepository:
+    GoalRepository
 ) : ViewModel() {
 
+    private val _selectedGoalId =
+        MutableStateFlow<String?>(
+            null
+        )
+
+    val selectedGoalId:
+            StateFlow<String?> =
+        _selectedGoalId
+            .asStateFlow()
+
     private val _actionError =
-        MutableStateFlow<String?>(null)
+        MutableStateFlow<String?>(
+            null
+        )
 
-    val actionError: StateFlow<String?> =
-        _actionError.asStateFlow()
+    val actionError:
+            StateFlow<String?> =
+        _actionError
+            .asStateFlow()
 
-    val uiState: StateFlow<GoalUiState> =
+    private val goalsFlow =
+        goalRepository
+            .observeGoals()
+
+    private val selectedTransactionsFlow:
+            Flow<List<GoalTransaction>> =
+        _selectedGoalId
+            .flatMapLatest {
+                    goalId ->
+
+                if (
+                    goalId.isNullOrBlank()
+                ) {
+
+                    flowOf(
+                        emptyList()
+                    )
+
+                } else {
+
+                    goalRepository
+                        .observeTransactions(
+                            goalId
+                        )
+                }
+            }
+
+    val uiState:
+            StateFlow<GoalUiState> =
         combine(
-            goalRepository.observeGoal(),
-            goalRepository.observeTransactions()
-        ) { goal, transactions ->
+            goalsFlow,
+            _selectedGoalId,
+            selectedTransactionsFlow
+        ) {
+                goals,
+                selectedId,
+                transactions ->
+
+            val resolvedSelectedId =
+                when {
+
+                    goals.isEmpty() ->
+                        null
+
+                    selectedId != null &&
+                            goals.any {
+                                it.id ==
+                                        selectedId
+                            } ->
+                        selectedId
+
+                    else ->
+                        goals.first().id
+                }
+
+            if (
+                resolvedSelectedId !=
+                selectedId
+            ) {
+
+                _selectedGoalId.value =
+                    resolvedSelectedId
+            }
+
+            val selectedGoal =
+                goals.firstOrNull {
+                    it.id ==
+                            resolvedSelectedId
+                }
 
             buildUiState(
-                goal = goal,
-                transactions = transactions
+                goals =
+                    goals,
+
+                selectedGoal =
+                    selectedGoal,
+
+                transactions =
+                    transactions
             )
         }
-            .catch { error ->
-                emit(
-                    GoalUiState(
-                        isLoading = false,
-                        error = error.message
-                            ?: "Your savings goal could not be loaded."
-                    )
-                )
-            }
             .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = GoalUiState(
-                    isLoading = true
-                )
+                scope =
+                    viewModelScope,
+
+                started =
+                    SharingStarted
+                        .WhileSubscribed(
+                            5000
+                        ),
+
+                initialValue =
+                    GoalUiState(
+                        isLoading =
+                            true
+                    )
             )
 
     private fun buildUiState(
-        goal: Goal?,
-        transactions: List<GoalTransaction>
+        goals: List<Goal>,
+        selectedGoal: Goal?,
+        transactions:
+        List<GoalTransaction>
     ): GoalUiState {
 
-        if (goal == null) {
+        if (
+            selectedGoal == null
+        ) {
+
             return GoalUiState(
-                isLoading = false,
-                transactions = transactions,
-                error = "Savings goal not found."
+                isLoading =
+                    false,
+
+                goals =
+                    goals,
+
+                goal =
+                    null,
+
+                transactions =
+                    emptyList()
             )
         }
 
         val sortedTransactions =
-            transactions.sortedByDescending {
-                it.createdAt
-            }
+            transactions
+                .sortedByDescending {
+                    it.createdAt
+                }
 
         val totalDeposits =
             transactions
                 .filter {
                     it.type ==
-                            GoalTransactionType.DEPOSIT
+                            GoalTransactionType
+                                .DEPOSIT
                 }
                 .sumOf {
                     it.amount
@@ -94,7 +200,8 @@ class GoalViewModel @Inject constructor(
             transactions
                 .filter {
                     it.type ==
-                            GoalTransactionType.WITHDRAWAL
+                            GoalTransactionType
+                                .WITHDRAWAL
                 }
                 .sumOf {
                     it.amount
@@ -102,25 +209,35 @@ class GoalViewModel @Inject constructor(
 
         val currentSavings =
             (
-                    goal.startingAmount +
+                    selectedGoal
+                        .startingAmount +
                             totalDeposits -
                             totalWithdrawals
                     )
-                .coerceAtLeast(0.0)
+                .coerceAtLeast(
+                    0.0
+                )
 
         val targetAmount =
-            goal.targetAmount
-                .coerceAtLeast(0.0)
+            selectedGoal
+                .targetAmount
+                .coerceAtLeast(
+                    0.0
+                )
 
         val remainingAmount =
             (
                     targetAmount -
                             currentSavings
                     )
-                .coerceAtLeast(0.0)
+                .coerceAtLeast(
+                    0.0
+                )
 
         val progress =
-            if (targetAmount > 0.0) {
+            if (
+                targetAmount > 0.0
+            ) {
 
                 (
                         currentSavings /
@@ -138,18 +255,20 @@ class GoalViewModel @Inject constructor(
 
         val monthsRemaining =
             calculateMonthsRemaining(
-                deadline = goal.deadline
+                selectedGoal
+                    .deadline
             )
 
         val requiredMonthlySaving =
             when {
 
-                remainingAmount <= 0.0 ->
+                remainingAmount <=
+                        0.0 ->
                     0.0
 
                 monthsRemaining > 0 ->
                     remainingAmount /
-                            monthsRemaining.toDouble()
+                            monthsRemaining
 
                 else ->
                     remainingAmount
@@ -157,208 +276,284 @@ class GoalViewModel @Inject constructor(
 
         val monthlyDepositAverage =
             calculateMonthlyDepositAverage(
-                transactions = transactions
+                transactions
             )
 
-        val projectedFinishDate =
-            calculateProjectedFinishDate(
+        val predictDeadline =
+            calculatePredictDeadline(
                 remainingAmount =
                     remainingAmount,
+
                 monthlyDepositAverage =
                     monthlyDepositAverage
             )
 
         val milestones =
             buildMilestones(
-                targetAmount = targetAmount,
-                currentSavings = currentSavings
+                targetAmount =
+                    targetAmount,
+
+                currentSavings =
+                    currentSavings
             )
 
         val nextMilestone =
-            milestones.firstOrNull {
-                !it.isReached
+            milestones
+                .firstOrNull {
+                    !it.isReached
+                }
+
+        val highestReached =
+            milestones
+                .lastOrNull {
+                    it.isReached
+                }
+
+        val selectedIndex =
+            goals.indexOfFirst {
+                it.id ==
+                        selectedGoal.id
+            }
+                .coerceAtLeast(
+                    0
+                )
+
+        val achievementMessage =
+            when {
+
+                progress >= 1f ->
+
+                    "🎉 Goal Completed! You reached your ${selectedGoal.name} savings target."
+
+                highestReached != null ->
+
+                    "🏆 ${highestReached.percentage}% milestone achieved · ${highestReached.title}"
+
+                else ->
+                    null
             }
 
         return GoalUiState(
-            isLoading = false,
-            goal = goal,
-            transactions = sortedTransactions,
-            currentSavings = currentSavings,
-            remainingAmount = remainingAmount,
-            progress = progress,
-            monthsRemaining = monthsRemaining,
+            isLoading =
+                false,
+
+            goals =
+                goals,
+
+            selectedGoalIndex =
+                selectedIndex,
+
+            goal =
+                selectedGoal,
+
+            transactions =
+                sortedTransactions,
+
+            currentSavings =
+                currentSavings,
+
+            remainingAmount =
+                remainingAmount,
+
+            progress =
+                progress,
+
+            monthsRemaining =
+                monthsRemaining,
+
             requiredMonthlySaving =
                 requiredMonthlySaving,
+
             monthlyDepositAverage =
                 monthlyDepositAverage,
-            projectedFinishDate =
-                projectedFinishDate,
-            milestones = milestones,
-            nextMilestone = nextMilestone,
-            error = null
+
+            predictDeadline =
+                predictDeadline,
+
+            milestones =
+                milestones,
+
+            nextMilestone =
+                nextMilestone,
+
+            achievementMessage =
+                achievementMessage
         )
     }
 
-    private fun buildMilestones(
+    fun selectPreviousGoal() {
+
+        val state =
+            uiState.value
+
+        if (
+            state.goals.size <= 1
+        ) {
+            return
+        }
+
+        val currentIndex =
+            state.selectedGoalIndex
+
+        val previousIndex =
+            if (
+                currentIndex <= 0
+            ) {
+                state.goals.lastIndex
+            } else {
+                currentIndex - 1
+            }
+
+        _selectedGoalId.value =
+            state.goals[
+                previousIndex
+            ].id
+    }
+
+    fun selectNextGoal() {
+
+        val state =
+            uiState.value
+
+        if (
+            state.goals.size <= 1
+        ) {
+            return
+        }
+
+        val currentIndex =
+            state.selectedGoalIndex
+
+        val nextIndex =
+            if (
+                currentIndex >=
+                state.goals.lastIndex
+            ) {
+                0
+            } else {
+                currentIndex + 1
+            }
+
+        _selectedGoalId.value =
+            state.goals[
+                nextIndex
+            ].id
+    }
+
+    fun addGoal(
+        name: String,
         targetAmount: Double,
-        currentSavings: Double
-    ): List<GoalMilestone> {
+        startingAmount: Double,
+        deadline: String,
+        onSuccess: () -> Unit = {}
+    ) {
 
-        if (targetAmount <= 0.0) {
-            return emptyList()
+        if (
+            name.isBlank()
+        ) {
+
+            _actionError.value =
+                "Goal name cannot be empty."
+
+            return
         }
 
-        val milestoneDefinitions =
-            listOf(
-                Triple(
-                    25,
-                    "Getting Started",
-                    "A strong start toward your goal."
-                ),
-                Triple(
-                    50,
-                    "Halfway There",
-                    "You're halfway to your target."
-                ),
-                Triple(
-                    75,
-                    "Almost There",
-                    "Only one quarter left to save."
-                ),
-                Triple(
-                    100,
-                    "Goal Reached",
-                    "You reached your savings target."
-                )
-            )
+        if (
+            targetAmount <= 0.0
+        ) {
 
-        return milestoneDefinitions.map {
-                definition ->
+            _actionError.value =
+                "Target amount must be greater than 0."
 
-            val percentage =
-                definition.first
-
-            val amount =
-                targetAmount *
-                        percentage /
-                        100.0
-
-            GoalMilestone(
-                percentage = percentage,
-                title = definition.second,
-                description = definition.third,
-                targetAmount = amount,
-                isReached =
-                    currentSavings >= amount
-            )
+            return
         }
-    }
 
-    private fun calculateMonthsRemaining(
-        deadline: String
-    ): Long {
+        if (
+            startingAmount < 0.0
+        ) {
 
-        val deadlineDate =
+            _actionError.value =
+                "Starting amount cannot be negative."
+
+            return
+        }
+
+        if (
+            startingAmount >
+            targetAmount
+        ) {
+
+            _actionError.value =
+                "Starting amount cannot exceed the target."
+            return
+        }
+
+        val parsedDeadline =
             runCatching {
-                LocalDate.parse(deadline)
+                LocalDate
+                    .parse(
+                        deadline
+                    )
             }.getOrNull()
-                ?: return 0L
 
-        val today =
-            LocalDate.now()
+        if (
+            parsedDeadline == null
+        ) {
 
-        if (deadlineDate.isBefore(today)) {
-            return 0L
+            _actionError.value =
+                "Use date format YYYY-MM-DD."
+
+            return
         }
 
-        return ChronoUnit.MONTHS.between(
-            YearMonth.from(today),
-            YearMonth.from(deadlineDate)
-        )
-    }
-
-    private fun calculateMonthlyDepositAverage(
-        transactions: List<GoalTransaction>
-    ): Double {
-
-        val deposits =
-            transactions.filter {
-
-                it.type ==
-                        GoalTransactionType.DEPOSIT &&
-                        it.amount > 0.0
-            }
-
-        if (deposits.isEmpty()) {
-            return 0.0
-        }
-
-        val depositsByMonth =
-            deposits.groupBy {
-                    transaction ->
-
-                val date =
-                    Instant
-                        .ofEpochMilli(
-                            transaction.createdAt
-                        )
-                        .atZone(
-                            ZoneId.systemDefault()
-                        )
-                        .toLocalDate()
-
-                YearMonth.from(
-                    date
+        if (
+            parsedDeadline
+                .isBefore(
+                    LocalDate.now()
                 )
-            }
+        ) {
 
-        if (depositsByMonth.isEmpty()) {
-            return 0.0
+            _actionError.value =
+                "Target date must be today or later."
+
+            return
         }
 
-        val monthlyTotals =
-            depositsByMonth
-                .values
-                .map { group ->
+        _actionError.value =
+            null
 
-                    group.sumOf {
-                        it.amount
-                    }
+        viewModelScope.launch {
+
+            goalRepository
+                .addGoal(
+                    name =
+                        name.trim(),
+
+                    targetAmount =
+                        targetAmount,
+
+                    startingAmount =
+                        startingAmount,
+
+                    deadline =
+                        deadline
+                )
+                .onSuccess {
+                        newGoalId ->
+
+                    _selectedGoalId.value =
+                        newGoalId
+
+                    onSuccess()
                 }
+                .onFailure {
+                        error ->
 
-        return monthlyTotals.average()
-    }
-
-    private fun calculateProjectedFinishDate(
-        remainingAmount: Double,
-        monthlyDepositAverage: Double
-    ): LocalDate? {
-
-        if (
-            remainingAmount <= 0.0
-        ) {
-            return LocalDate.now()
+                    _actionError.value =
+                        error.message
+                            ?: "Goal could not be added."
+                }
         }
-
-        if (
-            monthlyDepositAverage <= 0.0
-        ) {
-            return null
-        }
-
-        val monthsNeeded =
-            ceil(
-                remainingAmount /
-                        monthlyDepositAverage
-            )
-                .toLong()
-                .coerceAtLeast(1L)
-
-        return LocalDate
-            .now()
-            .plusMonths(
-                monthsNeeded
-            )
     }
 
     fun deposit(
@@ -366,7 +561,24 @@ class GoalViewModel @Inject constructor(
         note: String = ""
     ) {
 
-        if (amount <= 0.0) {
+        val goalId =
+            uiState.value
+                .goal
+                ?.id
+
+        if (
+            goalId.isNullOrBlank()
+        ) {
+
+            _actionError.value =
+                "Select a goal first."
+
+            return
+        }
+
+        if (
+            amount <= 0.0
+        ) {
 
             _actionError.value =
                 "Enter an amount greater than 0."
@@ -374,20 +586,28 @@ class GoalViewModel @Inject constructor(
             return
         }
 
-        _actionError.value = null
+        _actionError.value =
+            null
 
         viewModelScope.launch {
 
             goalRepository
                 .deposit(
-                    amount = amount,
-                    note = note.trim()
+                    goalId =
+                        goalId,
+
+                    amount =
+                        amount,
+
+                    note =
+                        note.trim()
                 )
-                .onFailure { error ->
+                .onFailure {
+                        error ->
 
                     _actionError.value =
                         error.message
-                            ?: "Savings could not be added. Try again."
+                            ?: "Savings could not be added."
                 }
         }
     }
@@ -397,7 +617,25 @@ class GoalViewModel @Inject constructor(
         note: String = ""
     ): Boolean {
 
-        if (amount <= 0.0) {
+        val state =
+            uiState.value
+
+        val goalId =
+            state.goal?.id
+
+        if (
+            goalId.isNullOrBlank()
+        ) {
+
+            _actionError.value =
+                "Select a goal first."
+
+            return false
+        }
+
+        if (
+            amount <= 0.0
+        ) {
 
             _actionError.value =
                 "Enter an amount greater than 0."
@@ -405,10 +643,10 @@ class GoalViewModel @Inject constructor(
             return false
         }
 
-        val availableSavings =
-            uiState.value.currentSavings
-
-        if (availableSavings <= 0.0) {
+        if (
+            state.currentSavings <=
+            0.0
+        ) {
 
             _actionError.value =
                 "You don't have any savings to withdraw."
@@ -418,143 +656,320 @@ class GoalViewModel @Inject constructor(
 
         if (
             amount >
-            availableSavings
+            state.currentSavings
         ) {
 
             _actionError.value =
                 "You can only withdraw up to ${
                     formatLkrForError(
-                        availableSavings
+                        state.currentSavings
                     )
                 }."
 
             return false
         }
 
-        _actionError.value = null
+        _actionError.value =
+            null
 
         viewModelScope.launch {
 
             goalRepository
                 .withdraw(
-                    amount = amount,
-                    note = note.trim()
+                    goalId =
+                        goalId,
+
+                    amount =
+                        amount,
+
+                    note =
+                        note.trim()
                 )
-                .onFailure { error ->
+                .onFailure {
+                        error ->
 
                     _actionError.value =
                         error.message
-                            ?: "Withdrawal failed. Try again."
+                            ?: "Withdrawal failed."
                 }
         }
 
         return true
     }
 
-    fun updateGoal(
-        name: String,
+    fun clearActionError() {
+
+        _actionError.value =
+            null
+    }
+
+    private fun buildMilestones(
         targetAmount: Double,
+        currentSavings: Double
+    ): List<GoalMilestone> {
+
+        if (
+            targetAmount <= 0.0
+        ) {
+            return emptyList()
+        }
+
+        return listOf(
+            GoalMilestone(
+                percentage = 25,
+                title = "Getting Started",
+                targetAmount =
+                    targetAmount *
+                            0.25,
+                isReached =
+                    currentSavings >=
+                            targetAmount *
+                            0.25
+            ),
+
+            GoalMilestone(
+                percentage = 50,
+                title = "Halfway There",
+                targetAmount =
+                    targetAmount *
+                            0.50,
+                isReached =
+                    currentSavings >=
+                            targetAmount *
+                            0.50
+            ),
+
+            GoalMilestone(
+                percentage = 75,
+                title = "Almost There",
+                targetAmount =
+                    targetAmount *
+                            0.75,
+                isReached =
+                    currentSavings >=
+                            targetAmount *
+                            0.75
+            ),
+
+            GoalMilestone(
+                percentage = 100,
+                title = "Goal Reached",
+                targetAmount =
+                    targetAmount,
+                isReached =
+                    currentSavings >=
+                            targetAmount
+            )
+        )
+    }
+
+    private fun calculateMonthsRemaining(
         deadline: String
-    ) {
+    ): Long {
 
-        if (name.isBlank()) {
-
-            _actionError.value =
-                "Goal name cannot be empty."
-
-            return
-        }
-
-        if (targetAmount <= 0.0) {
-
-            _actionError.value =
-                "Target amount must be greater than 0."
-
-            return
-        }
-
-        val parsedDeadline =
+        val deadlineDate =
             runCatching {
+
                 LocalDate.parse(
                     deadline
                 )
+
             }.getOrNull()
+                ?: return 0L
 
-        if (parsedDeadline == null) {
+        val today =
+            LocalDate.now()
 
-            _actionError.value =
-                "Enter a valid target date."
-
-            return
-        }
-
-        _actionError.value = null
-
-        viewModelScope.launch {
-
-            goalRepository
-                .updateGoal(
-                    name = name.trim(),
-                    targetAmount = targetAmount,
-                    deadline = deadline
+        if (
+            deadlineDate
+                .isBefore(
+                    today
                 )
-                .onFailure { error ->
-
-                    _actionError.value =
-                        error.message
-                            ?: "Goal could not be updated."
-                }
+        ) {
+            return 0L
         }
+
+        return ChronoUnit
+            .MONTHS
+            .between(
+                YearMonth.from(
+                    today
+                ),
+                YearMonth.from(
+                    deadlineDate
+                )
+            )
     }
 
-    fun clearActionError() {
-        _actionError.value = null
+    private fun calculateMonthlyDepositAverage(
+        transactions:
+        List<GoalTransaction>
+    ): Double {
+
+        val deposits =
+            transactions
+                .filter {
+
+                    it.type ==
+                            GoalTransactionType
+                                .DEPOSIT &&
+                            it.amount >
+                            0.0
+                }
+
+        if (
+            deposits.isEmpty()
+        ) {
+            return 0.0
+        }
+
+        val byMonth =
+            deposits
+                .groupBy {
+                        transaction ->
+
+                    YearMonth.from(
+                        Instant
+                            .ofEpochMilli(
+                                transaction
+                                    .createdAt
+                            )
+                            .atZone(
+                                ZoneId
+                                    .systemDefault()
+                            )
+                            .toLocalDate()
+                    )
+                }
+
+        if (
+            byMonth.isEmpty()
+        ) {
+            return 0.0
+        }
+
+        return byMonth
+            .values
+            .map {
+                    monthTransactions ->
+
+                monthTransactions
+                    .sumOf {
+                        it.amount
+                    }
+            }
+            .average()
+    }
+
+    private fun calculatePredictDeadline(
+        remainingAmount: Double,
+        monthlyDepositAverage: Double
+    ): LocalDate? {
+
+        if (
+            remainingAmount <=
+            0.0
+        ) {
+
+            return LocalDate.now()
+        }
+
+        if (
+            monthlyDepositAverage <=
+            0.0
+        ) {
+
+            return null
+        }
+
+        val monthsNeeded =
+            ceil(
+                remainingAmount /
+                        monthlyDepositAverage
+            )
+                .toLong()
+                .coerceAtLeast(
+                    1L
+                )
+
+        return LocalDate
+            .now()
+            .plusMonths(
+                monthsNeeded
+            )
     }
 
     private fun formatLkrForError(
         amount: Double
-    ): String {
-
-        return "LKR ${
+    ): String =
+        "LKR ${
             String.format(
                 "%,.0f",
                 amount
             )
         }"
-    }
 }
 
 data class GoalUiState(
-    val isLoading: Boolean = false,
-    val goal: Goal? = null,
+    val isLoading:
+    Boolean = false,
 
-    val transactions: List<GoalTransaction> =
+    val goals:
+    List<Goal> =
         emptyList(),
 
-    val currentSavings: Double = 0.0,
-    val remainingAmount: Double = 0.0,
-    val progress: Float = 0f,
+    val selectedGoalIndex:
+    Int = 0,
 
-    val monthsRemaining: Long = 0L,
+    val goal:
+    Goal? = null,
 
-    val requiredMonthlySaving: Double = 0.0,
-
-    val monthlyDepositAverage: Double = 0.0,
-
-    val projectedFinishDate: LocalDate? = null,
-
-    val milestones: List<GoalMilestone> =
+    val transactions:
+    List<GoalTransaction> =
         emptyList(),
 
-    val nextMilestone: GoalMilestone? = null,
+    val currentSavings:
+    Double = 0.0,
 
-    val error: String? = null
+    val remainingAmount:
+    Double = 0.0,
+
+    val progress:
+    Float = 0f,
+
+    val monthsRemaining:
+    Long = 0L,
+
+    val requiredMonthlySaving:
+    Double = 0.0,
+
+    val monthlyDepositAverage:
+    Double = 0.0,
+
+    val predictDeadline:
+    LocalDate? = null,
+
+    val milestones:
+    List<GoalMilestone> =
+        emptyList(),
+
+    val nextMilestone:
+    GoalMilestone? = null,
+
+    val achievementMessage:
+    String? = null
 )
 
 data class GoalMilestone(
-    val percentage: Int,
-    val title: String,
-    val description: String,
-    val targetAmount: Double,
-    val isReached: Boolean
+    val percentage:
+    Int,
+
+    val title:
+    String,
+
+    val targetAmount:
+    Double,
+
+    val isReached:
+    Boolean
 )
