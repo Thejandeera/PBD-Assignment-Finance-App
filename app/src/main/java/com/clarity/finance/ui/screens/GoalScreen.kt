@@ -1,7 +1,9 @@
 package com.clarity.finance.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,16 +25,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.ArrowDropUp
 import androidx.compose.material.icons.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.LaptopMac
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +47,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,7 +72,9 @@ import com.clarity.finance.ui.theme.ClarityTheme
 import com.clarity.finance.viewmodel.GoalMilestone
 import com.clarity.finance.viewmodel.GoalViewModel
 import java.text.NumberFormat
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -89,27 +98,21 @@ fun GoalScreen(
     onNavigateToIncome: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {}
 ) {
-
     val uiState by
-    viewModel.uiState
-        .collectAsStateWithLifecycle()
+    viewModel.uiState.collectAsStateWithLifecycle()
 
     val actionError by
-    viewModel.actionError
-        .collectAsStateWithLifecycle()
+    viewModel.actionError.collectAsStateWithLifecycle()
 
-    var showDepositDialog by
-    remember {
+    var showDepositDialog by remember {
         mutableStateOf(false)
     }
 
-    var showWithdrawDialog by
-    remember {
+    var showWithdrawDialog by remember {
         mutableStateOf(false)
     }
 
-    var showAddGoalDialog by
-    remember {
+    var showAddGoalDialog by remember {
         mutableStateOf(false)
     }
 
@@ -124,16 +127,12 @@ fun GoalScreen(
             colors.background,
 
         bottomBar = {
-
             ClarityBottomBar(
                 currentTab =
                     ClarityNavTab.GOAL,
 
-                onTabSelected = {
-                        tab ->
-
+                onTabSelected = { tab ->
                     when (tab) {
-
                         ClarityNavTab.HOME ->
                             onNavigateToHome()
 
@@ -149,8 +148,7 @@ fun GoalScreen(
                 }
             )
         }
-    ) {
-            innerPadding ->
+    ) { innerPadding ->
 
         LazyColumn(
             modifier =
@@ -160,69 +158,49 @@ fun GoalScreen(
                 PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
-
                     top =
-                        innerPadding
-                            .calculateTopPadding() +
+                        innerPadding.calculateTopPadding() +
                                 12.dp,
-
                     bottom =
-                        innerPadding
-                            .calculateBottomPadding() +
+                        innerPadding.calculateBottomPadding() +
                                 32.dp
                 ),
 
             verticalArrangement =
-                Arrangement.spacedBy(
-                    16.dp
-                )
+                Arrangement.spacedBy(16.dp)
         ) {
 
             item {
-
                 GoalHeader(
                     onAddGoal = {
-
-                        viewModel
-                            .clearActionError()
-
-                        showAddGoalDialog =
-                            true
+                        viewModel.clearActionError()
+                        showAddGoalDialog = true
                     }
                 )
             }
 
             when {
-
                 uiState.isLoading -> {
-
                     item {
-
                         LoadingGoalCard()
                     }
                 }
 
                 uiState.goal == null -> {
-
                     item {
-
                         EmptyGoalCard(
                             onAddGoal = {
-
-                                showAddGoalDialog =
-                                    true
+                                showAddGoalDialog = true
                             }
                         )
                     }
                 }
 
                 else -> {
-
                     val goal =
                         uiState.goal!!
 
                     item {
-
                         GoalProgressCard(
                             goalName =
                                 goal.name,
@@ -249,8 +227,7 @@ fun GoalScreen(
                                 uiState.achievementMessage,
 
                             showSwitchButtons =
-                                uiState.goals.size >
-                                        1,
+                                uiState.goals.size > 1,
 
                             onPrevious =
                                 viewModel::selectPreviousGoal,
@@ -261,22 +238,18 @@ fun GoalScreen(
                     }
 
                     item {
-
                         GoalMetricsSection(
                             remainingAmount =
                                 uiState.remainingAmount,
 
                             requiredMonthlySaving =
-                                uiState
-                                    .requiredMonthlySaving,
+                                uiState.requiredMonthlySaving,
 
                             monthsRemaining =
-                                uiState
-                                    .monthsRemaining,
+                                uiState.monthsRemaining,
 
                             predictDeadline =
-                                uiState
-                                    .predictDeadline
+                                uiState.predictDeadline
                                     ?.format(
                                         DateTimeFormatter
                                             .ofPattern(
@@ -287,34 +260,23 @@ fun GoalScreen(
                     }
 
                     item {
-
                         GoalActionButtons(
                             hasSavings =
-                                uiState.currentSavings >
-                                        0.0,
+                                uiState.currentSavings > 0.0,
 
                             onSave = {
-
-                                viewModel
-                                    .clearActionError()
-
-                                showDepositDialog =
-                                    true
+                                viewModel.clearActionError()
+                                showDepositDialog = true
                             },
 
                             onWithdraw = {
-
-                                viewModel
-                                    .clearActionError()
-
-                                showWithdrawDialog =
-                                    true
+                                viewModel.clearActionError()
+                                showWithdrawDialog = true
                             }
                         )
                     }
 
                     item {
-
                         SavingsHistoryCard(
                             transactions =
                                 uiState.transactions
@@ -326,18 +288,13 @@ fun GoalScreen(
     }
 
     if (showAddGoalDialog) {
-
         AddGoalDialog(
             errorMessage =
                 actionError,
 
             onDismiss = {
-
-                viewModel
-                    .clearActionError()
-
-                showAddGoalDialog =
-                    false
+                viewModel.clearActionError()
+                showAddGoalDialog = false
             },
 
             onConfirm = {
@@ -347,28 +304,18 @@ fun GoalScreen(
                     deadline ->
 
                 viewModel.addGoal(
-                    name =
-                        name,
-
-                    targetAmount =
-                        target,
-
-                    startingAmount =
-                        starting,
-
-                    deadline =
-                        deadline
+                    name = name,
+                    targetAmount = target,
+                    startingAmount = starting,
+                    deadline = deadline
                 ) {
-
-                    showAddGoalDialog =
-                        false
+                    showAddGoalDialog = false
                 }
             }
         )
     }
 
     if (showDepositDialog) {
-
         GoalTransactionDialog(
             title =
                 "Save to Goal",
@@ -383,12 +330,8 @@ fun GoalScreen(
                 actionError,
 
             onDismiss = {
-
-                viewModel
-                    .clearActionError()
-
-                showDepositDialog =
-                    false
+                viewModel.clearActionError()
+                showDepositDialog = false
             },
 
             onConfirm = {
@@ -396,21 +339,16 @@ fun GoalScreen(
                     note ->
 
                 viewModel.deposit(
-                    amount =
-                        amount,
-
-                    note =
-                        note
+                    amount = amount,
+                    note = note
                 )
 
-                showDepositDialog =
-                    false
+                showDepositDialog = false
             }
         )
     }
 
     if (showWithdrawDialog) {
-
         GoalTransactionDialog(
             title =
                 "Withdraw Savings",
@@ -432,12 +370,8 @@ fun GoalScreen(
                 }",
 
             onDismiss = {
-
-                viewModel
-                    .clearActionError()
-
-                showWithdrawDialog =
-                    false
+                viewModel.clearActionError()
+                showWithdrawDialog = false
             },
 
             onConfirm = {
@@ -446,17 +380,12 @@ fun GoalScreen(
 
                 val accepted =
                     viewModel.withdraw(
-                        amount =
-                            amount,
-
-                        note =
-                            note
+                        amount = amount,
+                        note = note
                     )
 
                 if (accepted) {
-
-                    showWithdrawDialog =
-                        false
+                    showWithdrawDialog = false
                 }
             }
         )
@@ -467,7 +396,6 @@ fun GoalScreen(
 private fun GoalHeader(
     onAddGoal: () -> Unit
 ) {
-
     val colors =
         ClarityTheme.colors
 
@@ -478,14 +406,10 @@ private fun GoalHeader(
         verticalAlignment =
             Alignment.CenterVertically
     ) {
-
         Column(
             modifier =
-                Modifier.weight(
-                    1f
-                )
+                Modifier.weight(1f)
         ) {
-
             Text(
                 text =
                     "My Goals",
@@ -522,18 +446,14 @@ private fun GoalHeader(
 
             modifier =
                 Modifier
-                    .size(
-                        44.dp
-                    )
+                    .size(44.dp)
                     .background(
                         color =
                             goalAccent(),
-
                         shape =
                             CircleShape
                     )
         ) {
-
             Icon(
                 imageVector =
                     Icons.Rounded.Add,
@@ -543,9 +463,7 @@ private fun GoalHeader(
 
                 tint =
                     if (
-                        ClarityTheme
-                            .colors
-                            .isDark
+                        ClarityTheme.colors.isDark
                     ) {
                         Color.Black
                     } else {
@@ -570,7 +488,6 @@ private fun GoalProgressCard(
     onPrevious: () -> Unit,
     onNext: () -> Unit
 ) {
-
     val colors =
         ClarityTheme.colors
 
@@ -584,136 +501,82 @@ private fun GoalProgressCard(
                 .background(
                     color =
                         colors.card,
-
                     shape =
-                        RoundedCornerShape(
-                            18.dp
-                        )
+                        RoundedCornerShape(18.dp)
                 )
-                .padding(
-                    18.dp
-                )
+                .padding(18.dp)
     ) {
 
+        // ---------------------------------------------------------
+        // CLEAN GOAL NAME + ARROWS
+        // ---------------------------------------------------------
+
         Row(
+            modifier =
+                Modifier.fillMaxWidth(),
+
             verticalAlignment =
-                Alignment.CenterVertically
+                Alignment.CenterVertically,
+
+            horizontalArrangement =
+                Arrangement.Center
         ) {
 
-            if (
-                showSwitchButtons
-            ) {
+            IconButton(
+                onClick =
+                    onPrevious,
 
-                IconButton(
-                    onClick =
-                        onPrevious,
+                enabled =
+                    showSwitchButtons,
 
-                    modifier =
-                        Modifier.size(
-                            34.dp
-                        )
-                ) {
-
-                    Icon(
-                        imageVector =
-                            Icons.Rounded
-                                .ArrowBackIosNew,
-
-                        contentDescription =
-                            "Previous goal",
-
-                        tint =
-                            colors.secondaryLabel,
-
-                        modifier =
-                            Modifier.size(
-                                16.dp
-                            )
-                    )
-                }
-            }
-
-            Box(
                 modifier =
-                    Modifier
-                        .size(
-                            46.dp
-                        )
-                        .background(
-                            color =
-                                goalSoftBackground(),
-
-                            shape =
-                                RoundedCornerShape(
-                                    12.dp
-                                )
-                        ),
-
-                contentAlignment =
-                    Alignment.Center
+                    Modifier.size(38.dp)
             ) {
-
                 Icon(
                     imageVector =
-                        Icons.Rounded
-                            .LaptopMac,
+                        Icons.Rounded.ArrowBackIosNew,
 
                     contentDescription =
-                        null,
+                        "Previous goal",
 
                     tint =
-                        accent
-                )
-            }
+                        if (showSwitchButtons) {
+                            accent
+                        } else {
+                            colors.secondaryLabel
+                                .copy(alpha = 0.25f)
+                        },
 
-            Spacer(
-                modifier =
-                    Modifier.size(
-                        10.dp
-                    )
-            )
-
-            Column(
-                modifier =
-                    Modifier.weight(
-                        1f
-                    )
-            ) {
-
-                Text(
-                    text =
-                        goalName,
-
-                    color =
-                        colors.label,
-
-                    fontWeight =
-                        FontWeight.SemiBold
-                )
-
-                Text(
-                    text =
-                        "Savings goal",
-
-                    color =
-                        colors.secondaryLabel,
-
-                    style =
-                        MaterialTheme
-                            .typography
-                            .bodySmall
+                    modifier =
+                        Modifier.size(17.dp)
                 )
             }
 
             Text(
                 text =
-                    "${(progress * 100).toInt()}%",
+                    goalName,
+
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .padding(
+                            horizontal = 12.dp
+                        ),
+
+                textAlign =
+                    TextAlign.Center,
 
                 color =
-                    accent,
+                    colors.label,
 
                 fontWeight =
                     FontWeight.Bold,
+
+                maxLines =
+                    1,
+
+                overflow =
+                    TextOverflow.Ellipsis,
 
                 style =
                     MaterialTheme
@@ -721,45 +584,40 @@ private fun GoalProgressCard(
                         .titleLarge
             )
 
-            if (
-                showSwitchButtons
-            ) {
+            IconButton(
+                onClick =
+                    onNext,
 
-                IconButton(
-                    onClick =
-                        onNext,
+                enabled =
+                    showSwitchButtons,
+
+                modifier =
+                    Modifier.size(38.dp)
+            ) {
+                Icon(
+                    imageVector =
+                        Icons.Rounded.ArrowForwardIos,
+
+                    contentDescription =
+                        "Next goal",
+
+                    tint =
+                        if (showSwitchButtons) {
+                            accent
+                        } else {
+                            colors.secondaryLabel
+                                .copy(alpha = 0.25f)
+                        },
 
                     modifier =
-                        Modifier.size(
-                            34.dp
-                        )
-                ) {
-
-                    Icon(
-                        imageVector =
-                            Icons.Rounded
-                                .ArrowForwardIos,
-
-                        contentDescription =
-                            "Next goal",
-
-                        tint =
-                            colors.secondaryLabel,
-
-                        modifier =
-                            Modifier.size(
-                                16.dp
-                            )
-                    )
-                }
+                        Modifier.size(17.dp)
+                )
             }
         }
 
         Spacer(
             modifier =
-                Modifier.height(
-                    22.dp
-                )
+                Modifier.height(20.dp)
         )
 
         MilestoneProgressRing(
@@ -773,31 +631,25 @@ private fun GoalProgressCard(
                 nextMilestone
         )
 
-        if (
-            achievementMessage != null
-        ) {
+        Spacer(
+            modifier =
+                Modifier.height(12.dp)
+        )
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        12.dp
-                    )
-            )
+        ProgressMessageCard(
+            progress =
+                progress,
 
-            AchievementBanner(
-                message =
-                    achievementMessage,
+            goalName =
+                goalName,
 
-                completed =
-                    progress >= 1f
-            )
-        }
+            achievementMessage =
+                achievementMessage
+        )
 
         Spacer(
             modifier =
-                Modifier.height(
-                    20.dp
-                )
+                Modifier.height(18.dp)
         )
 
         Row(
@@ -807,9 +659,7 @@ private fun GoalProgressCard(
             horizontalArrangement =
                 Arrangement.SpaceBetween
         ) {
-
             Column {
-
                 Text(
                     text =
                         "Saved",
@@ -841,7 +691,6 @@ private fun GoalProgressCard(
                 horizontalAlignment =
                     Alignment.End
             ) {
-
                 Text(
                     text =
                         "Target",
@@ -872,20 +721,16 @@ private fun GoalProgressCard(
 
         Spacer(
             modifier =
-                Modifier.height(
-                    14.dp
-                )
+                Modifier.height(14.dp)
         )
 
         Row(
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
-
             Icon(
                 imageVector =
-                    Icons.Rounded
-                        .CalendarMonth,
+                    Icons.Rounded.CalendarMonth,
 
                 contentDescription =
                     null,
@@ -894,16 +739,12 @@ private fun GoalProgressCard(
                     accent,
 
                 modifier =
-                    Modifier.size(
-                        18.dp
-                    )
+                    Modifier.size(18.dp)
             )
 
             Spacer(
                 modifier =
-                    Modifier.size(
-                        8.dp
-                    )
+                    Modifier.size(8.dp)
             )
 
             Text(
@@ -928,7 +769,6 @@ private fun MilestoneProgressRing(
     milestones: List<GoalMilestone>,
     nextMilestone: GoalMilestone?
 ) {
-
     val colors =
         ClarityTheme.colors
 
@@ -942,41 +782,29 @@ private fun MilestoneProgressRing(
         contentAlignment =
             Alignment.Center
     ) {
-
         Box(
             modifier =
-                Modifier.size(
-                    190.dp
-                ),
+                Modifier.size(190.dp),
 
             contentAlignment =
                 Alignment.Center
         ) {
-
             CircularProgressIndicator(
                 progress = {
                     progress
                 },
 
                 modifier =
-                    Modifier.size(
-                        150.dp
-                    ),
+                    Modifier.size(150.dp),
 
                 color =
                     accent,
 
                 trackColor =
-                    if (
-                        colors.isDark
-                    ) {
-                        Color(
-                            0xFF3A3A3C
-                        )
+                    if (colors.isDark) {
+                        Color(0xFF3A3A3C)
                     } else {
-                        Color(
-                            0xFFE5E5EA
-                        )
+                        Color(0xFFE5E5EA)
                     },
 
                 strokeWidth =
@@ -987,7 +815,6 @@ private fun MilestoneProgressRing(
                 horizontalAlignment =
                     Alignment.CenterHorizontally
             ) {
-
                 Text(
                     text =
                         "${(progress * 100).toInt()}%",
@@ -1018,14 +845,17 @@ private fun MilestoneProgressRing(
                 )
             }
 
-            // 100% / finish point = TOP
+            // Correct ring mapping:
+            // Start / 100% = TOP
+            // 25% = RIGHT
+            // 50% = BOTTOM
+            // 75% = LEFT
+
             milestones
                 .firstOrNull {
-                    it.percentage ==
-                            100
+                    it.percentage == 100
                 }
-                ?.let {
-                        milestone ->
+                ?.let { milestone ->
 
                     MilestoneBubble(
                         milestone =
@@ -1033,8 +863,7 @@ private fun MilestoneProgressRing(
 
                         isNext =
                             nextMilestone
-                                ?.percentage ==
-                                    100,
+                                ?.percentage == 100,
 
                         modifier =
                             Modifier.align(
@@ -1043,14 +872,11 @@ private fun MilestoneProgressRing(
                     )
                 }
 
-            // 25% = RIGHT
             milestones
                 .firstOrNull {
-                    it.percentage ==
-                            25
+                    it.percentage == 25
                 }
-                ?.let {
-                        milestone ->
+                ?.let { milestone ->
 
                     MilestoneBubble(
                         milestone =
@@ -1058,8 +884,7 @@ private fun MilestoneProgressRing(
 
                         isNext =
                             nextMilestone
-                                ?.percentage ==
-                                    25,
+                                ?.percentage == 25,
 
                         modifier =
                             Modifier.align(
@@ -1068,14 +893,11 @@ private fun MilestoneProgressRing(
                     )
                 }
 
-            // 50% = BOTTOM
             milestones
                 .firstOrNull {
-                    it.percentage ==
-                            50
+                    it.percentage == 50
                 }
-                ?.let {
-                        milestone ->
+                ?.let { milestone ->
 
                     MilestoneBubble(
                         milestone =
@@ -1083,8 +905,7 @@ private fun MilestoneProgressRing(
 
                         isNext =
                             nextMilestone
-                                ?.percentage ==
-                                    50,
+                                ?.percentage == 50,
 
                         modifier =
                             Modifier.align(
@@ -1093,14 +914,11 @@ private fun MilestoneProgressRing(
                     )
                 }
 
-            // 75% = LEFT
             milestones
                 .firstOrNull {
-                    it.percentage ==
-                            75
+                    it.percentage == 75
                 }
-                ?.let {
-                        milestone ->
+                ?.let { milestone ->
 
                     MilestoneBubble(
                         milestone =
@@ -1108,8 +926,7 @@ private fun MilestoneProgressRing(
 
                         isNext =
                             nextMilestone
-                                ?.percentage ==
-                                    75,
+                                ?.percentage == 75,
 
                         modifier =
                             Modifier.align(
@@ -1124,12 +941,9 @@ private fun MilestoneProgressRing(
         progress < 1f &&
         nextMilestone != null
     ) {
-
         Spacer(
             modifier =
-                Modifier.height(
-                    8.dp
-                )
+                Modifier.height(6.dp)
         )
 
         Text(
@@ -1159,7 +973,6 @@ private fun MilestoneBubble(
     isNext: Boolean,
     modifier: Modifier = Modifier
 ) {
-
     val colors =
         ClarityTheme.colors
 
@@ -1168,7 +981,6 @@ private fun MilestoneBubble(
 
     val background =
         when {
-
             milestone.isReached ->
                 GoalGreen
 
@@ -1176,37 +988,24 @@ private fun MilestoneBubble(
                 accent
 
             else ->
-                if (
-                    colors.isDark
-                ) {
-                    Color(
-                        0xFF303033
-                    )
+                if (colors.isDark) {
+                    Color(0xFF303033)
                 } else {
-                    Color(
-                        0xFFF2F2F7
-                    )
+                    Color(0xFFF2F2F7)
                 }
         }
 
     Box(
         modifier =
             modifier
-                .size(
-                    38.dp
-                )
-                .clip(
-                    CircleShape
-                )
-                .background(
-                    background
-                )
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(background)
                 .then(
                     if (
                         isNext &&
                         !milestone.isReached
                     ) {
-
                         Modifier.border(
                             width =
                                 2.dp,
@@ -1214,14 +1013,12 @@ private fun MilestoneBubble(
                             color =
                                 Color.White
                                     .copy(
-                                        alpha =
-                                            0.35f
+                                        alpha = 0.35f
                                     ),
 
                             shape =
                                 CircleShape
                         )
-
                     } else {
                         Modifier
                     }
@@ -1230,11 +1027,7 @@ private fun MilestoneBubble(
         contentAlignment =
             Alignment.Center
     ) {
-
-        if (
-            milestone.isReached
-        ) {
-
+        if (milestone.isReached) {
             Icon(
                 imageVector =
                     Icons.Rounded.Check,
@@ -1246,25 +1039,17 @@ private fun MilestoneBubble(
                     Color.White,
 
                 modifier =
-                    Modifier.size(
-                        18.dp
-                    )
+                    Modifier.size(18.dp)
             )
-
         } else {
-
             Text(
                 text =
                     milestone.percentage
                         .toString(),
 
                 color =
-                    if (
-                        isNext
-                    ) {
-                        if (
-                            colors.isDark
-                        ) {
+                    if (isNext) {
+                        if (colors.isDark) {
                             Color.Black
                         } else {
                             Color.White
@@ -1286,13 +1071,48 @@ private fun MilestoneBubble(
 }
 
 @Composable
-private fun AchievementBanner(
-    message: String,
-    completed: Boolean
+private fun ProgressMessageCard(
+    progress: Float,
+    goalName: String,
+    achievementMessage: String?
 ) {
-
     val colors =
         ClarityTheme.colors
+
+    val percent =
+        (progress * 100)
+            .toInt()
+
+    val message =
+        when {
+            progress >= 1f ->
+                "🎉 Goal Completed! You reached your $goalName target."
+
+            percent >= 75 ->
+                "🚀 Almost there! You've crossed 75% of your goal."
+
+            percent >= 50 ->
+                "🔥 Halfway there! You've already saved more than 50%."
+
+            percent >= 25 ->
+                "🏆 Great progress! You've completed the first 25%."
+
+            else ->
+                "🌱 Nice start! Keep saving to reach your first 25% milestone."
+        }
+
+    val displayMessage =
+        when {
+            progress >= 1f ->
+                message
+
+            achievementMessage != null &&
+                    percent >= 25 ->
+                achievementMessage
+
+            else ->
+                message
+        }
 
     Row(
         modifier =
@@ -1300,45 +1120,31 @@ private fun AchievementBanner(
                 .fillMaxWidth()
                 .background(
                     color =
-                        if (
-                            completed
-                        ) {
-                            if (
-                                colors.isDark
-                            ) {
-                                Color(
-                                    0xFF15351F
-                                )
-                            } else {
-                                Color(
-                                    0xFFE8F7EC
-                                )
-                            }
-                        } else {
-                            goalSoftBackground()
+                        when {
+                            progress >= 1f ->
+                                successSoftBackground()
+
+                            else ->
+                                goalSoftBackground()
                         },
 
                     shape =
-                        RoundedCornerShape(
-                            12.dp
-                        )
+                        RoundedCornerShape(12.dp)
                 )
                 .padding(
-                    12.dp
+                    horizontal = 12.dp,
+                    vertical = 11.dp
                 ),
 
         verticalAlignment =
             Alignment.CenterVertically
     ) {
-
         Text(
             text =
-                message,
+                displayMessage,
 
             color =
-                if (
-                    completed
-                ) {
+                if (progress >= 1f) {
                     GoalGreen
                 } else {
                     goalAccent()
@@ -1362,17 +1168,13 @@ private fun GoalMetricsSection(
     monthsRemaining: Long,
     predictDeadline: String?
 ) {
-
     val colors =
         ClarityTheme.colors
 
     Column(
         verticalArrangement =
-            Arrangement.spacedBy(
-                12.dp
-            )
+            Arrangement.spacedBy(12.dp)
     ) {
-
         Text(
             text =
                 "Goal Summary",
@@ -1389,11 +1191,8 @@ private fun GoalMetricsSection(
                 Modifier.fillMaxWidth(),
 
             horizontalArrangement =
-                Arrangement.spacedBy(
-                    12.dp
-                )
+                Arrangement.spacedBy(12.dp)
         ) {
-
             GoalMetricCard(
                 title =
                     "Remaining",
@@ -1404,9 +1203,7 @@ private fun GoalMetricsSection(
                     ),
 
                 modifier =
-                    Modifier.weight(
-                        1f
-                    )
+                    Modifier.weight(1f)
             )
 
             GoalMetricCard(
@@ -1419,9 +1216,7 @@ private fun GoalMetricsSection(
                     ),
 
                 modifier =
-                    Modifier.weight(
-                        1f
-                    )
+                    Modifier.weight(1f)
             )
         }
 
@@ -1430,11 +1225,8 @@ private fun GoalMetricsSection(
                 Modifier.fillMaxWidth(),
 
             horizontalArrangement =
-                Arrangement.spacedBy(
-                    12.dp
-                )
+                Arrangement.spacedBy(12.dp)
         ) {
-
             GoalMetricCard(
                 title =
                     "Months Left",
@@ -1444,9 +1236,7 @@ private fun GoalMetricsSection(
                         .toString(),
 
                 modifier =
-                    Modifier.weight(
-                        1f
-                    )
+                    Modifier.weight(1f)
             )
 
             GoalMetricCard(
@@ -1458,9 +1248,7 @@ private fun GoalMetricsSection(
                         ?: "Not enough data",
 
                 modifier =
-                    Modifier.weight(
-                        1f
-                    )
+                    Modifier.weight(1f)
             )
         }
     }
@@ -1472,7 +1260,6 @@ private fun GoalMetricCard(
     value: String,
     modifier: Modifier = Modifier
 ) {
-
     val colors =
         ClarityTheme.colors
 
@@ -1481,15 +1268,10 @@ private fun GoalMetricCard(
             modifier
                 .background(
                     colors.card,
-                    RoundedCornerShape(
-                        14.dp
-                    )
+                    RoundedCornerShape(14.dp)
                 )
-                .padding(
-                    14.dp
-                )
+                .padding(14.dp)
     ) {
-
         Text(
             text =
                 title,
@@ -1505,9 +1287,7 @@ private fun GoalMetricCard(
 
         Spacer(
             modifier =
-                Modifier.height(
-                    6.dp
-                )
+                Modifier.height(6.dp)
         )
 
         Text(
@@ -1529,34 +1309,24 @@ private fun GoalActionButtons(
     onSave: () -> Unit,
     onWithdraw: () -> Unit
 ) {
-
     Row(
         modifier =
             Modifier.fillMaxWidth(),
 
         horizontalArrangement =
-            Arrangement.spacedBy(
-                12.dp
-            )
+            Arrangement.spacedBy(12.dp)
     ) {
-
         Button(
             onClick =
                 onSave,
 
             modifier =
                 Modifier
-                    .weight(
-                        1f
-                    )
-                    .height(
-                        52.dp
-                    ),
+                    .weight(1f)
+                    .height(50.dp),
 
             shape =
-                RoundedCornerShape(
-                    16.dp
-                ),
+                RoundedCornerShape(15.dp),
 
             colors =
                 ButtonDefaults
@@ -1565,21 +1335,20 @@ private fun GoalActionButtons(
                             goalAccent()
                     )
         ) {
-
             Icon(
                 imageVector =
-                    Icons.Rounded
-                        .Savings,
+                    Icons.Rounded.Savings,
 
                 contentDescription =
-                    null
+                    null,
+
+                modifier =
+                    Modifier.size(18.dp)
             )
 
             Spacer(
                 modifier =
-                    Modifier.size(
-                        8.dp
-                    )
+                    Modifier.size(6.dp)
             )
 
             Text(
@@ -1587,7 +1356,12 @@ private fun GoalActionButtons(
                     "Save to Goal",
 
                 fontWeight =
-                    FontWeight.SemiBold
+                    FontWeight.SemiBold,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .labelMedium
             )
         }
 
@@ -1600,37 +1374,53 @@ private fun GoalActionButtons(
 
             modifier =
                 Modifier
-                    .weight(
-                        1f
-                    )
-                    .height(
-                        52.dp
-                    ),
+                    .weight(1f)
+                    .height(50.dp),
 
             shape =
-                RoundedCornerShape(
-                    16.dp
+                RoundedCornerShape(15.dp),
+
+            colors =
+                ButtonDefaults.outlinedButtonColors(
+                    contentColor =
+                        GoalRed,
+
+                    disabledContentColor =
+                        GoalRed.copy(
+                            alpha = 0.35f
+                        )
                 )
         ) {
-
             Icon(
                 imageVector =
-                    Icons.Rounded
-                        .ArrowUpward,
+                    Icons.Rounded.ArrowUpward,
 
                 contentDescription =
-                    null
+                    null,
+
+                tint =
+                    GoalRed,
+
+                modifier =
+                    Modifier.size(18.dp)
             )
 
             Spacer(
                 modifier =
-                    Modifier.size(
-                        7.dp
-                    )
+                    Modifier.size(6.dp)
             )
 
             Text(
-                "Withdraw"
+                text =
+                    "Withdraw",
+
+                color =
+                    GoalRed,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .labelMedium
             )
         }
     }
@@ -1638,59 +1428,126 @@ private fun GoalActionButtons(
 
 @Composable
 private fun SavingsHistoryCard(
-    transactions:
-    List<GoalTransaction>
+    transactions: List<GoalTransaction>
 ) {
-
     val colors =
         ClarityTheme.colors
 
+    var showAll by
+    remember {
+        mutableStateOf(false)
+    }
+
+    val visibleTransactions =
+        if (showAll) {
+            transactions
+        } else {
+            transactions.take(2)
+        }
+
     Column {
+        Row(
+            modifier =
+                Modifier.fillMaxWidth(),
 
-        Text(
-            text =
-                "Savings History",
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+            Text(
+                text =
+                    "Savings History",
 
-            color =
-                colors.label,
+                color =
+                    colors.label,
 
-            fontWeight =
-                FontWeight.SemiBold
-        )
+                fontWeight =
+                    FontWeight.SemiBold,
+
+                modifier =
+                    Modifier.weight(1f)
+            )
+
+            if (transactions.size > 2) {
+                Row(
+                    modifier =
+                        Modifier
+                            .clip(
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                showAll =
+                                    !showAll
+                            }
+                            .padding(
+                                horizontal = 8.dp,
+                                vertical = 5.dp
+                            ),
+
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+                    Text(
+                        text =
+                            if (showAll) {
+                                "Show Less"
+                            } else {
+                                "View All"
+                            },
+
+                        color =
+                            goalAccent(),
+
+                        style =
+                            MaterialTheme
+                                .typography
+                                .labelMedium,
+
+                        fontWeight =
+                            FontWeight.SemiBold
+                    )
+
+                    Icon(
+                        imageVector =
+                            if (showAll) {
+                                Icons.Rounded
+                                    .ArrowDropUp
+                            } else {
+                                Icons.Rounded
+                                    .ArrowDropDown
+                            },
+
+                        contentDescription =
+                            null,
+
+                        tint =
+                            goalAccent()
+                    )
+                }
+            }
+        }
 
         Spacer(
             modifier =
-                Modifier.height(
-                    10.dp
-                )
+                Modifier.height(10.dp)
         )
 
-        if (
-            transactions.isEmpty()
-        ) {
-
+        if (transactions.isEmpty()) {
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .background(
                             colors.card,
-                            RoundedCornerShape(
-                                16.dp
-                            )
+                            RoundedCornerShape(16.dp)
                         )
-                        .padding(
-                            28.dp
-                        ),
+                        .padding(28.dp),
 
                 horizontalAlignment =
                     Alignment.CenterHorizontally
             ) {
-
                 Icon(
                     imageVector =
-                        Icons.Rounded
-                            .Savings,
+                        Icons.Rounded.Savings,
 
                     contentDescription =
                         null,
@@ -1699,16 +1556,12 @@ private fun SavingsHistoryCard(
                         goalAccent(),
 
                     modifier =
-                        Modifier.size(
-                            34.dp
-                        )
+                        Modifier.size(34.dp)
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(
-                            10.dp
-                        )
+                        Modifier.height(10.dp)
                 )
 
                 Text(
@@ -1741,64 +1594,66 @@ private fun SavingsHistoryCard(
 
         } else {
 
-            LazyColumn(
+            Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(
-                            min = 100.dp,
-                            max = 330.dp
-                        )
                         .clip(
-                            RoundedCornerShape(
-                                16.dp
-                            )
+                            RoundedCornerShape(16.dp)
                         )
                         .background(
                             colors.card
                         )
             ) {
-
-                itemsIndexed(
-                    items =
-                        transactions,
-
-                    key = {
+                visibleTransactions
+                    .forEachIndexed {
                             index,
                             transaction ->
 
-                        transaction.id
-                            .ifBlank {
-                                "$index-${transaction.createdAt}"
-                            }
-                    }
-                ) {
-                        index,
-                        transaction ->
-
-                    SavingsHistoryRow(
-                        transaction =
-                            transaction
-                    )
-
-                    if (
-                        index <
-                        transactions.lastIndex
-                    ) {
-
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(
-                                        1.dp
-                                    )
-                                    .background(
-                                        colors.separator
-                                    )
+                        SavingsHistoryRow(
+                            transaction =
+                                transaction
                         )
+
+                        if (
+                            index <
+                            visibleTransactions.lastIndex
+                        ) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(
+                                            colors.separator
+                                        )
+                            )
+                        }
                     }
-                }
+            }
+
+            AnimatedVisibility(
+                visible =
+                    showAll &&
+                            transactions.size > 6
+            ) {
+                Text(
+                    text =
+                        "Showing ${transactions.size} transactions",
+
+                    modifier =
+                        Modifier.padding(
+                            top = 8.dp
+                        ),
+
+                    color =
+                        colors.secondaryLabel,
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
             }
         }
     }
@@ -1806,17 +1661,14 @@ private fun SavingsHistoryCard(
 
 @Composable
 private fun SavingsHistoryRow(
-    transaction:
-    GoalTransaction
+    transaction: GoalTransaction
 ) {
-
     val colors =
         ClarityTheme.colors
 
     val isDeposit =
         transaction.type ==
-                GoalTransactionType
-                    .DEPOSIT
+                GoalTransactionType.DEPOSIT
 
     Row(
         modifier =
@@ -1830,25 +1682,16 @@ private fun SavingsHistoryRow(
         verticalAlignment =
             Alignment.CenterVertically
     ) {
-
         Box(
             modifier =
                 Modifier
-                    .size(
-                        38.dp
-                    )
+                    .size(38.dp)
                     .background(
                         color =
-                            if (
-                                isDeposit
-                            ) {
-                                Color(
-                                    0xFF14351F
-                                )
+                            if (isDeposit) {
+                                successSoftBackground()
                             } else {
-                                Color(
-                                    0xFF3B1D1D
-                                )
+                                errorSoftBackground()
                             },
 
                         shape =
@@ -1858,12 +1701,9 @@ private fun SavingsHistoryRow(
             contentAlignment =
                 Alignment.Center
         ) {
-
             Icon(
                 imageVector =
-                    if (
-                        isDeposit
-                    ) {
+                    if (isDeposit) {
                         Icons.Rounded
                             .ArrowDownward
                     } else {
@@ -1875,9 +1715,7 @@ private fun SavingsHistoryRow(
                     null,
 
                 tint =
-                    if (
-                        isDeposit
-                    ) {
+                    if (isDeposit) {
                         GoalGreen
                     } else {
                         GoalRed
@@ -1887,44 +1725,44 @@ private fun SavingsHistoryRow(
 
         Spacer(
             modifier =
-                Modifier.size(
-                    12.dp
-                )
+                Modifier.size(12.dp)
         )
 
         Column(
             modifier =
-                Modifier.weight(
-                    1f
-                )
+                Modifier.weight(1f)
         ) {
-
             Text(
                 text =
-                    if (
-                        isDeposit
-                    ) {
+                    if (isDeposit) {
                         "Savings deposit"
                     } else {
                         "Savings withdrawal"
                     },
 
                 color =
-                    colors.label
+                    colors.label,
+
+                fontWeight =
+                    FontWeight.Medium
             )
 
             if (
-                transaction
-                    .note
+                transaction.note
                     .isNotBlank()
             ) {
-
                 Text(
                     text =
                         transaction.note,
 
                     color =
                         colors.secondaryLabel,
+
+                    maxLines =
+                        1,
+
+                    overflow =
+                        TextOverflow.Ellipsis,
 
                     style =
                         MaterialTheme
@@ -1936,9 +1774,7 @@ private fun SavingsHistoryRow(
 
         Text(
             text =
-                if (
-                    isDeposit
-                ) {
+                if (isDeposit) {
                     "+${
                         formatLkr(
                             transaction.amount
@@ -1953,23 +1789,24 @@ private fun SavingsHistoryRow(
                 },
 
             color =
-                if (
-                    isDeposit
-                ) {
+                if (isDeposit) {
                     GoalGreen
                 } else {
                     GoalRed
                 },
 
             fontWeight =
-                FontWeight.SemiBold
+                FontWeight.SemiBold,
+
+            style =
+                MaterialTheme
+                    .typography
+                    .bodySmall
         )
     }
 }
 
-@OptIn(
-    ExperimentalMaterial3Api::class
-)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddGoalDialog(
     errorMessage: String?,
@@ -1981,7 +1818,6 @@ private fun AddGoalDialog(
         String
     ) -> Unit
 ) {
-
     var name by
     remember {
         mutableStateOf("")
@@ -2000,13 +1836,15 @@ private fun AddGoalDialog(
     var deadline by
     remember {
         mutableStateOf(
-            LocalDate
-                .now()
-                .plusYears(
-                    1
-                )
+            LocalDate.now()
+                .plusYears(1)
                 .toString()
         )
+    }
+
+    var showDatePicker by
+    remember {
+        mutableStateOf(false)
     }
 
     AlertDialog(
@@ -2014,28 +1852,22 @@ private fun AddGoalDialog(
             onDismiss,
 
         title = {
-
             Text(
                 "Add New Goal"
             )
         },
 
         text = {
-
             Column(
                 verticalArrangement =
-                    Arrangement.spacedBy(
-                        12.dp
-                    )
+                    Arrangement.spacedBy(12.dp)
             ) {
-
                 OutlinedTextField(
                     value =
                         name,
 
                     onValueChange = {
-                        name =
-                            it
+                        name = it
                     },
 
                     label = {
@@ -2063,9 +1895,7 @@ private fun AddGoalDialog(
 
                     onValueChange = {
                         targetText =
-                            sanitizeAmountInput(
-                                it
-                            )
+                            sanitizeAmountInput(it)
                     },
 
                     label = {
@@ -2099,9 +1929,7 @@ private fun AddGoalDialog(
 
                     onValueChange = {
                         startingText =
-                            sanitizeAmountInput(
-                                it
-                            )
+                            sanitizeAmountInput(it)
                     },
 
                     label = {
@@ -2133,10 +1961,10 @@ private fun AddGoalDialog(
                     value =
                         deadline,
 
-                    onValueChange = {
-                        deadline =
-                            it
-                    },
+                    onValueChange = {},
+
+                    readOnly =
+                        true,
 
                     label = {
                         Text(
@@ -2144,23 +1972,34 @@ private fun AddGoalDialog(
                         )
                     },
 
-                    supportingText = {
-                        Text(
-                            "Format: YYYY-MM-DD"
-                        )
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                showDatePicker = true
+                            }
+                        ) {
+                            Icon(
+                                imageVector =
+                                    Icons.Rounded.CalendarMonth,
+
+                                contentDescription =
+                                    "Choose target date",
+
+                                tint =
+                                    goalAccent()
+                            )
+                        }
                     },
 
-                    singleLine =
-                        true,
-
                     modifier =
-                        Modifier.fillMaxWidth()
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showDatePicker = true
+                            }
                 )
 
-                if (
-                    errorMessage != null
-                ) {
-
+                if (errorMessage != null) {
                     Text(
                         text =
                             errorMessage,
@@ -2178,12 +2017,11 @@ private fun AddGoalDialog(
         },
 
         confirmButton = {
-
             Button(
                 onClick = {
-
                     onConfirm(
                         name,
+
                         targetText
                             .toDoubleOrNull()
                             ?: 0.0,
@@ -2204,7 +2042,6 @@ private fun AddGoalDialog(
                                         ?: 0.0
                                     ) > 0.0
             ) {
-
                 Text(
                     "Create Goal"
                 )
@@ -2212,23 +2049,121 @@ private fun AddGoalDialog(
         },
 
         dismissButton = {
-
             TextButton(
                 onClick =
                     onDismiss
             ) {
-
                 Text(
                     "Cancel"
                 )
             }
         }
     )
+
+    if (showDatePicker) {
+        GoalDatePickerDialog(
+            currentDate =
+                deadline,
+
+            onDismiss = {
+                showDatePicker = false
+            },
+
+            onDateSelected = {
+                    selectedDate ->
+
+                deadline =
+                    selectedDate
+
+                showDatePicker =
+                    false
+            }
+        )
+    }
 }
 
-@OptIn(
-    ExperimentalMaterial3Api::class
-)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GoalDatePickerDialog(
+    currentDate: String,
+    onDismiss: () -> Unit,
+    onDateSelected: (String) -> Unit
+) {
+    val initialDate =
+        runCatching {
+            LocalDate.parse(
+                currentDate
+            )
+        }.getOrDefault(
+            LocalDate.now()
+        )
+
+    val initialMillis =
+        initialDate
+            .atStartOfDay(
+                ZoneId.systemDefault()
+            )
+            .toInstant()
+            .toEpochMilli()
+
+    val datePickerState =
+        rememberDatePickerState(
+            initialSelectedDateMillis =
+                initialMillis
+        )
+
+    DatePickerDialog(
+        onDismissRequest =
+            onDismiss,
+
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val millis =
+                        datePickerState
+                            .selectedDateMillis
+
+                    if (millis != null) {
+                        val selectedDate =
+                            Instant
+                                .ofEpochMilli(millis)
+                                .atZone(
+                                    ZoneId.of("UTC")
+                                )
+                                .toLocalDate()
+                                .toString()
+
+                        onDateSelected(
+                            selectedDate
+                        )
+                    }
+                }
+            ) {
+                Text(
+                    "Select"
+                )
+            }
+        },
+
+        dismissButton = {
+            TextButton(
+                onClick =
+                    onDismiss
+            ) {
+                Text(
+                    "Cancel"
+                )
+            }
+        }
+    ) {
+        DatePicker(
+            state =
+                datePickerState
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GoalTransactionDialog(
     title: String,
@@ -2242,7 +2177,6 @@ private fun GoalTransactionDialog(
         String
     ) -> Unit
 ) {
-
     var amountText by
     remember {
         mutableStateOf("")
@@ -2263,23 +2197,17 @@ private fun GoalTransactionDialog(
             onDismiss,
 
         title = {
-
             Text(
                 title
             )
         },
 
         text = {
-
             Column(
                 verticalArrangement =
-                    Arrangement.spacedBy(
-                        12.dp
-                    )
+                    Arrangement.spacedBy(12.dp)
             ) {
-
                 helperText?.let {
-
                     Text(
                         text =
                             it,
@@ -2296,11 +2224,8 @@ private fun GoalTransactionDialog(
                         amountText,
 
                     onValueChange = {
-
                         amountText =
-                            sanitizeAmountInput(
-                                it
-                            )
+                            sanitizeAmountInput(it)
                     },
 
                     label = {
@@ -2325,10 +2250,7 @@ private fun GoalTransactionDialog(
                         errorMessage != null,
 
                     supportingText =
-                        if (
-                            errorMessage != null
-                        ) {
-
+                        if (errorMessage != null) {
                             {
                                 Text(
                                     text =
@@ -2338,7 +2260,6 @@ private fun GoalTransactionDialog(
                                         GoalRed
                                 )
                             }
-
                         } else {
                             null
                         },
@@ -2372,10 +2293,8 @@ private fun GoalTransactionDialog(
         },
 
         confirmButton = {
-
             Button(
                 onClick = {
-
                     onConfirm(
                         amount,
                         noteText
@@ -2392,7 +2311,6 @@ private fun GoalTransactionDialog(
                                 accentColor
                         )
             ) {
-
                 Text(
                     confirmLabel
                 )
@@ -2400,12 +2318,10 @@ private fun GoalTransactionDialog(
         },
 
         dismissButton = {
-
             TextButton(
                 onClick =
                     onDismiss
             ) {
-
                 Text(
                     "Cancel"
                 )
@@ -2416,19 +2332,15 @@ private fun GoalTransactionDialog(
 
 @Composable
 private fun LoadingGoalCard() {
-
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(
-                    220.dp
-                ),
+                .height(220.dp),
 
         contentAlignment =
             Alignment.Center
     ) {
-
         CircularProgressIndicator(
             color =
                 goalAccent()
@@ -2440,7 +2352,6 @@ private fun LoadingGoalCard() {
 private fun EmptyGoalCard(
     onAddGoal: () -> Unit
 ) {
-
     val colors =
         ClarityTheme.colors
 
@@ -2450,18 +2361,13 @@ private fun EmptyGoalCard(
                 .fillMaxWidth()
                 .background(
                     colors.card,
-                    RoundedCornerShape(
-                        16.dp
-                    )
+                    RoundedCornerShape(16.dp)
                 )
-                .padding(
-                    28.dp
-                ),
+                .padding(28.dp),
 
         horizontalAlignment =
             Alignment.CenterHorizontally
     ) {
-
         Icon(
             imageVector =
                 Icons.Rounded.Savings,
@@ -2473,16 +2379,12 @@ private fun EmptyGoalCard(
                 goalAccent(),
 
             modifier =
-                Modifier.size(
-                    42.dp
-                )
+                Modifier.size(42.dp)
         )
 
         Spacer(
             modifier =
-                Modifier.height(
-                    12.dp
-                )
+                Modifier.height(12.dp)
         )
 
         Text(
@@ -2509,9 +2411,7 @@ private fun EmptyGoalCard(
 
         Spacer(
             modifier =
-                Modifier.height(
-                    16.dp
-                )
+                Modifier.height(16.dp)
         )
 
         Button(
@@ -2525,7 +2425,6 @@ private fun EmptyGoalCard(
                             goalAccent()
                     )
         ) {
-
             Icon(
                 imageVector =
                     Icons.Rounded.Add,
@@ -2536,9 +2435,7 @@ private fun EmptyGoalCard(
 
             Spacer(
                 modifier =
-                    Modifier.size(
-                        6.dp
-                    )
+                    Modifier.size(6.dp)
             )
 
             Text(
@@ -2551,9 +2448,7 @@ private fun EmptyGoalCard(
 @Composable
 private fun goalAccent(): Color =
     if (
-        ClarityTheme
-            .colors
-            .isDark
+        ClarityTheme.colors.isDark
     ) {
         DarkGoalPurple
     } else {
@@ -2563,23 +2458,36 @@ private fun goalAccent(): Color =
 @Composable
 private fun goalSoftBackground(): Color =
     if (
-        ClarityTheme
-            .colors
-            .isDark
+        ClarityTheme.colors.isDark
     ) {
-        Color(
-            0xFF2D2238
-        )
+        Color(0xFF2D2238)
     } else {
-        Color(
-            0xFFF4E9FF
-        )
+        Color(0xFFF4E9FF)
+    }
+
+@Composable
+private fun successSoftBackground(): Color =
+    if (
+        ClarityTheme.colors.isDark
+    ) {
+        Color(0xFF14351F)
+    } else {
+        Color(0xFFE8F7EC)
+    }
+
+@Composable
+private fun errorSoftBackground(): Color =
+    if (
+        ClarityTheme.colors.isDark
+    ) {
+        Color(0xFF3B1D1D)
+    } else {
+        Color(0xFFFFECEB)
     }
 
 private fun sanitizeAmountInput(
     input: String
 ): String {
-
     val filtered =
         input.filter {
             it.isDigit() ||
@@ -2587,18 +2495,13 @@ private fun sanitizeAmountInput(
         }
 
     val firstDot =
-        filtered.indexOf(
-            '.'
-        )
+        filtered.indexOf('.')
 
     return if (
         firstDot == -1
     ) {
-
         filtered
-
     } else {
-
         filtered.substring(
             0,
             firstDot + 1
@@ -2617,12 +2520,10 @@ private fun sanitizeAmountInput(
 private fun formatLkr(
     amount: Double
 ): String {
-
     val formatter =
-        NumberFormat
-            .getNumberInstance(
-                Locale.US
-            )
+        NumberFormat.getNumberInstance(
+            Locale.US
+        )
 
     formatter.maximumFractionDigits =
         0
