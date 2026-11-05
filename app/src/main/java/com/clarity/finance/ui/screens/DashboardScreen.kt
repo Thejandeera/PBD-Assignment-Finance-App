@@ -77,21 +77,15 @@ import com.clarity.finance.ui.theme.ClarityType
 import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.util.ProfileImageManager
 import com.clarity.finance.viewmodel.AuthViewModel
+import com.clarity.finance.viewmodel.DashboardViewModel
 import com.clarity.finance.viewmodel.DraftViewModel
 import com.clarity.finance.viewmodel.ExpenseMonthlyMetrics
 import com.clarity.finance.viewmodel.ExpenseViewModel
-import com.clarity.finance.viewmodel.GoalViewModel
-import com.clarity.finance.viewmodel.IncomeViewModel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/**
- * Home tab.
- * [onSignOutSuccess] is kept for API compatibility;
- * signing out now lives in Settings.
- */
 @Composable
 fun DashboardScreen(
     authViewModel: AuthViewModel,
@@ -100,8 +94,7 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
     expenseViewModel: ExpenseViewModel = hiltViewModel(),
     draftViewModel: DraftViewModel = hiltViewModel(),
-    incomeViewModel: IncomeViewModel = hiltViewModel(),
-    goalViewModel: GoalViewModel = hiltViewModel(),
+    dashboardViewModel: DashboardViewModel = hiltViewModel(),
     onNavigateToExpensesHistory: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
@@ -114,9 +107,6 @@ fun DashboardScreen(
     val currentUser by
     authViewModel.currentUserFlow.collectAsStateWithLifecycle()
 
-    val historyState by
-    expenseViewModel.historyState.collectAsStateWithLifecycle()
-
     val draftCount by
     draftViewModel.pendingDraftCount.collectAsStateWithLifecycle()
 
@@ -126,11 +116,8 @@ fun DashboardScreen(
     val exchangeRate by
     authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
 
-    val incomeState by
-    incomeViewModel.uiState.collectAsStateWithLifecycle()
-
-    val goalState by
-    goalViewModel.uiState.collectAsStateWithLifecycle()
+    val dashboardState by
+    dashboardViewModel.uiState.collectAsStateWithLifecycle()
 
     var showAddExpenseSheet by remember {
         mutableStateOf(false)
@@ -152,14 +139,17 @@ fun DashboardScreen(
             .substringBefore(' ')
             .ifBlank { displayName }
 
-    val greeting = "Hi, $firstName"
+    val greeting =
+        "Hi, $firstName"
 
     val photoPath =
         authViewModel.profilePhotoPath
 
     val avatarBitmap =
         remember(photoPath) {
-            ProfileImageManager.loadBitmap(photoPath)
+            ProfileImageManager.loadBitmap(
+                photoPath
+            )
         }
 
     val scrollState =
@@ -197,13 +187,18 @@ fun DashboardScreen(
                 expenseViewModel.deleteExpense(
                     expense.id
                 )
+                selectedExpense = null
             }
         )
     }
 
     Scaffold(
-        modifier = modifier.fillMaxSize(),
-        containerColor = colors.background,
+        modifier =
+            modifier.fillMaxSize(),
+
+        containerColor =
+            colors.background,
+
         contentWindowInsets =
             WindowInsets(
                 0,
@@ -211,15 +206,19 @@ fun DashboardScreen(
                 0,
                 0
             ),
+
         bottomBar = {
             ClarityBottomBar(
                 currentTab =
                     ClarityNavTab.HOME,
+
                 onAddClick = {
                     showAddExpenseSheet = true
                 },
+
                 onTabSelected = { tab ->
                     when (tab) {
+
                         ClarityNavTab.HOME ->
                             Unit
 
@@ -247,13 +246,13 @@ fun DashboardScreen(
                 )
         ) {
 
-            // Pinned top area.
             Column(
                 modifier =
                     Modifier.background(
                         colors.background
                     )
             ) {
+
                 Spacer(
                     modifier =
                         Modifier.windowInsetsTopHeight(
@@ -262,28 +261,39 @@ fun DashboardScreen(
                 )
 
                 LargeTitleHeader(
-                    title = greeting,
+                    title =
+                        greeting,
+
                     eyebrow =
                         DisplayDates.todayEyebrow(),
+
                     trailing = {
+
                         Box(
                             modifier = Modifier
                                 .size(44.dp)
                                 .pressFade(
                                     onClickLabel =
                                         "Open settings",
+
                                     onClick =
                                         onNavigateToSettings
                                 ),
+
                             contentAlignment =
                                 Alignment.Center
                         ) {
+
                             ProfileAvatar(
                                 bitmap =
                                     avatarBitmap,
+
                                 name =
                                     displayName,
-                                size = 36.dp,
+
+                                size =
+                                    36.dp,
+
                                 contentDescription =
                                     "Profile and settings"
                             )
@@ -293,25 +303,31 @@ fun DashboardScreen(
 
                 BalanceCard(
                     income =
-                        incomeState
-                            .receivedTotalLkr,
+                        dashboardState
+                            .totalIncomeLkr,
+
                     expenses =
-                        historyState
-                            .metrics
-                            .totalExpense,
+                        dashboardState
+                            .totalExpensesLkr,
+
                     currency =
                         currentCurrency,
+
                     exchangeRate =
                         exchangeRate,
+
                     modifier =
                         Modifier.padding(
-                            horizontal = 16.dp
+                            horizontal =
+                                16.dp
                         )
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(12.dp)
+                        Modifier.height(
+                            12.dp
+                        )
                 )
 
                 Hairline(
@@ -328,24 +344,31 @@ fun DashboardScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .verticalScroll(scrollState)
+                    .verticalScroll(
+                        scrollState
+                    )
             ) {
 
                 Spacer(
                     modifier =
-                        Modifier.height(4.dp)
+                        Modifier.height(
+                            4.dp
+                        )
                 )
 
                 AnimatedVisibility(
                     visible =
                         draftCount > 0
                 ) {
+
                     GroupedSection(
                         modifier =
                             Modifier.padding(
-                                bottom = 16.dp
+                                bottom =
+                                    16.dp
                             )
                     ) {
+
                         ListRow(
                             title =
                                 if (draftCount == 1) {
@@ -353,17 +376,23 @@ fun DashboardScreen(
                                 } else {
                                     "$draftCount bank SMS to review"
                                 },
+
                             subtitle =
                                 "Approve drafted transactions as expenses",
+
                             leading = {
                                 IconTile(
                                     icon =
                                         Icons.Rounded.Sms,
+
                                     background =
                                         colors.indigo
                                 )
                             },
-                            showChevron = true,
+
+                            showChevron =
+                                true,
+
                             onClick =
                                 onNavigateToDrafts
                         )
@@ -372,87 +401,124 @@ fun DashboardScreen(
 
                 SavingsGoalCard(
                     goalName =
-                        goalState.goal
+                        dashboardState
+                            .goal
                             ?.name
                             ?: "MacBook Pro M4",
+
                     savedInLkr =
-                        goalState.currentSavings,
+                        dashboardState
+                            .currentSavingsLkr,
+
                     targetInLkr =
-                        goalState.goal
+                        dashboardState
+                            .goal
                             ?.targetAmount
                             ?: 0.0,
+
                     monthlyTargetInLkr =
-                        goalState
-                            .requiredMonthlySaving,
+                        dashboardState
+                            .requiredMonthlySavingLkr,
+
                     deadline =
-                        goalState.goal
+                        dashboardState
+                            .goal
                             ?.deadline
                             .orEmpty(),
+
+                    goalStatus =
+                        dashboardState
+                            .goalStatus,
+
                     currency =
                         currentCurrency,
+
                     exchangeRate =
                         exchangeRate,
+
                     modifier =
                         Modifier.padding(
-                            horizontal = 16.dp
+                            horizontal =
+                                16.dp
                         )
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(16.dp)
+                        Modifier.height(
+                            16.dp
+                        )
                 )
 
                 PendingPaymentsCard(
                     pending =
-                        incomeState
+                        dashboardState
                             .pendingIncomes,
+
                     pendingTotalLkr =
-                        incomeState
+                        dashboardState
                             .pendingTotalLkr,
+
                     currency =
                         currentCurrency,
+
                     exchangeRate =
                         exchangeRate,
+
                     onClick =
                         onNavigateToIncome
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(16.dp)
+                        Modifier.height(
+                            16.dp
+                        )
                 )
 
                 SpendingMixCard(
                     metrics =
-                        historyState.metrics,
+                        dashboardState
+                            .expenseMetrics,
+
                     currency =
                         currentCurrency,
+
                     exchangeRate =
                         exchangeRate,
+
                     modifier =
                         Modifier.padding(
-                            horizontal = 16.dp
+                            horizontal =
+                                16.dp
                         )
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(24.dp)
+                        Modifier.height(
+                            24.dp
+                        )
                 )
 
                 RecentTransactionsSection(
                     expenses =
-                        historyState.expenses,
+                        dashboardState
+                            .expenses,
+
                     currency =
                         currentCurrency,
+
                     exchangeRate =
                         exchangeRate,
+
                     onSeeAllClick =
                         onNavigateToExpensesHistory,
+
                     onExpenseClick = {
                         selectedExpense = it
                     },
+
                     onAddClick = {
                         showAddExpenseSheet = true
                     }
@@ -460,7 +526,9 @@ fun DashboardScreen(
 
                 Spacer(
                     modifier =
-                        Modifier.height(32.dp)
+                        Modifier.height(
+                            32.dp
+                        )
                 )
             }
         }
@@ -479,23 +547,35 @@ private fun BalanceCard(
         ClarityTheme.colors
 
     val available =
-        (income - expenses)
-            .coerceAtLeast(0.0)
+        (
+                income -
+                        expenses
+                )
+            .coerceAtLeast(
+                0.0
+            )
 
     val spentRatio =
         if (income > 0.0) {
-            (expenses / income)
+            (
+                    expenses /
+                            income
+                    )
                 .toFloat()
         } else {
             0f
         }
 
     val spentPercent =
-        (spentRatio * 100)
+        (
+                spentRatio *
+                        100
+                )
             .roundToInt()
 
     val progressColor =
         when {
+
             spentRatio > 1f ->
                 colors.red
 
@@ -507,17 +587,22 @@ private fun BalanceCard(
         }
 
     ClarityCard(
-        modifier = modifier
+        modifier =
+            modifier
     ) {
+
         Column(
             modifier =
                 Modifier.semantics(
-                    mergeDescendants = true
+                    mergeDescendants =
+                        true
                 ) {}
         ) {
+
             Text(
                 text =
                     "Available to Spend",
+
                 style =
                     ClarityType
                         .subheadline
@@ -525,48 +610,65 @@ private fun BalanceCard(
                             fontWeight =
                                 FontWeight.SemiBold
                         ),
+
                 color =
                     colors.secondaryLabel
             )
 
             Spacer(
                 modifier =
-                    Modifier.height(2.dp)
+                    Modifier.height(
+                        2.dp
+                    )
             )
 
             Text(
                 text =
-                    CurrencyFormatter.format(
-                        available,
-                        currency,
-                        exchangeRate
-                    ),
+                    CurrencyFormatter
+                        .format(
+                            available,
+                            currency,
+                            exchangeRate
+                        ),
+
                 style =
                     ClarityType.amountHero,
+
                 color =
                     colors.label,
-                maxLines = 1,
+
+                maxLines =
+                    1,
+
                 overflow =
                     TextOverflow.Ellipsis
             )
 
             if (income > 0.0) {
+
                 Spacer(
                     modifier =
-                        Modifier.height(12.dp)
+                        Modifier.height(
+                            12.dp
+                        )
                 )
 
                 CapsuleProgressBar(
                     progress =
                         spentRatio,
+
                     color =
                         progressColor,
-                    height = 6.dp
+
+                    height =
+                        6.dp
                 )
 
                 Spacer(
                     modifier =
-                        Modifier.height(6.dp)
+                        Modifier.height(
+                            6.dp
+                        )
                 )
 
                 Text(
@@ -576,8 +678,10 @@ private fun BalanceCard(
                         } else {
                             "$spentPercent% of this month's income spent"
                         },
+
                     style =
                         ClarityType.footnote,
+
                     color =
                         colors.secondaryLabel
                 )
@@ -586,14 +690,18 @@ private fun BalanceCard(
 
         Spacer(
             modifier =
-                Modifier.height(14.dp)
+                Modifier.height(
+                    14.dp
+                )
         )
 
         Hairline()
 
         Spacer(
             modifier =
-                Modifier.height(14.dp)
+                Modifier.height(
+                    14.dp
+                )
         )
 
         Row(
@@ -602,46 +710,66 @@ private fun BalanceCard(
                     IntrinsicSize.Min
                 )
         ) {
+
             BalanceStat(
-                label = "Income",
+                label =
+                    "Income",
+
                 amount =
-                    CurrencyFormatter.format(
-                        income,
-                        currency,
-                        exchangeRate
-                    ),
+                    CurrencyFormatter
+                        .format(
+                            income,
+                            currency,
+                            exchangeRate
+                        ),
+
                 icon =
                     Icons.Rounded
                         .ArrowDownward,
+
                 tint =
                     colors.income,
+
                 modifier =
-                    Modifier.weight(1f)
+                    Modifier.weight(
+                        1f
+                    )
             )
 
             VerticalHairline(
                 modifier =
-                    Modifier.fillMaxHeight()
+                    Modifier
+                        .fillMaxHeight()
             )
 
             BalanceStat(
-                label = "Expenses",
+                label =
+                    "Expenses",
+
                 amount =
-                    CurrencyFormatter.format(
-                        expenses,
-                        currency,
-                        exchangeRate
-                    ),
+                    CurrencyFormatter
+                        .format(
+                            expenses,
+                            currency,
+                            exchangeRate
+                        ),
+
                 icon =
                     Icons.Rounded
                         .ArrowUpward,
+
                 tint =
                     colors.outflow,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(
-                        start = 14.dp
-                    )
+
+                modifier =
+                    Modifier
+                        .weight(
+                            1f
+                        )
+                        .padding(
+                            start =
+                                14.dp
+                        )
             )
         }
     }
@@ -661,59 +789,89 @@ private fun BalanceStat(
     Row(
         modifier =
             modifier.semantics(
-                mergeDescendants = true
+                mergeDescendants =
+                    true
             ) {},
+
         verticalAlignment =
             Alignment.CenterVertically
     ) {
 
         Box(
             modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
+                .size(
+                    28.dp
+                )
+                .clip(
+                    CircleShape
+                )
                 .background(
                     tint.copy(
                         alpha =
-                            if (colors.isDark) {
+                            if (
+                                colors.isDark
+                            ) {
                                 0.24f
                             } else {
                                 0.14f
                             }
                     )
                 ),
+
             contentAlignment =
                 Alignment.Center
         ) {
+
             Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = tint,
+                imageVector =
+                    icon,
+
+                contentDescription =
+                    null,
+
+                tint =
+                    tint,
+
                 modifier =
-                    Modifier.size(16.dp)
+                    Modifier.size(
+                        16.dp
+                    )
             )
         }
 
         Spacer(
             modifier =
-                Modifier.width(10.dp)
+                Modifier.width(
+                    10.dp
+                )
         )
 
         Column {
+
             Text(
-                text = label,
+                text =
+                    label,
+
                 style =
                     ClarityType.footnote,
+
                 color =
                     colors.secondaryLabel
             )
 
             Text(
-                text = amount,
+                text =
+                    amount,
+
                 style =
                     ClarityType.amountCallout,
+
                 color =
                     colors.label,
-                maxLines = 1,
+
+                maxLines =
+                    1,
+
                 overflow =
                     TextOverflow.Ellipsis
             )
@@ -728,6 +886,7 @@ private fun SavingsGoalCard(
     targetInLkr: Double,
     monthlyTargetInLkr: Double,
     deadline: String,
+    goalStatus: String,
     currency: String,
     exchangeRate: Double,
     modifier: Modifier = Modifier
@@ -736,8 +895,13 @@ private fun SavingsGoalCard(
         ClarityTheme.colors
 
     val progress =
-        if (targetInLkr > 0.0) {
-            (savedInLkr / targetInLkr)
+        if (
+            targetInLkr > 0.0
+        ) {
+            (
+                    savedInLkr /
+                            targetInLkr
+                    )
                 .toFloat()
                 .coerceIn(
                     0f,
@@ -748,12 +912,20 @@ private fun SavingsGoalCard(
         }
 
     val formattedDeadline =
-        if (deadline.isBlank()) {
+        if (
+            deadline.isBlank()
+        ) {
+
             "your target date"
+
         } else {
+
             runCatching {
+
                 LocalDate
-                    .parse(deadline)
+                    .parse(
+                        deadline
+                    )
                     .format(
                         DateTimeFormatter
                             .ofPattern(
@@ -761,20 +933,24 @@ private fun SavingsGoalCard(
                                 Locale.US
                             )
                     )
+
             }.getOrDefault(
                 deadline
             )
         }
 
     ClarityCard(
-        modifier = modifier
+        modifier =
+            modifier
     ) {
 
         Row(
             modifier =
                 Modifier.semantics(
-                    mergeDescendants = true
+                    mergeDescendants =
+                        true
                 ) {},
+
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
@@ -783,34 +959,46 @@ private fun SavingsGoalCard(
                 icon =
                     Icons.Rounded
                         .LaptopMac,
+
                 background =
                     colors.goal,
-                size = 40.dp
+
+                size =
+                    40.dp
             )
 
             Spacer(
                 modifier =
-                    Modifier.width(12.dp)
+                    Modifier.width(
+                        12.dp
+                    )
             )
 
             Column(
                 modifier =
-                    Modifier.weight(1f)
+                    Modifier.weight(
+                        1f
+                    )
             ) {
+
                 Text(
                     text =
                         goalName,
+
                     style =
                         ClarityType.headline,
+
                     color =
                         colors.label
                 )
 
                 Text(
                     text =
-                        "Primary savings goal",
+                        goalStatus,
+
                     style =
                         ClarityType.subheadline,
+
                     color =
                         colors.secondaryLabel
                 )
@@ -821,10 +1009,13 @@ private fun SavingsGoalCard(
                     String.format(
                         Locale.US,
                         "%.1f%%",
-                        progress * 100
+                        progress *
+                                100
                     ),
+
                 style =
                     ClarityType.headline,
+
                 color =
                     colors.purpleText
             )
@@ -832,20 +1023,27 @@ private fun SavingsGoalCard(
 
         Spacer(
             modifier =
-                Modifier.height(14.dp)
+                Modifier.height(
+                    14.dp
+                )
         )
 
         CapsuleProgressBar(
             progress =
                 progress,
+
             color =
                 colors.goal,
-            height = 8.dp
+
+            height =
+                8.dp
         )
 
         Spacer(
             modifier =
-                Modifier.height(8.dp)
+                Modifier.height(
+                    8.dp
+                )
         )
 
         Row(
@@ -863,12 +1061,17 @@ private fun SavingsGoalCard(
                                 exchangeRate
                             )
                     } saved",
+
                 style =
                     ClarityType.footnote,
+
                 color =
                     colors.secondaryLabel,
+
                 modifier =
-                    Modifier.weight(1f)
+                    Modifier.weight(
+                        1f
+                    )
             )
 
             Text(
@@ -881,8 +1084,10 @@ private fun SavingsGoalCard(
                                 exchangeRate
                             )
                     }",
+
                 style =
                     ClarityType.footnote,
+
                 color =
                     colors.secondaryLabel
             )
@@ -890,11 +1095,14 @@ private fun SavingsGoalCard(
 
         Spacer(
             modifier =
-                Modifier.height(12.dp)
+                Modifier.height(
+                    12.dp
+                )
         )
 
         val infoText =
             when {
+
                 targetInLkr <= 0.0 ->
                     "Set a savings goal to start tracking your progress."
 
@@ -918,19 +1126,17 @@ private fun SavingsGoalCard(
         InfoNote(
             text =
                 infoText,
+
             icon =
                 Icons.Rounded
                     .TrackChanges,
+
             iconTint =
                 colors.goal
         )
     }
 }
 
-/**
- * Outstanding freelance payments (FR-17),
- * linking to the Income tab to follow them up.
- */
 @Composable
 private fun PendingPaymentsCard(
     pending: List<Income>,
@@ -946,15 +1152,23 @@ private fun PendingPaymentsCard(
         pending.size
 
     val subtitle =
-        if (pending.isEmpty()) {
+        if (
+            pending.isEmpty()
+        ) {
+
             "Freelance invoices waiting for payment appear here"
+
         } else {
+
             val names =
                 pending
-                    .take(2)
+                    .take(
+                        2
+                    )
                     .joinToString(
                         " · "
                     ) { income ->
+
                         "${income.title} ${
                             CurrencyFormatter
                                 .formatOriginal(
@@ -964,7 +1178,9 @@ private fun PendingPaymentsCard(
                         }"
                     }
 
-            if (count > 2) {
+            if (
+                count > 2
+            ) {
                 "$names · +${count - 2} more"
             } else {
                 names
@@ -972,9 +1188,13 @@ private fun PendingPaymentsCard(
         }
 
     GroupedSection {
+
         ListRow(
             title =
-                when (count) {
+                when (
+                    count
+                ) {
+
                     0 ->
                         "No Pending Payments"
 
@@ -984,20 +1204,29 @@ private fun PendingPaymentsCard(
                     else ->
                         "$count Pending Payments"
                 },
+
             subtitle =
                 subtitle,
+
             leading = {
+
                 IconTile(
                     icon =
                         Icons.Rounded
                             .Schedule,
+
                     background =
                         colors.teal
                 )
             },
+
             trailing =
-                if (count > 0) {
+                if (
+                    count > 0
+                ) {
+
                     {
+
                         Text(
                             text =
                                 CurrencyFormatter
@@ -1006,19 +1235,30 @@ private fun PendingPaymentsCard(
                                         currency,
                                         exchangeRate
                                     ),
+
                             style =
                                 ClarityType
                                     .amountCallout,
+
                             color =
                                 colors.secondaryLabel,
-                            maxLines = 1
+
+                            maxLines =
+                                1
                         )
                     }
+
                 } else {
+
                     null
                 },
-            showChevron = true,
-            onClick = onClick,
+
+            showChevron =
+                true,
+
+            onClick =
+                onClick,
+
             onClickLabel =
                 "Open income"
         )
@@ -1036,32 +1276,42 @@ private fun SpendingMixCard(
         ClarityTheme.colors
 
     val hasSpending =
-        metrics.totalExpense > 0.0
+        metrics.totalExpense >
+                0.0
 
     ClarityCard(
-        modifier = modifier
+        modifier =
+            modifier
     ) {
 
         Row(
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
+
             Text(
                 text =
                     "Spending Mix",
+
                 style =
                     ClarityType.headline,
+
                 color =
                     colors.label,
+
                 modifier =
-                    Modifier.weight(1f)
+                    Modifier.weight(
+                        1f
+                    )
             )
 
             Text(
                 text =
                     "Target 60 / 40",
+
                 style =
                     ClarityType.footnote,
+
                 color =
                     colors.secondaryLabel
             )
@@ -1069,12 +1319,15 @@ private fun SpendingMixCard(
 
         Spacer(
             modifier =
-                Modifier.height(12.dp)
+                Modifier.height(
+                    12.dp
+                )
         )
 
         StackedBar(
             segments =
                 listOf(
+
                     metrics
                         .committedTotal
                         .toFloat() to
@@ -1089,16 +1342,23 @@ private fun SpendingMixCard(
 
         Spacer(
             modifier =
-                Modifier.height(14.dp)
+                Modifier.height(
+                    14.dp
+                )
         )
 
-        if (hasSpending) {
+        if (
+            hasSpending
+        ) {
+
             LegendRow(
                 label =
                     "Committed",
+
                 percentage =
                     metrics
                         .committedPercentage,
+
                 amount =
                     CurrencyFormatter
                         .format(
@@ -1107,21 +1367,26 @@ private fun SpendingMixCard(
                             currency,
                             exchangeRate
                         ),
+
                 color =
                     colors.committed
             )
 
             Spacer(
                 modifier =
-                    Modifier.height(8.dp)
+                    Modifier.height(
+                        8.dp
+                    )
             )
 
             LegendRow(
                 label =
                     "Discretionary",
+
                 percentage =
                     metrics
                         .discretionaryPercentage,
+
                 amount =
                     CurrencyFormatter
                         .format(
@@ -1130,16 +1395,20 @@ private fun SpendingMixCard(
                             currency,
                             exchangeRate
                         ),
+
                 color =
                     colors.discretionary
             )
 
         } else {
+
             Text(
                 text =
                     "No spending recorded this month yet.",
+
                 style =
                     ClarityType.footnote,
+
                 color =
                     colors.secondaryLabel
             )
@@ -1163,53 +1432,75 @@ internal fun LegendRow(
             modifier
                 .fillMaxWidth()
                 .semantics(
-                    mergeDescendants = true
+                    mergeDescendants =
+                        true
                 ) {},
+
         verticalAlignment =
             Alignment.CenterVertically
     ) {
 
         LegendDot(
-            color = color,
-            size = 10.dp
+            color =
+                color,
+
+            size =
+                10.dp
         )
 
         Spacer(
             modifier =
-                Modifier.width(8.dp)
+                Modifier.width(
+                    8.dp
+                )
         )
 
         Text(
-            text = label,
+            text =
+                label,
+
             style =
                 ClarityType.subheadline,
+
             color =
                 colors.label
         )
 
         Spacer(
             modifier =
-                Modifier.width(6.dp)
+                Modifier.width(
+                    6.dp
+                )
         )
 
         Text(
             text =
                 "$percentage%",
+
             style =
                 ClarityType.subheadline,
+
             color =
                 colors.secondaryLabel,
+
             modifier =
-                Modifier.weight(1f)
+                Modifier.weight(
+                    1f
+                )
         )
 
         Text(
-            text = amount,
+            text =
+                amount,
+
             style =
                 ClarityType.amountCallout,
+
             color =
                 colors.label,
-            maxLines = 1
+
+            maxLines =
+                1
         )
     }
 }
@@ -1226,34 +1517,47 @@ private fun RecentTransactionsSection(
     SectionTitle(
         title =
             "Recent Transactions",
+
         actionLabel =
-            if (expenses.isNotEmpty()) {
+            if (
+                expenses.isNotEmpty()
+            ) {
                 "See All"
             } else {
                 null
             },
+
         onAction =
             onSeeAllClick
     )
 
     Spacer(
         modifier =
-            Modifier.height(4.dp)
+            Modifier.height(
+                4.dp
+            )
     )
 
     GroupedSection {
 
-        if (expenses.isEmpty()) {
+        if (
+            expenses.isEmpty()
+        ) {
 
             EmptyStateView(
                 icon =
-                    Icons.Rounded.Receipt,
+                    Icons.Rounded
+                        .Receipt,
+
                 title =
                     "No Expenses Yet",
+
                 message =
                     "Expenses you log this month will appear here.",
+
                 actionLabel =
                     "Add Expense",
+
                 onAction =
                     onAddClick
             )
@@ -1261,7 +1565,9 @@ private fun RecentTransactionsSection(
         } else {
 
             val recent =
-                expenses.take(4)
+                expenses.take(
+                    4
+                )
 
             recent.forEachIndexed {
                     index,
@@ -1270,13 +1576,17 @@ private fun RecentTransactionsSection(
                 ExpenseRow(
                     expense =
                         expense,
+
                     currency =
                         currency,
+
                     exchangeRate =
                         exchangeRate,
+
                     showDivider =
                         index <
                                 recent.lastIndex,
+
                     onClick = {
                         onExpenseClick(
                             expense
