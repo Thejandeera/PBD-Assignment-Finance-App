@@ -1,9 +1,20 @@
 package com.clarity.finance.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -1074,306 +1085,180 @@ private fun GoalProgressCard(
 @Composable
 private fun MilestoneProgressRing(
     progress: Float,
-    milestones: List<GoalMilestone>,
+    @Suppress("UNUSED_PARAMETER") milestones: List<GoalMilestone>,
     nextMilestone: GoalMilestone?
 ) {
-    val colors =
-        ClarityTheme.colors
+    val colors = ClarityTheme.colors
+    val accent = goalAccent()
+    val isDark = colors.isDark
 
-    val accent =
-        goalAccent()
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+        label = "goalProgressAnimation"
+    )
 
-    Box(
-        modifier =
-            Modifier.fillMaxWidth(),
+    val trackColor = if (isDark) Color(0xFF2C2C2E) else Color(0xFFE5E5EA)
+    val glowColor = accent.copy(alpha = if (isDark) 0.35f else 0.20f)
+    val completeColor = GoalGreen
 
-        contentAlignment =
-            Alignment.Center
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier =
-                Modifier.size(190.dp),
-
-            contentAlignment =
-                Alignment.Center
+            modifier = Modifier
+                .size(200.dp)
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(
-                progress = {
-                    progress
-                },
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokeWidth = 14.dp.toPx()
+                val radius = (size.minDimension - strokeWidth) / 2f
+                val centerOffset = Offset(size.width / 2f, size.height / 2f)
 
-                modifier =
-                    Modifier.size(150.dp),
+                // 1. Smooth background track
+                drawCircle(
+                    color = trackColor,
+                    radius = radius,
+                    center = centerOffset,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
 
-                color =
-                    accent,
+                // 2. Soft outer glow behind the progress arc
+                if (animatedProgress > 0.01f) {
+                    drawArc(
+                        color = glowColor,
+                        startAngle = -90f,
+                        sweepAngle = 360f * animatedProgress,
+                        useCenter = false,
+                        topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                        size = Size(radius * 2, radius * 2),
+                        style = Stroke(width = strokeWidth + 6.dp.toPx(), cap = StrokeCap.Round)
+                    )
 
-                trackColor =
-                    if (colors.isDark) {
-                        Color(0xFF3A3A3C)
+                    // 3. Main gradient progress arc
+                    val ringColors = if (animatedProgress >= 1f) {
+                        listOf(completeColor.copy(alpha = 0.8f), completeColor, Color(0xFF86EFAC))
                     } else {
-                        Color(0xFFE5E5EA)
-                    },
+                        listOf(accent.copy(alpha = 0.8f), accent, Color(0xFFC084FC))
+                    }
+                    val sweepGradient = Brush.sweepGradient(
+                        colors = ringColors,
+                        center = centerOffset
+                    )
 
-                strokeWidth =
-                    12.dp
-            )
-
-            Column(
-                horizontalAlignment =
-                    Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text =
-                        "${(progress * 100).toInt()}%",
-
-                    color =
-                        colors.label,
-
-                    fontWeight =
-                        FontWeight.Bold,
-
-                    style =
-                        MaterialTheme
-                            .typography
-                            .headlineMedium
-                )
-
-                Text(
-                    text =
-                        "completed",
-
-                    color =
-                        colors.secondaryLabel,
-
-                    style =
-                        MaterialTheme
-                            .typography
-                            .bodySmall
-                )
-            }
-
-            // Correct ring mapping:
-            // Start / 100% = TOP
-            // 25% = RIGHT
-            // 50% = BOTTOM
-            // 75% = LEFT
-
-            milestones
-                .firstOrNull {
-                    it.percentage == 100
-                }
-                ?.let { milestone ->
-
-                    MilestoneBubble(
-                        milestone =
-                            milestone,
-
-                        isNext =
-                            nextMilestone
-                                ?.percentage == 100,
-
-                        modifier =
-                            Modifier.align(
-                                Alignment.TopCenter
-                            )
+                    drawArc(
+                        brush = sweepGradient,
+                        startAngle = -90f,
+                        sweepAngle = 360f * animatedProgress,
+                        useCenter = false,
+                        topLeft = Offset(centerOffset.x - radius, centerOffset.y - radius),
+                        size = Size(radius * 2, radius * 2),
+                        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                     )
                 }
 
-            milestones
-                .firstOrNull {
-                    it.percentage == 25
-                }
-                ?.let { milestone ->
+                // 4. Milestone checkpoint markers (25%, 50%, 75%, 100%)
+                listOf(25, 50, 75, 100).forEach { pct ->
+                    val angleDeg = -90f + (360f * (pct / 100f))
+                    val rad = Math.toRadians(angleDeg.toDouble())
+                    val markerX = centerOffset.x + radius * cos(rad).toFloat()
+                    val markerY = centerOffset.y + radius * sin(rad).toFloat()
+                    val isReached = animatedProgress >= (pct / 100f)
 
-                    MilestoneBubble(
-                        milestone =
-                            milestone,
-
-                        isNext =
-                            nextMilestone
-                                ?.percentage == 25,
-
-                        modifier =
-                            Modifier.align(
-                                Alignment.CenterEnd
-                            )
-                    )
-                }
-
-            milestones
-                .firstOrNull {
-                    it.percentage == 50
-                }
-                ?.let { milestone ->
-
-                    MilestoneBubble(
-                        milestone =
-                            milestone,
-
-                        isNext =
-                            nextMilestone
-                                ?.percentage == 50,
-
-                        modifier =
-                            Modifier.align(
-                                Alignment.BottomCenter
-                            )
-                    )
-                }
-
-            milestones
-                .firstOrNull {
-                    it.percentage == 75
-                }
-                ?.let { milestone ->
-
-                    MilestoneBubble(
-                        milestone =
-                            milestone,
-
-                        isNext =
-                            nextMilestone
-                                ?.percentage == 75,
-
-                        modifier =
-                            Modifier.align(
-                                Alignment.CenterStart
-                            )
-                    )
-                }
-        }
-    }
-
-    if (
-        progress < 1f &&
-        nextMilestone != null
-    ) {
-        Spacer(
-            modifier =
-                Modifier.height(6.dp)
-        )
-
-        Text(
-            text =
-                "Next milestone · ${nextMilestone.percentage}% ${nextMilestone.title}",
-
-            modifier =
-                Modifier.fillMaxWidth(),
-
-            color =
-                colors.secondaryLabel,
-
-            textAlign =
-                TextAlign.Center,
-
-            style =
-                MaterialTheme
-                    .typography
-                    .bodySmall
-        )
-    }
-}
-
-@Composable
-private fun MilestoneBubble(
-    milestone: GoalMilestone,
-    isNext: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val colors =
-        ClarityTheme.colors
-
-    val accent =
-        goalAccent()
-
-    val background =
-        when {
-            milestone.isReached ->
-                GoalGreen
-
-            isNext ->
-                accent
-
-            else ->
-                if (colors.isDark) {
-                    Color(0xFF303033)
-                } else {
-                    Color(0xFFF2F2F7)
-                }
-        }
-
-    Box(
-        modifier =
-            modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(background)
-                .then(
-                    if (
-                        isNext &&
-                        !milestone.isReached
-                    ) {
-                        Modifier.border(
-                            width =
-                                2.dp,
-
-                            color =
-                                Color.White
-                                    .copy(
-                                        alpha = 0.35f
-                                    ),
-
-                            shape =
-                                CircleShape
+                    if (isReached) {
+                        // Reached: White dot inside accent/green circle with border
+                        drawCircle(
+                            color = if (pct == 100) completeColor else accent,
+                            radius = 6.dp.toPx(),
+                            center = Offset(markerX, markerY)
+                        )
+                        drawCircle(
+                            color = Color.White,
+                            radius = 2.5.dp.toPx(),
+                            center = Offset(markerX, markerY)
                         )
                     } else {
-                        Modifier
+                        // Unreached: Subtle checkpoint marker on track
+                        drawCircle(
+                            color = if (isDark) Color(0xFF48484A) else Color(0xFFC7C7CC),
+                            radius = 3.5.dp.toPx(),
+                            center = Offset(markerX, markerY)
+                        )
                     }
-                ),
+                }
+            }
 
-        contentAlignment =
-            Alignment.Center
-    ) {
-        if (milestone.isReached) {
-            Icon(
-                imageVector =
-                    Icons.Rounded.Check,
+            // Central animated percentage & status
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "${(animatedProgress * 100).toInt()}%",
+                    color = colors.label,
+                    fontWeight = FontWeight.Black,
+                    style = MaterialTheme.typography.displaySmall
+                )
 
-                contentDescription =
-                    "${milestone.percentage}% achieved",
+                Spacer(modifier = Modifier.height(2.dp))
 
-                tint =
-                    Color.White,
+                if (animatedProgress >= 1f) {
+                    Text(
+                        text = "ACHIEVED",
+                        color = completeColor,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                } else {
+                    Text(
+                        text = "completed",
+                        color = colors.secondaryLabel,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
 
-                modifier =
-                    Modifier.size(18.dp)
-            )
-        } else {
-            Text(
-                text =
-                    milestone.percentage
-                        .toString(),
+        Spacer(modifier = Modifier.height(10.dp))
 
-                color =
-                    if (isNext) {
-                        if (colors.isDark) {
-                            Color.Black
-                        } else {
-                            Color.White
+        // Sleek milestone pills below the ring
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            listOf(25, 50, 75, 100).forEach { pct ->
+                val reached = animatedProgress >= (pct / 100f)
+                val isTargetNext = nextMilestone?.percentage == pct && !reached
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            when {
+                                reached -> completeColor.copy(alpha = 0.15f)
+                                isTargetNext -> accent.copy(alpha = 0.15f)
+                                else -> colors.background
+                            }
+                        )
+                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (reached) "✓ $pct%" else "$pct%",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (reached || isTargetNext) FontWeight.Bold else FontWeight.Medium,
+                        color = when {
+                            reached -> completeColor
+                            isTargetNext -> accent
+                            else -> colors.secondaryLabel
                         }
-                    } else {
-                        colors.secondaryLabel
-                    },
-
-                fontWeight =
-                    FontWeight.Bold,
-
-                style =
-                    MaterialTheme
-                        .typography
-                        .labelSmall
-            )
+                    )
+                }
+            }
         }
     }
 }
