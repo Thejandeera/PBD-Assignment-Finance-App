@@ -5,8 +5,11 @@ import com.clarity.finance.data.remote.FirestorePaths
 import com.clarity.finance.data.remote.asFlow
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
+import com.clarity.finance.model.CUSTOM_INCOME_SOURCE_ICON
 import com.clarity.finance.model.IncomeSource
+import com.clarity.finance.model.IncomeSourceItem
 import com.clarity.finance.model.IncomeStatus
+import com.clarity.finance.model.getDefaultIncomeSources
 import com.clarity.finance.util.DispatcherProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.CollectionReference
@@ -40,6 +43,11 @@ class FirestoreIncomeRepository @Inject constructor(
 
     private fun incomes(): CollectionReference =
         incomesOrNull() ?: throw IllegalStateException("User is not authenticated")
+
+    private fun incomeSourcesOrNull(): CollectionReference? {
+        val uid = auth.currentUser?.uid ?: return null
+        return firestore.collection(FirestorePaths.USERS).document(uid).collection(FirestorePaths.INCOME_SOURCES)
+    }
 
     // Stream errors are rethrown so the view model can show a meaningful error state (FR-18).
 
@@ -93,6 +101,41 @@ class FirestoreIncomeRepository @Inject constructor(
     }
 
     // =========================================================================
+    // Income sources (built-in + user-defined)
+    // =========================================================================
+
+    override fun observeIncomeSources(): Flow<List<IncomeSourceItem>> {
+        val collection = incomeSourcesOrNull() ?: return flowOf(getDefaultIncomeSources())
+        return collection
+            .orderBy("createdAt", Query.Direction.ASCENDING)
+            .asFlow { snapshot ->
+                getDefaultIncomeSources() + snapshot.documents.mapNotNull { it.toIncomeSourceItem() }
+            }
+            .catch { error ->
+                // Custom sources are optional; the built-ins keep income entry working.
+                Log.w(TAG, "Income sources read failed (${error.message}); using built-in sources.")
+                emit(getDefaultIncomeSources())
+            }
+    }
+
+    override suspend fun addCustomIncomeSource(source: IncomeSourceItem): Result<Unit> =
+        withContext(dispatchers.io) {
+            runCatching {
+                val collection = incomeSourcesOrNull() ?: throw IllegalStateException("User is not authenticated")
+                val id = source.id.ifEmpty { collection.document().id }
+                collection.document(id).set(
+                    mapOf(
+                        "name" to source.name,
+                        "icon" to source.icon,
+                        "defaultCurrency" to source.defaultCurrency.name,
+                        "createdAt" to System.currentTimeMillis()
+                    )
+                ).await()
+                Unit
+            }
+        }
+
+    // =========================================================================
     // Mappers
     // =========================================================================
 
@@ -107,7 +150,9 @@ class FirestoreIncomeRepository @Inject constructor(
     }
 
     private fun Income.toMap(): Map<String, Any> = mapOf(
-        "source" to source.name,
+        "source" to sourceId,
+        "sourceName" to sourceName,
+        "sourceIcon" to sourceIcon,
         "amount" to amount,
         "currency" to currency.name,
         "exchangeRate" to exchangeRate,
@@ -122,9 +167,9 @@ class FirestoreIncomeRepository @Inject constructor(
 
     private fun DocumentSnapshot.toIncome(): Income? {
         if (!exists()) return null
-        val source = getString("source")
-            ?.let { runCatching { IncomeSource.valueOf(it) }.getOrNull() }
-            ?: return null
+        val sourceId = getString("source")?.takeIf { it.isNotBlank() } ?: return null
+        // Entries saved before custom sources existed only carry the built-in id.
+        val builtIn = IncomeSource.fromId(sourceId)
         val currency = getString("currency")
             ?.let { runCatching { CurrencyType.valueOf(it) }.getOrNull() }
             ?: CurrencyType.LKR
@@ -136,7 +181,9 @@ class FirestoreIncomeRepository @Inject constructor(
 
         return Income(
             id = id,
-            source = source,
+            sourceId = sourceId,
+            sourceName = getString("sourceName")?.takeIf { it.isNotBlank() } ?: builtIn?.displayName ?: "Other",
+            sourceIcon = getString("sourceIcon")?.takeIf { it.isNotBlank() } ?: builtIn?.icon ?: CUSTOM_INCOME_SOURCE_ICON,
             amount = amount,
             currency = currency,
             exchangeRate = rate,
@@ -147,6 +194,20 @@ class FirestoreIncomeRepository @Inject constructor(
             projectName = getString("projectName").orEmpty(),
             note = getString("note").orEmpty(),
             createdAt = getLong("createdAt") ?: 0L
+        )
+    }
+
+    private fun DocumentSnapshot.toIncomeSourceItem(): IncomeSourceItem? {
+        if (!exists()) return null
+        val name = getString("name")?.takeIf { it.isNotBlank() } ?: return null
+        return IncomeSourceItem(
+            id = id,
+            name = name,
+            icon = getString("icon")?.takeIf { it.isNotBlank() } ?: CUSTOM_INCOME_SOURCE_ICON,
+            defaultCurrency = getString("defaultCurrency")
+                ?.let { runCatching { CurrencyType.valueOf(it) }.getOrNull() }
+                ?: CurrencyType.LKR,
+            isCustom = true
         )
     }
 

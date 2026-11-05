@@ -47,15 +47,22 @@ import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-/** Color that identifies an income source in badges, bars and legends. */
+/**
+ * Color that identifies an income source in badges, bars and legends. Built-in sources have
+ * fixed colors; custom sources get a stable color derived from their id.
+ */
 @Composable
-fun incomeSourceColor(source: IncomeSource): Color {
+fun incomeSourceColor(sourceId: String): Color {
     val colors = ClarityTheme.colors
-    return when (source) {
+    return when (IncomeSource.fromId(sourceId)) {
         IncomeSource.SALARY -> colors.green
         IncomeSource.FREELANCE -> colors.indigo
         IncomeSource.ADSENSE -> colors.teal
         IncomeSource.CRYPTO -> colors.orange
+        null -> {
+            val palette = listOf(colors.pink, colors.blue, colors.purple, colors.yellow)
+            palette[Math.floorMod(sourceId.hashCode(), palette.size)]
+        }
     }
 }
 
@@ -87,7 +94,7 @@ fun IncomeRow(
 ) {
     val colors = ClarityTheme.colors
     val meta = buildList {
-        if (income.projectName.isNotBlank()) add(income.source.displayName)
+        if (income.projectName.isNotBlank()) add(income.sourceName)
         if (income.isPending) {
             add(pendingAgeLabel(income.date))
         } else if (showDate) {
@@ -117,7 +124,7 @@ fun IncomeRow(
     ListRow(
         title = income.title,
         subtitle = note ?: meta,
-        leading = { EmojiBadge(emoji = income.source.icon, tint = incomeSourceColor(income.source)) },
+        leading = { EmojiBadge(emoji = income.sourceIcon, tint = incomeSourceColor(income.sourceId)) },
         trailing = {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
@@ -175,8 +182,8 @@ fun DeleteIncomeAlert(
 }
 
 /**
- * Income detail sheet: original amount, LKR equivalent and the stored rate snapshot. Pending
- * freelance payments get a "Mark as Received" action so they can be closed off when paid.
+ * Income detail sheet: original amount, LKR equivalent and the stored rate snapshot, with Edit
+ * in the navigation row. Pending payments get a "Mark as Received" action for when they're paid.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -185,6 +192,7 @@ fun IncomeDetailSheet(
     currency: String,
     exchangeRate: Double,
     onDismiss: () -> Unit,
+    onEdit: () -> Unit,
     onMarkReceived: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -213,6 +221,13 @@ fun IncomeDetailSheet(
                     .height(48.dp)
                     .padding(horizontal = 8.dp)
             ) {
+                TextLinkButton(
+                    text = "Edit",
+                    onClick = { hideThen(onEdit) },
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 4.dp)
+                )
                 Text(
                     text = "Income",
                     style = ClarityType.headline,
@@ -237,7 +252,7 @@ fun IncomeDetailSheet(
                     .padding(top = 12.dp, bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                EmojiBadge(emoji = income.source.icon, tint = incomeSourceColor(income.source), size = 64.dp)
+                EmojiBadge(emoji = income.sourceIcon, tint = incomeSourceColor(income.sourceId), size = 64.dp)
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = CurrencyFormatter.formatOriginal(income.amount, income.currency.name),
@@ -262,7 +277,7 @@ fun IncomeDetailSheet(
             }
 
             GroupedSection(containerColor = colors.elevatedCard) {
-                DetailRow(label = "Source", value = income.source.displayName, showDivider = true)
+                DetailRow(label = "Source", value = income.sourceName, showDivider = true)
                 DetailRow(
                     label = "Status",
                     value = if (income.isPending) "Pending · ${pendingAgeLabel(income.date)}" else income.status.displayName,

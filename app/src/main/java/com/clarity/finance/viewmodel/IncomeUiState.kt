@@ -3,17 +3,19 @@ package com.clarity.finance.viewmodel
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeSource
+import com.clarity.finance.model.IncomeSourceItem
 import com.clarity.finance.model.IncomeStatus
+import com.clarity.finance.model.toItem
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 
 /**
- * State of the Add Income sheet (wireframe 12.2). Amounts are typed as positive numbers; a
- * crypto loss is expressed with [isLoss] instead of a minus sign.
+ * State of the Add / Edit Income sheet (wireframe 12.2). Amounts are typed as positive
+ * numbers; a crypto loss is expressed with [isLoss] instead of a minus sign.
  */
 data class IncomeFormState(
-    val source: IncomeSource = IncomeSource.SALARY,
+    val source: IncomeSourceItem = IncomeSource.SALARY.toItem(),
     val currency: CurrencyType = IncomeSource.SALARY.defaultCurrency,
     val amountInput: String = "",
     val isLoss: Boolean = false,
@@ -28,8 +30,13 @@ data class IncomeFormState(
     val dateError: String? = null,
     val projectError: String? = null,
     val isSubmitting: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    /** Set while an existing entry is being edited; null when adding a new one. */
+    val editingIncomeId: String? = null,
+    val editingCreatedAt: Long? = null
 ) {
+    val isEditing: Boolean get() = editingIncomeId != null
+
     val isForeignCurrency: Boolean get() = currency != CurrencyType.LKR
 
     /** Signed LKR equivalent of the typed amount, or null until amount (and rate) are valid. */
@@ -43,7 +50,7 @@ data class IncomeFormState(
 
 /** One source's share of a month's received income. */
 data class IncomeSourceTotal(
-    val source: IncomeSource,
+    val source: IncomeSourceItem,
     val amountLkr: Double,
     val entryCount: Int,
     /** Share of the month's positive income; 0 for a source that ended the month negative. */

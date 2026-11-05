@@ -1,6 +1,7 @@
 package com.clarity.finance.data.repository
 
 import com.clarity.finance.model.Income
+import com.clarity.finance.model.IncomeSourceItem
 import kotlinx.coroutines.flow.Flow
 
 interface IncomeRepository {
@@ -13,4 +14,8 @@ interface IncomeRepository {
     suspend fun addIncome(income: Income): Result<Unit>
     suspend fun updateIncome(income: Income): Result<Unit>
     suspend fun deleteIncome(incomeId: String): Result<Unit>
+
+    /** Built-in sources followed by the user's own, oldest first. */
+    fun observeIncomeSources(): Flow<List<IncomeSourceItem>>
+    suspend fun addCustomIncomeSource(source: IncomeSourceItem): Result<Unit>
 }

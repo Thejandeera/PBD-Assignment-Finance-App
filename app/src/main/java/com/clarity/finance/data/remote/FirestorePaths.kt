@@ -7,6 +7,7 @@ package com.clarity.finance.data.remote
 object FirestorePaths {
     const val USERS = "users"
     const val INCOMES = "incomes"
+    const val INCOME_SOURCES = "incomeSources"
     const val EXPENSES = "expenses"
     const val RECURRING = "recurring"
     const val GOALS = "goals"
