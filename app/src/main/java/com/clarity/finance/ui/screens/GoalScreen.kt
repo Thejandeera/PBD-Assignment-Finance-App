@@ -1,6 +1,7 @@
 package com.clarity.finance.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,21 +11,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.LaptopMac
-import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.AlertDialog
@@ -46,9 +47,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,7 +73,7 @@ private val DarkGoalPurple =
     Color(0xFFB388FF)
 
 private val GoalGreen =
-    Color(0xFF34C759)
+    Color(0xFF30D158)
 
 private val GoalRed =
     Color(0xFFFF453A)
@@ -149,6 +152,7 @@ fun GoalScreen(
                         innerPadding
                             .calculateTopPadding() +
                                 12.dp,
+
                     bottom =
                         innerPadding
                             .calculateBottomPadding() +
@@ -238,7 +242,13 @@ fun GoalScreen(
                                 uiState.progress,
 
                             deadline =
-                                goal.deadline
+                                goal.deadline,
+
+                            milestones =
+                                uiState.milestones,
+
+                            nextMilestone =
+                                uiState.nextMilestone
                         )
                     }
 
@@ -284,119 +294,34 @@ fun GoalScreen(
 
                     item {
 
-                        GoalMilestonesSection(
-                            milestones =
-                                uiState.milestones,
+                        GoalActionButtons(
+                            hasSavings =
+                                uiState.currentSavings >
+                                        0.0,
 
-                            nextMilestone =
-                                uiState.nextMilestone,
+                            onSave = {
 
-                            currentSavings =
-                                uiState.currentSavings
+                                viewModel
+                                    .clearActionError()
+
+                                showDepositDialog =
+                                    true
+                            },
+
+                            onWithdraw = {
+
+                                viewModel
+                                    .clearActionError()
+
+                                showWithdrawDialog =
+                                    true
+                            }
                         )
                     }
 
                     item {
 
-                        Row(
-                            modifier =
-                                Modifier.fillMaxWidth(),
-
-                            horizontalArrangement =
-                                Arrangement.spacedBy(
-                                    12.dp
-                                )
-                        ) {
-
-                            Button(
-                                onClick = {
-
-                                    viewModel
-                                        .clearActionError()
-
-                                    showDepositDialog =
-                                        true
-                                },
-
-                                modifier =
-                                    Modifier.weight(
-                                        1f
-                                    ),
-
-                                colors =
-                                    ButtonDefaults
-                                        .buttonColors(
-                                            containerColor =
-                                                goalAccent()
-                                        )
-                            ) {
-
-                                Icon(
-                                    imageVector =
-                                        Icons.Rounded.Add,
-
-                                    contentDescription =
-                                        null
-                                )
-
-                                Spacer(
-                                    modifier =
-                                        Modifier.size(
-                                            6.dp
-                                        )
-                                )
-
-                                Text(
-                                    "Add Savings"
-                                )
-                            }
-
-                            OutlinedButton(
-                                onClick = {
-
-                                    viewModel
-                                        .clearActionError()
-
-                                    showWithdrawDialog =
-                                        true
-                                },
-
-                                enabled =
-                                    uiState.currentSavings >
-                                            0.0,
-
-                                modifier =
-                                    Modifier.weight(
-                                        1f
-                                    )
-                            ) {
-
-                                Icon(
-                                    imageVector =
-                                        Icons.Rounded
-                                            .ArrowUpward,
-
-                                    contentDescription =
-                                        null
-                                )
-
-                                Spacer(
-                                    modifier =
-                                        Modifier.size(
-                                            6.dp
-                                        )
-                                )
-
-                                Text(
-                                    "Withdraw"
-                                )
-                            }
-                        }
-                    }
-
-                    item {
-
-                        TransactionsSection(
+                        SavingsHistoryCard(
                             transactions =
                                 uiState.transactions
                         )
@@ -410,10 +335,10 @@ fun GoalScreen(
 
         GoalTransactionDialog(
             title =
-                "Add Savings",
+                "Save to Goal",
 
             confirmLabel =
-                "Add",
+                "Save",
 
             accentColor =
                 goalAccent(),
@@ -520,9 +445,9 @@ private fun goalSoftBackground(): Color {
     return if (
         ClarityTheme.colors.isDark
     ) {
-        Color(0xFF2C2235)
+        Color(0xFF2D2238)
     } else {
-        Color(0xFFF3E5F5)
+        Color(0xFFF4E9FF)
     }
 }
 
@@ -532,7 +457,7 @@ private fun successSoftBackground(): Color {
     return if (
         ClarityTheme.colors.isDark
     ) {
-        Color(0xFF17331F)
+        Color(0xFF14351F)
     } else {
         Color(0xFFE8F7EC)
     }
@@ -544,7 +469,7 @@ private fun errorSoftBackground(): Color {
     return if (
         ClarityTheme.colors.isDark
     ) {
-        Color(0xFF3A1D1D)
+        Color(0xFF3B1D1D)
     } else {
         Color(0xFFFFECEB)
     }
@@ -568,7 +493,9 @@ private fun GoalProgressCard(
     currentSavings: Double,
     targetAmount: Double,
     progress: Float,
-    deadline: String
+    deadline: String,
+    milestones: List<GoalMilestone>,
+    nextMilestone: GoalMilestone?
 ) {
 
     val colors =
@@ -586,7 +513,7 @@ private fun GoalProgressCard(
 
                 shape =
                     RoundedCornerShape(
-                        16.dp
+                        18.dp
                     )
             )
             .padding(
@@ -602,7 +529,7 @@ private fun GoalProgressCard(
             Box(
                 modifier = Modifier
                     .size(
-                        48.dp
+                        46.dp
                     )
                     .background(
                         color =
@@ -631,7 +558,7 @@ private fun GoalProgressCard(
 
                     modifier =
                         Modifier.size(
-                            28.dp
+                            27.dp
                         )
                 )
             }
@@ -704,84 +631,21 @@ private fun GoalProgressCard(
                 )
         )
 
-        Box(
-            modifier =
-                Modifier.fillMaxWidth(),
+        MilestoneProgressRing(
+            progress =
+                progress,
 
-            contentAlignment =
-                Alignment.Center
-        ) {
+            milestones =
+                milestones,
 
-            CircularProgressIndicator(
-                progress = {
-                    progress
-                },
-
-                modifier =
-                    Modifier.size(
-                        140.dp
-                    ),
-
-                color =
-                    accent,
-
-                trackColor =
-                    if (
-                        colors.isDark
-                    ) {
-                        Color(
-                            0xFF3A3A3C
-                        )
-                    } else {
-                        Color(
-                            0xFFE5E5EA
-                        )
-                    },
-
-                strokeWidth =
-                    12.dp
-            )
-
-            Column(
-                horizontalAlignment =
-                    Alignment.CenterHorizontally
-            ) {
-
-                Text(
-                    text =
-                        "${(progress * 100).toInt()}%",
-
-                    color =
-                        colors.label,
-
-                    fontWeight =
-                        FontWeight.Bold,
-
-                    style =
-                        MaterialTheme
-                            .typography
-                            .headlineMedium
-                )
-
-                Text(
-                    text =
-                        "completed",
-
-                    color =
-                        colors.secondaryLabel,
-
-                    style =
-                        MaterialTheme
-                            .typography
-                            .bodySmall
-                )
-            }
-        }
+            nextMilestone =
+                nextMilestone
+        )
 
         Spacer(
             modifier =
                 Modifier.height(
-                    24.dp
+                    22.dp
                 )
         )
 
@@ -880,7 +744,7 @@ private fun GoalProgressCard(
 
                 modifier =
                     Modifier.size(
-                        20.dp
+                        18.dp
                     )
             )
 
@@ -901,7 +765,450 @@ private fun GoalProgressCard(
                 style =
                     MaterialTheme
                         .typography
-                        .bodyMedium
+                        .bodySmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun MilestoneProgressRing(
+    progress: Float,
+    milestones: List<GoalMilestone>,
+    nextMilestone: GoalMilestone?
+) {
+
+    val colors =
+        ClarityTheme.colors
+
+    val accent =
+        goalAccent()
+
+    Box(
+        modifier =
+            Modifier.fillMaxWidth(),
+
+        contentAlignment =
+            Alignment.Center
+    ) {
+
+        Box(
+            modifier =
+                Modifier.size(
+                    190.dp
+                ),
+
+            contentAlignment =
+                Alignment.Center
+        ) {
+
+            CircularProgressIndicator(
+                progress = {
+                    progress
+                },
+
+                modifier =
+                    Modifier.size(
+                        150.dp
+                    ),
+
+                color =
+                    accent,
+
+                trackColor =
+                    if (
+                        colors.isDark
+                    ) {
+                        Color(
+                            0xFF3A3A3C
+                        )
+                    } else {
+                        Color(
+                            0xFFE5E5EA
+                        )
+                    },
+
+                strokeWidth =
+                    12.dp
+            )
+
+            Column(
+                horizontalAlignment =
+                    Alignment.CenterHorizontally
+            ) {
+
+                Text(
+                    text =
+                        "${(progress * 100).toInt()}%",
+
+                    color =
+                        colors.label,
+
+                    fontWeight =
+                        FontWeight.Bold,
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .headlineMedium
+                )
+
+                Text(
+                    text =
+                        "completed",
+
+                    color =
+                        colors.secondaryLabel,
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
+            }
+
+            milestones
+                .getOrNull(0)
+                ?.let { milestone ->
+
+                    MilestoneBubble(
+                        milestone =
+                            milestone,
+
+                        isNext =
+                            nextMilestone
+                                ?.percentage ==
+                                    milestone.percentage,
+
+                        modifier =
+                            Modifier
+                                .align(
+                                    Alignment.TopCenter
+                                )
+                    )
+                }
+
+            milestones
+                .getOrNull(1)
+                ?.let { milestone ->
+
+                    MilestoneBubble(
+                        milestone =
+                            milestone,
+
+                        isNext =
+                            nextMilestone
+                                ?.percentage ==
+                                    milestone.percentage,
+
+                        modifier =
+                            Modifier
+                                .align(
+                                    Alignment.CenterEnd
+                                )
+                    )
+                }
+
+            milestones
+                .getOrNull(2)
+                ?.let { milestone ->
+
+                    MilestoneBubble(
+                        milestone =
+                            milestone,
+
+                        isNext =
+                            nextMilestone
+                                ?.percentage ==
+                                    milestone.percentage,
+
+                        modifier =
+                            Modifier
+                                .align(
+                                    Alignment.BottomCenter
+                                )
+                    )
+                }
+
+            milestones
+                .getOrNull(3)
+                ?.let { milestone ->
+
+                    MilestoneBubble(
+                        milestone =
+                            milestone,
+
+                        isNext =
+                            nextMilestone
+                                ?.percentage ==
+                                    milestone.percentage,
+
+                        modifier =
+                            Modifier
+                                .align(
+                                    Alignment.CenterStart
+                                )
+                    )
+                }
+        }
+    }
+
+    Spacer(
+        modifier =
+            Modifier.height(
+                6.dp
+            )
+    )
+
+    if (nextMilestone != null) {
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    goalSoftBackground(),
+                    RoundedCornerShape(
+                        12.dp
+                    )
+                )
+                .padding(
+                    horizontal =
+                        12.dp,
+
+                    vertical =
+                        10.dp
+                ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+
+            Icon(
+                imageVector =
+                    Icons.Rounded
+                        .TrackChanges,
+
+                contentDescription =
+                    null,
+
+                tint =
+                    accent,
+
+                modifier =
+                    Modifier.size(
+                        18.dp
+                    )
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.size(
+                        8.dp
+                    )
+            )
+
+            Text(
+                text =
+                    "Next milestone: ${nextMilestone.percentage}% · ${nextMilestone.title}",
+
+                color =
+                    colors.label,
+
+                fontWeight =
+                    FontWeight.Medium,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodySmall
+            )
+        }
+
+    } else {
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    successSoftBackground(),
+                    RoundedCornerShape(
+                        12.dp
+                    )
+                )
+                .padding(
+                    12.dp
+                ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+
+            Icon(
+                imageVector =
+                    Icons.Rounded.Check,
+
+                contentDescription =
+                    null,
+
+                tint =
+                    GoalGreen
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.size(
+                        8.dp
+                    )
+            )
+
+            Text(
+                text =
+                    "All milestones completed!",
+
+                color =
+                    GoalGreen,
+
+                fontWeight =
+                    FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun MilestoneBubble(
+    milestone: GoalMilestone,
+    isNext: Boolean,
+    modifier: Modifier = Modifier
+) {
+
+    val colors =
+        ClarityTheme.colors
+
+    val accent =
+        goalAccent()
+
+    val background =
+        when {
+
+            milestone.isReached ->
+                GoalGreen
+
+            isNext ->
+                accent
+
+            else ->
+                lockedBackground()
+        }
+
+    val foreground =
+        when {
+
+            milestone.isReached ->
+                Color.White
+
+            isNext ->
+                if (
+                    colors.isDark
+                ) {
+                    Color.Black
+                } else {
+                    Color.White
+                }
+
+            else ->
+                colors.secondaryLabel
+        }
+
+    Box(
+        modifier =
+            modifier
+                .size(
+                    38.dp
+                )
+                .clip(
+                    CircleShape
+                )
+                .background(
+                    background
+                )
+                .then(
+                    if (
+                        isNext &&
+                        !milestone.isReached
+                    ) {
+
+                        Modifier.border(
+                            width =
+                                2.dp,
+
+                            color =
+                                if (
+                                    colors.isDark
+                                ) {
+                                    Color.White
+                                        .copy(
+                                            alpha =
+                                                0.35f
+                                        )
+                                } else {
+                                    accent.copy(
+                                        alpha =
+                                            0.25f
+                                    )
+                                },
+
+                            shape =
+                                CircleShape
+                        )
+
+                    } else {
+                        Modifier
+                    }
+                ),
+
+        contentAlignment =
+            Alignment.Center
+    ) {
+
+        if (milestone.isReached) {
+
+            Icon(
+                imageVector =
+                    Icons.Rounded.Check,
+
+                contentDescription =
+                    "${milestone.percentage}% reached",
+
+                tint =
+                    foreground,
+
+                modifier =
+                    Modifier.size(
+                        18.dp
+                    )
+            )
+
+        } else {
+
+            Text(
+                text =
+                    milestone.percentage
+                        .toString(),
+
+                color =
+                    foreground,
+
+                fontWeight =
+                    FontWeight.Bold,
+
+                textAlign =
+                    TextAlign.Center,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .labelSmall
             )
         }
     }
@@ -1008,7 +1315,7 @@ private fun GoalMetricsSection(
 
             GoalMetricCard(
                 title =
-                    "Goal Horizon",
+                    "Projected Finish",
 
                 value =
                     projectedFinishDate
@@ -1023,7 +1330,7 @@ private fun GoalMetricsSection(
 
         Text(
             text =
-                "Goal Horizon estimates when you may reach the goal if your recent average saving rate continues.",
+                "Projected Finish estimates when you may reach the goal if your recent average saving rate continues.",
 
             color =
                 colors.secondaryLabel,
@@ -1115,11 +1422,9 @@ private fun GoalStatusCard(
         when {
 
             progress >= 1f ->
-
                 "Goal completed! You reached your target."
 
             monthlyDepositAverage <= 0.0 ->
-
                 "Start saving to calculate your projected finish date."
 
             monthlyDepositAverage >=
@@ -1128,7 +1433,6 @@ private fun GoalStatusCard(
                 "You're on track. Keep up your current saving rate."
 
             else ->
-
                 "Increase your monthly savings to stay on track."
         }
 
@@ -1184,13 +1488,6 @@ private fun GoalStatusCard(
                     FontWeight.SemiBold
             )
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        2.dp
-                    )
-            )
-
             Text(
                 text =
                     message,
@@ -1208,382 +1505,124 @@ private fun GoalStatusCard(
 }
 
 @Composable
-private fun GoalMilestonesSection(
-    milestones: List<GoalMilestone>,
-    nextMilestone: GoalMilestone?,
-    currentSavings: Double
+private fun GoalActionButtons(
+    hasSavings: Boolean,
+    onSave: () -> Unit,
+    onWithdraw: () -> Unit
 ) {
-
-    val colors =
-        ClarityTheme.colors
 
     val accent =
         goalAccent()
 
-    Column(
-        verticalArrangement =
+    Row(
+        modifier =
+            Modifier.fillMaxWidth(),
+
+        horizontalArrangement =
             Arrangement.spacedBy(
                 12.dp
             )
     ) {
 
-        Text(
-            text =
-                "Milestones",
+        Button(
+            onClick =
+                onSave,
 
-            color =
-                colors.label,
-
-            fontWeight =
-                FontWeight.SemiBold,
-
-            style =
-                MaterialTheme
-                    .typography
-                    .titleMedium
-        )
-
-        if (nextMilestone != null) {
-
-            val amountNeeded =
-                (
-                        nextMilestone.targetAmount -
-                                currentSavings
-                        )
-                    .coerceAtLeast(
-                        0.0
+            modifier =
+                Modifier
+                    .weight(
+                        1f
                     )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color =
-                            goalSoftBackground(),
-
-                        shape =
-                            RoundedCornerShape(
-                                14.dp
-                            )
-                    )
-                    .padding(
-                        14.dp
+                    .height(
+                        52.dp
                     ),
 
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                Icon(
-                    imageVector =
-                        Icons.Rounded.Flag,
-
-                    contentDescription =
-                        null,
-
-                    tint =
-                        accent
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.size(
-                            12.dp
-                        )
-                )
-
-                Column {
-
-                    Text(
-                        text =
-                            "Next: ${nextMilestone.percentage}%",
-
-                        color =
-                            accent,
-
-                        fontWeight =
-                            FontWeight.SemiBold
-                    )
-
-                    Text(
-                        text =
-                            "Save ${
-                                formatLkr(
-                                    amountNeeded
-                                )
-                            } more to unlock ${nextMilestone.title}.",
-
-                        color =
-                            colors.secondaryLabel,
-
-                        style =
-                            MaterialTheme
-                                .typography
-                                .bodySmall
-                    )
-                }
-            }
-
-        } else {
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color =
-                            successSoftBackground(),
-
-                        shape =
-                            RoundedCornerShape(
-                                14.dp
-                            )
-                    )
-                    .padding(
-                        14.dp
-                    ),
-
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                Icon(
-                    imageVector =
-                        Icons.Rounded.Check,
-
-                    contentDescription =
-                        null,
-
-                    tint =
-                        GoalGreen
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.size(
-                            12.dp
-                        )
-                )
-
-                Text(
-                    text =
-                        "All milestones completed!",
-
-                    color =
-                        GoalGreen,
-
-                    fontWeight =
-                        FontWeight.SemiBold
-                )
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    color =
-                        colors.card,
-
-                    shape =
-                        RoundedCornerShape(
-                            16.dp
-                        )
-                )
-        ) {
-
-            milestones
-                .forEachIndexed {
-                        index,
-                        milestone ->
-
-                    MilestoneRow(
-                        milestone =
-                            milestone
-                    )
-
-                    if (
-                        index <
-                        milestones.lastIndex
-                    ) {
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(
-                                    1.dp
-                                )
-                                .background(
-                                    colors.separator
-                                )
-                        )
-                    }
-                }
-        }
-    }
-}
-
-@Composable
-private fun MilestoneRow(
-    milestone: GoalMilestone
-) {
-
-    val colors =
-        ClarityTheme.colors
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                horizontal =
-                    16.dp,
-
-                vertical =
-                    14.dp
-            ),
-
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-
-        Box(
-            modifier = Modifier
-                .size(
-                    42.dp
-                )
-                .background(
-                    color =
-                        if (
-                            milestone.isReached
-                        ) {
-                            successSoftBackground()
-                        } else {
-                            lockedBackground()
-                        },
-
-                    shape =
-                        CircleShape
+            shape =
+                RoundedCornerShape(
+                    16.dp
                 ),
 
-            contentAlignment =
-                Alignment.Center
+            colors =
+                ButtonDefaults
+                    .buttonColors(
+                        containerColor =
+                            accent
+                    )
         ) {
 
             Icon(
                 imageVector =
-                    if (
-                        milestone.isReached
-                    ) {
-                        Icons.Rounded.Check
-                    } else {
-                        Icons.Rounded.Lock
-                    },
+                    Icons.Rounded
+                        .Savings,
 
                 contentDescription =
-                    null,
-
-                tint =
-                    if (
-                        milestone.isReached
-                    ) {
-                        GoalGreen
-                    } else {
-                        colors.secondaryLabel
-                    }
+                    null
             )
-        }
 
-        Spacer(
-            modifier =
-                Modifier.size(
-                    12.dp
-                )
-        )
-
-        Column(
-            modifier =
-                Modifier.weight(
-                    1f
-                )
-        ) {
+            Spacer(
+                modifier =
+                    Modifier.size(
+                        8.dp
+                    )
+            )
 
             Text(
                 text =
-                    "${milestone.percentage}% · ${milestone.title}",
-
-                color =
-                    colors.label,
+                    "Save to Goal",
 
                 fontWeight =
                     FontWeight.SemiBold
             )
-
-            Text(
-                text =
-                    milestone.description,
-
-                color =
-                    colors.secondaryLabel,
-
-                style =
-                    MaterialTheme
-                        .typography
-                        .bodySmall
-            )
         }
 
-        Column(
-            horizontalAlignment =
-                Alignment.End
-        ) {
+        OutlinedButton(
+            onClick =
+                onWithdraw,
 
-            Text(
-                text =
-                    formatLkr(
-                        milestone.targetAmount
+            enabled =
+                hasSavings,
+
+            modifier =
+                Modifier
+                    .weight(
+                        1f
+                    )
+                    .height(
+                        52.dp
                     ),
 
-                color =
-                    colors.label,
+            shape =
+                RoundedCornerShape(
+                    16.dp
+                )
+        ) {
 
-                fontWeight =
-                    FontWeight.Medium,
+            Icon(
+                imageVector =
+                    Icons.Rounded
+                        .ArrowUpward,
 
-                style =
-                    MaterialTheme
-                        .typography
-                        .bodySmall
+                contentDescription =
+                    null
+            )
+
+            Spacer(
+                modifier =
+                    Modifier.size(
+                        7.dp
+                    )
             )
 
             Text(
                 text =
-                    if (
-                        milestone.isReached
-                    ) {
-                        "Reached"
-                    } else {
-                        "Locked"
-                    },
-
-                color =
-                    if (
-                        milestone.isReached
-                    ) {
-                        GoalGreen
-                    } else {
-                        colors.secondaryLabel
-                    },
-
-                style =
-                    MaterialTheme
-                        .typography
-                        .bodySmall
+                    "Withdraw"
             )
         }
     }
 }
 
 @Composable
-private fun TransactionsSection(
+private fun SavingsHistoryCard(
     transactions: List<GoalTransaction>
 ) {
 
@@ -1623,11 +1662,11 @@ private fun TransactionsSection(
                     .background(
                         colors.card,
                         RoundedCornerShape(
-                            14.dp
+                            16.dp
                         )
                     )
                     .padding(
-                        24.dp
+                        28.dp
                     ),
 
                 horizontalAlignment =
@@ -1637,7 +1676,7 @@ private fun TransactionsSection(
                 Box(
                     modifier = Modifier
                         .size(
-                            48.dp
+                            50.dp
                         )
                         .background(
                             goalSoftBackground(),
@@ -1656,7 +1695,12 @@ private fun TransactionsSection(
                             null,
 
                         tint =
-                            goalAccent()
+                            goalAccent(),
+
+                        modifier =
+                            Modifier.size(
+                                25.dp
+                            )
                     )
                 }
 
@@ -1687,10 +1731,13 @@ private fun TransactionsSection(
 
                 Text(
                     text =
-                        "Add your first savings deposit and it will appear here.",
+                        "Save money toward your goal and your history will appear here.",
 
                     color =
                         colors.secondaryLabel,
+
+                    textAlign =
+                        TextAlign.Center,
 
                     style =
                         MaterialTheme
@@ -1701,200 +1748,268 @@ private fun TransactionsSection(
 
         } else {
 
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(
+                        min = 100.dp,
+                        max = 360.dp
+                    )
                     .background(
-                        colors.card,
+                        color =
+                            colors.card,
+
+                        shape =
+                            RoundedCornerShape(
+                                16.dp
+                            )
+                    )
+                    .clip(
                         RoundedCornerShape(
-                            14.dp
+                            16.dp
                         )
+                    ),
+
+                contentPadding =
+                    PaddingValues(
+                        vertical =
+                            4.dp
                     )
             ) {
 
-                transactions
-                    .take(
-                        10
-                    )
-                    .forEachIndexed {
+                itemsIndexed(
+                    items =
+                        transactions,
+
+                    key = {
                             index,
                             transaction ->
 
-                        val isDeposit =
-                            transaction.type ==
-                                    GoalTransactionType
-                                        .DEPOSIT
+                        transaction.id
+                            .ifBlank {
+                                "$index-${transaction.createdAt}"
+                            }
+                    }
+                ) {
+                        index,
+                        transaction ->
 
-                        Row(
+                    SavingsHistoryRow(
+                        transaction =
+                            transaction
+                    )
+
+                    if (
+                        index <
+                        transactions.lastIndex
+                    ) {
+
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(
-                                    horizontal =
-                                        16.dp,
-
-                                    vertical =
-                                        12.dp
-                                ),
-
-                            verticalAlignment =
-                                Alignment.CenterVertically
-                        ) {
-
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(
-                                            36.dp
-                                        )
-                                        .background(
-                                            color =
-                                                if (
-                                                    isDeposit
-                                                ) {
-                                                    successSoftBackground()
-                                                } else {
-                                                    errorSoftBackground()
-                                                },
-
-                                            shape =
-                                                CircleShape
-                                        ),
-
-                                contentAlignment =
-                                    Alignment.Center
-                            ) {
-
-                                Icon(
-                                    imageVector =
-                                        if (
-                                            isDeposit
-                                        ) {
-                                            Icons.Rounded
-                                                .ArrowDownward
-                                        } else {
-                                            Icons.Rounded
-                                                .ArrowUpward
-                                        },
-
-                                    contentDescription =
-                                        null,
-
-                                    tint =
-                                        if (
-                                            isDeposit
-                                        ) {
-                                            GoalGreen
-                                        } else {
-                                            GoalRed
-                                        }
+                                .height(
+                                    1.dp
                                 )
-                            }
-
-                            Spacer(
-                                modifier =
-                                    Modifier.size(
-                                        12.dp
-                                    )
-                            )
-
-                            Column(
-                                modifier =
-                                    Modifier.weight(
-                                        1f
-                                    )
-                            ) {
-
-                                Text(
-                                    text =
-                                        if (
-                                            isDeposit
-                                        ) {
-                                            "Savings deposit"
-                                        } else {
-                                            "Savings withdrawal"
-                                        },
-
-                                    color =
-                                        colors.label,
-
-                                    fontWeight =
-                                        FontWeight.Medium
+                                .background(
+                                    colors.separator
                                 )
-
-                                if (
-                                    transaction
-                                        .note
-                                        .isNotBlank()
-                                ) {
-
-                                    Text(
-                                        text =
-                                            transaction.note,
-
-                                        color =
-                                            colors.secondaryLabel,
-
-                                        style =
-                                            MaterialTheme
-                                                .typography
-                                                .bodySmall
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text =
-                                    if (
-                                        isDeposit
-                                    ) {
-                                        "+${
-                                            formatLkr(
-                                                transaction.amount
-                                            )
-                                        }"
-                                    } else {
-                                        "-${
-                                            formatLkr(
-                                                transaction.amount
-                                            )
-                                        }"
-                                    },
-
-                                color =
-                                    if (
-                                        isDeposit
-                                    ) {
-                                        GoalGreen
-                                    } else {
-                                        GoalRed
-                                    },
-
-                                fontWeight =
-                                    FontWeight.SemiBold
-                            )
-                        }
-
-                        if (
-                            index <
-                            transactions
-                                .take(10)
-                                .lastIndex
-                        ) {
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(
-                                        1.dp
-                                    )
-                                    .background(
-                                        colors.separator
-                                    )
-                            )
-                        }
+                        )
                     }
+                }
+            }
+
+            Spacer(
+                modifier =
+                    Modifier.height(
+                        6.dp
+                    )
+            )
+
+            Text(
+                text =
+                    "Swipe inside the card to view older savings activity.",
+
+                color =
+                    colors.secondaryLabel,
+
+                style =
+                    MaterialTheme
+                        .typography
+                        .bodySmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun SavingsHistoryRow(
+    transaction: GoalTransaction
+) {
+
+    val colors =
+        ClarityTheme.colors
+
+    val isDeposit =
+        transaction.type ==
+                GoalTransactionType.DEPOSIT
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                horizontal =
+                    14.dp,
+
+                vertical =
+                    12.dp
+            ),
+
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+
+        Box(
+            modifier =
+                Modifier
+                    .size(
+                        38.dp
+                    )
+                    .background(
+                        color =
+                            if (
+                                isDeposit
+                            ) {
+                                successSoftBackground()
+                            } else {
+                                errorSoftBackground()
+                            },
+
+                        shape =
+                            CircleShape
+                    ),
+
+            contentAlignment =
+                Alignment.Center
+        ) {
+
+            Icon(
+                imageVector =
+                    if (
+                        isDeposit
+                    ) {
+                        Icons.Rounded
+                            .ArrowDownward
+                    } else {
+                        Icons.Rounded
+                            .ArrowUpward
+                    },
+
+                contentDescription =
+                    null,
+
+                tint =
+                    if (
+                        isDeposit
+                    ) {
+                        GoalGreen
+                    } else {
+                        GoalRed
+                    },
+
+                modifier =
+                    Modifier.size(
+                        20.dp
+                    )
+            )
+        }
+
+        Spacer(
+            modifier =
+                Modifier.size(
+                    12.dp
+                )
+        )
+
+        Column(
+            modifier =
+                Modifier.weight(
+                    1f
+                )
+        ) {
+
+            Text(
+                text =
+                    if (
+                        isDeposit
+                    ) {
+                        "Savings deposit"
+                    } else {
+                        "Savings withdrawal"
+                    },
+
+                color =
+                    colors.label,
+
+                fontWeight =
+                    FontWeight.Medium
+            )
+
+            if (
+                transaction
+                    .note
+                    .isNotBlank()
+            ) {
+
+                Text(
+                    text =
+                        transaction.note,
+
+                    color =
+                        colors.secondaryLabel,
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
             }
         }
+
+        Text(
+            text =
+                if (
+                    isDeposit
+                ) {
+                    "+${
+                        formatLkr(
+                            transaction.amount
+                        )
+                    }"
+                } else {
+                    "-${
+                        formatLkr(
+                            transaction.amount
+                        )
+                    }"
+                },
+
+            color =
+                if (
+                    isDeposit
+                ) {
+                    GoalGreen
+                } else {
+                    GoalRed
+                },
+
+            fontWeight =
+                FontWeight.SemiBold,
+
+            style =
+                MaterialTheme
+                    .typography
+                    .bodyMedium
+        )
     }
 }
 
@@ -1946,7 +2061,7 @@ private fun EmptyGoalCard(
                 )
             )
             .padding(
-                20.dp
+                24.dp
             ),
 
         horizontalAlignment =
@@ -2001,7 +2116,10 @@ private fun EmptyGoalCard(
                     ?: "Your savings goal could not be loaded.",
 
             color =
-                colors.secondaryLabel
+                colors.secondaryLabel,
+
+            textAlign =
+                TextAlign.Center
         )
     }
 }
