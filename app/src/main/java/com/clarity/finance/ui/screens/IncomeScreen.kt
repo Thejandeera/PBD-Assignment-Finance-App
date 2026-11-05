@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -37,7 +38,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.Income
+import com.clarity.finance.model.RecurringIncome
 import com.clarity.finance.ui.components.ActivityIndicator
+import com.clarity.finance.ui.components.AddEditRecurringIncomeSheet
 import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.AddIncomeButton
 import com.clarity.finance.ui.components.AddIncomeSheet
@@ -48,12 +51,14 @@ import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.ui.components.ClaritySnackbarHost
 import com.clarity.finance.ui.components.CollapsingTitleBar
 import com.clarity.finance.ui.components.DeleteIncomeAlert
+import com.clarity.finance.ui.components.DeleteRecurringAlert
 import com.clarity.finance.ui.components.DisplayDates
 import com.clarity.finance.ui.components.EmptyStateView
 import com.clarity.finance.ui.components.GroupedSection
 import com.clarity.finance.ui.components.IconTile
 import com.clarity.finance.ui.components.IncomeDetailSheet
 import com.clarity.finance.ui.components.IncomeRow
+import com.clarity.finance.ui.components.RecurringIncomeRow
 import com.clarity.finance.ui.components.LargeTitleHeader
 import com.clarity.finance.ui.components.LegendDot
 import com.clarity.finance.ui.components.ListRow
@@ -92,6 +97,9 @@ fun IncomeScreen(
 
     var showAddIncomeSheet by remember { mutableStateOf(false) }
     var showAddExpenseSheet by remember { mutableStateOf(false) }
+    var showAddRecurringSheet by remember { mutableStateOf(false) }
+    var editingRecurring by remember { mutableStateOf<RecurringIncome?>(null) }
+    var recurringToDelete by remember { mutableStateOf<RecurringIncome?>(null) }
     var selectedIncome by remember { mutableStateOf<Income?>(null) }
     var incomeToDelete by remember { mutableStateOf<Income?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -111,6 +119,64 @@ fun IncomeScreen(
         AddIncomeSheet(
             viewModel = viewModel,
             onDismiss = { showAddIncomeSheet = false }
+        )
+    }
+
+    if (showAddRecurringSheet || editingRecurring != null) {
+        val sources by viewModel.sources.collectAsStateWithLifecycle()
+        val targetRecurring = editingRecurring
+        AddEditRecurringIncomeSheet(
+            recurring = targetRecurring,
+            sources = sources,
+            onSave = { name, amount, sourceId, sourceName, sourceIcon, dayOfMonth, currency ->
+                if (targetRecurring != null) {
+                    viewModel.updateRecurringIncome(
+                        targetRecurring.copy(
+                            name = name,
+                            amount = amount,
+                            sourceId = sourceId,
+                            sourceName = sourceName,
+                            sourceIcon = sourceIcon,
+                            dayOfMonth = dayOfMonth,
+                            currency = currency
+                        )
+                    )
+                } else {
+                    viewModel.addRecurringIncome(
+                        name = name,
+                        amount = amount,
+                        sourceId = sourceId,
+                        sourceName = sourceName,
+                        sourceIcon = sourceIcon,
+                        dayOfMonth = dayOfMonth,
+                        currency = currency
+                    )
+                }
+                showAddRecurringSheet = false
+                editingRecurring = null
+            },
+            onDelete = if (targetRecurring != null) {
+                {
+                    recurringToDelete = targetRecurring
+                    editingRecurring = null
+                    showAddRecurringSheet = false
+                }
+            } else null,
+            onDismiss = {
+                showAddRecurringSheet = false
+                editingRecurring = null
+            }
+        )
+    }
+
+    recurringToDelete?.let { recurring ->
+        DeleteRecurringAlert(
+            recurring = recurring,
+            onConfirm = {
+                viewModel.deleteRecurringIncome(recurring.id)
+                recurringToDelete = null
+            },
+            onDismiss = { recurringToDelete = null }
         )
     }
 
@@ -220,7 +286,9 @@ fun IncomeScreen(
                             viewModel.resetFormState()
                             showAddIncomeSheet = true
                         },
+                        onAddRecurringClick = { showAddRecurringSheet = true },
                         onIncomeClick = { selectedIncome = it },
+                        onRecurringClick = { editingRecurring = it },
                         onDeleteRequest = { incomeToDelete = it }
                     )
                 }
@@ -240,7 +308,9 @@ private fun IncomeContent(
     currency: String,
     exchangeRate: Double,
     onAddClick: () -> Unit,
+    onAddRecurringClick: () -> Unit,
     onIncomeClick: (Income) -> Unit,
+    onRecurringClick: (RecurringIncome) -> Unit,
     onDeleteRequest: (Income) -> Unit
 ) {
     val colors = ClarityTheme.colors
@@ -252,6 +322,43 @@ private fun IncomeContent(
         exchangeRate = exchangeRate,
         modifier = Modifier.padding(horizontal = 16.dp)
     )
+
+    Spacer(modifier = Modifier.height(24.dp))
+    SectionTitle(
+        title = "Recurring Income",
+        actionLabel = "+ Add",
+        onAction = onAddRecurringClick
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    if (state.recurringIncomes.isEmpty()) {
+        GroupedSection {
+            ListRow(
+                title = "No recurring incomes",
+                subtitle = "Set up monthly salary or regular income to auto-commit each month.",
+                leading = { IconTile(icon = Icons.Rounded.Schedule, background = colors.accent) },
+                onClick = onAddRecurringClick,
+                onClickLabel = "Add recurring income"
+            )
+        }
+    } else {
+        GroupedSection {
+            state.recurringIncomes.forEachIndexed { index, rec ->
+                RecurringIncomeRow(
+                    recurring = rec,
+                    currentMonth = state.currentMonth,
+                    monthTitle = monthTitle,
+                    currency = currency,
+                    exchangeRate = exchangeRate,
+                    showDivider = index < state.recurringIncomes.lastIndex,
+                    onClick = { onRecurringClick(rec) }
+                )
+            }
+        }
+        SectionFooterLabel(
+            text = "Recurring incomes automatically record as received on their scheduled day each month.",
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+    }
 
     // Pending payments are listed from every month so none are forgotten.
     Spacer(modifier = Modifier.height(24.dp))

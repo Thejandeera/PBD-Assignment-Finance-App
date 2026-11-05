@@ -6,6 +6,7 @@ import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeSource
 import com.clarity.finance.model.IncomeStatus
+import com.clarity.finance.model.RecurringIncome
 import com.clarity.finance.model.toItem
 import com.clarity.finance.util.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -379,6 +380,109 @@ class IncomeViewModelTest {
         val form = viewModel.formState.value
         assertEquals("12000", form.amountInput)
         assertTrue(form.isLoss)
+    }
+
+    @Test
+    fun addRecurringIncome_addsAndEmitsInUiState() = runTest {
+        val collectJob = launch(UnconfinedTestDispatcher()) {
+            viewModel.uiState.collect {}
+        }
+
+        viewModel.addRecurringIncome(
+            name = "Salary",
+            amount = 100_000.0,
+            sourceId = IncomeSource.SALARY.name,
+            sourceName = IncomeSource.SALARY.displayName,
+            sourceIcon = IncomeSource.SALARY.icon,
+            dayOfMonth = 7,
+            currency = CurrencyType.LKR
+        )
+
+        val recurringList = viewModel.uiState.value.recurringIncomes
+        assertEquals(1, recurringList.size)
+        val rec = recurringList.first()
+        assertEquals("Salary", rec.name)
+        assertEquals(100_000.0, rec.amount, 0.001)
+        assertEquals(7, rec.dayOfMonth)
+        assertEquals(IncomeSource.SALARY.name, rec.sourceId)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun updateRecurringIncome_updatesExistingEntry() = runTest {
+        val collectJob = launch(UnconfinedTestDispatcher()) {
+            viewModel.uiState.collect {}
+        }
+
+        viewModel.addRecurringIncome(
+            name = "Salary",
+            amount = 100_000.0,
+            sourceId = IncomeSource.SALARY.name,
+            sourceName = IncomeSource.SALARY.displayName,
+            sourceIcon = IncomeSource.SALARY.icon,
+            dayOfMonth = 7,
+            currency = CurrencyType.LKR
+        )
+
+        val initialRec = viewModel.uiState.value.recurringIncomes.first()
+        viewModel.updateRecurringIncome(initialRec.copy(amount = 120_000.0, dayOfMonth = 10))
+
+        val updated = viewModel.uiState.value.recurringIncomes.first()
+        assertEquals(120_000.0, updated.amount, 0.001)
+        assertEquals(10, updated.dayOfMonth)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun deleteRecurringIncome_removesEntry() = runTest {
+        val collectJob = launch(UnconfinedTestDispatcher()) {
+            viewModel.uiState.collect {}
+        }
+
+        viewModel.addRecurringIncome(
+            name = "Salary",
+            amount = 100_000.0,
+            sourceId = IncomeSource.SALARY.name,
+            sourceName = IncomeSource.SALARY.displayName,
+            sourceIcon = IncomeSource.SALARY.icon,
+            dayOfMonth = 7,
+            currency = CurrencyType.LKR
+        )
+
+        val initialRec = viewModel.uiState.value.recurringIncomes.first()
+        viewModel.deleteRecurringIncome(initialRec.id)
+
+        assertTrue(viewModel.uiState.value.recurringIncomes.isEmpty())
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun recurringIncome_whenDayReached_autoCommitsToReceivedIncome() = runTest {
+        val collectJob = launch(UnconfinedTestDispatcher()) {
+            viewModel.uiState.collect {}
+        }
+
+        val today = LocalDate.now().dayOfMonth
+        viewModel.addRecurringIncome(
+            name = "Monthly Salary",
+            amount = 100_000.0,
+            sourceId = IncomeSource.SALARY.name,
+            sourceName = IncomeSource.SALARY.displayName,
+            sourceIcon = IncomeSource.SALARY.icon,
+            dayOfMonth = today, // today is reached
+            currency = CurrencyType.LKR
+        )
+
+        // It should have committed the income into received entries
+        val received = viewModel.uiState.value.receivedIncomes
+        val committedEntry = received.find { it.projectName == "Monthly Salary" || it.sourceName == "Salary" }
+        assertNotNull(committedEntry)
+        assertEquals(100_000.0, committedEntry!!.amountLKR, 0.001)
+
+        collectJob.cancel()
     }
 
     private fun income(
