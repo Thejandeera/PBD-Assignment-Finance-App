@@ -13,8 +13,8 @@ enum class PaymentMethod(val displayName: String) {
 }
 
 /**
- * Kavindu's four income streams. [defaultCurrency] is pre-selected when the source is picked,
- * but the user can still change it (e.g. a freelance client paying in USD).
+ * Kavindu's four built-in income streams. Users can add their own sources on top of these
+ * (see IncomeSourceItem). [defaultCurrency] is pre-selected when the source is picked.
  */
 enum class IncomeSource(
     val displayName: String,
@@ -26,11 +26,9 @@ enum class IncomeSource(
     ADSENSE("AdSense", "📈", CurrencyType.USD),
     CRYPTO("Crypto", "🪙", CurrencyType.USDT);
 
-    /** Only freelance invoices can be outstanding (mirrors firestore.rules). */
-    val canBePending: Boolean get() = this == FREELANCE
-
-    /** Crypto is recorded as a net position, so a month can end in a loss. */
-    val allowsLoss: Boolean get() = this == CRYPTO
+    companion object {
+        fun fromId(id: String): IncomeSource? = entries.firstOrNull { it.name == id }
+    }
 }
 
 /** USDT is pegged to the US dollar, so both convert with the LKR-per-USD rate. */

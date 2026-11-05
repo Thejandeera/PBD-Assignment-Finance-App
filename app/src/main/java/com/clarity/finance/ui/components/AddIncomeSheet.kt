@@ -13,12 +13,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -47,7 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.model.CurrencyType
-import com.clarity.finance.model.IncomeSource
+import com.clarity.finance.model.IncomeSourceItem
 import com.clarity.finance.model.IncomeStatus
 import com.clarity.finance.ui.theme.ClarityShapes
 import com.clarity.finance.ui.theme.ClarityTheme
@@ -59,10 +63,13 @@ import java.util.Locale
 
 private val CurrencyOptions = CurrencyType.entries
 
+private const val SOURCES_PER_ROW = 4
+
 /**
- * Add-income sheet (wireframe 12.2): amount first, then source, currency with an editable
- * LKR rate, and — for freelance work — whether the payment is received or still pending.
- * The common case (salary in LKR, received today) needs only an amount and "Add".
+ * Add-income sheet (wireframe 12.2): amount first, then source (built-in or the user's own,
+ * with "New" to create one), currency with an editable LKR rate, and — for invoiced work —
+ * whether the payment is received or still pending. The common case (salary in LKR, received
+ * today) needs only an amount and "Add".
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +83,9 @@ fun AddIncomeSheet(
     val scope = rememberCoroutineScope()
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val liveRate by viewModel.liveRate.collectAsStateWithLifecycle()
+    val sources by viewModel.sources.collectAsStateWithLifecycle()
     var showDatePicker by remember { mutableStateOf(false) }
+    var showNewSourceDialog by remember { mutableStateOf(false) }
 
     val hideThen: (() -> Unit) -> Unit = { action ->
         scope.launch { sheetState.hide() }.invokeOnCompletion { action() }
@@ -86,7 +95,7 @@ fun AddIncomeSheet(
         hideThen(onDismiss)
     }
     val canSubmit = (formState.amountInput.toDoubleOrNull() ?: 0.0) > 0.0
-    val isFreelance = formState.source == IncomeSource.FREELANCE
+    val canBePending = formState.source.canBePending
     val isPending = formState.status == IncomeStatus.PENDING
 
     ClaritySheet(
@@ -221,17 +230,33 @@ fun AddIncomeSheet(
 
             // Source
             SectionHeaderLabel(text = "Source", modifier = Modifier.padding(horizontal = 16.dp))
-            Row(
+            Column(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                IncomeSource.entries.forEach { source ->
-                    SourceTile(
-                        source = source,
-                        isSelected = formState.source == source,
-                        onClick = { viewModel.onSourceSelected(source) },
-                        modifier = Modifier.weight(1f)
-                    )
+                // A null entry is the trailing "New" tile.
+                (sources + null).chunked(SOURCES_PER_ROW).forEach { rowItems ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        rowItems.forEach { source ->
+                            if (source == null) {
+                                NewSourceTile(
+                                    onClick = {
+                                        dismissKeyboard()
+                                        showNewSourceDialog = true
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            } else {
+                                SourceTile(
+                                    source = source,
+                                    isSelected = formState.source.id == source.id,
+                                    onClick = { viewModel.onSourceSelected(source) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        repeat(SOURCES_PER_ROW - rowItems.size) { Spacer(modifier = Modifier.weight(1f)) }
+                    }
                 }
             }
 
@@ -251,8 +276,8 @@ fun AddIncomeSheet(
                 )
             }
 
-            // Freelance invoices can be logged before the client pays.
-            if (isFreelance) {
+            // Freelance and custom sources can be logged as invoices before the client pays.
+            if (canBePending) {
                 Spacer(modifier = Modifier.height(20.dp))
                 SectionHeaderLabel(text = "Payment", modifier = Modifier.padding(horizontal = 16.dp))
                 SegmentedControl(
@@ -329,7 +354,7 @@ fun AddIncomeSheet(
 
             GroupedSection(containerColor = colors.elevatedCard, footer = formState.dateError) {
                 ListRow(
-                    title = if (isFreelance && isPending) "Invoice Date" else "Date Received",
+                    title = if (canBePending && isPending) "Invoice Date" else "Date Received",
                     trailing = {
                         Text(
                             text = DisplayDates.short(formState.date),
@@ -361,6 +386,14 @@ fun AddIncomeSheet(
         }
     }
 
+    if (showNewSourceDialog) {
+        NewIncomeSourceDialog(
+            validate = viewModel::validateNewSourceName,
+            onCreate = { name, currency -> viewModel.addCustomSource(name, currency) },
+            onDismiss = { showNewSourceDialog = false }
+        )
+    }
+
     if (showDatePicker) {
         PastDatePickerDialog(
             initialDate = formState.date,
@@ -370,10 +403,103 @@ fun AddIncomeSheet(
     }
 }
 
+/**
+ * Creates a custom income source: a name and the currency it usually pays in.
+ * [onCreate] returns a validation message, or null once the source is created.
+ */
+@Composable
+private fun NewIncomeSourceDialog(
+    validate: (String) -> String?,
+    onCreate: (String, CurrencyType) -> String?,
+    onDismiss: () -> Unit
+) {
+    val colors = ClarityTheme.colors
+    var name by remember { mutableStateOf("") }
+    var currency by remember { mutableStateOf(CurrencyType.LKR) }
+    var submitError by remember { mutableStateOf<String?>(null) }
+    // Only flag a problem once something is typed, e.g. a duplicate name.
+    val liveError = if (name.isBlank()) null else validate(name)
+    val error = submitError ?: liveError
+
+    ClarityAlertDialog(
+        title = "New Income Source",
+        message = "Name the source and choose the currency it usually pays in.",
+        onDismissRequest = onDismiss,
+        actions = listOf(
+            AlertAction(label = "Cancel", style = AlertActionStyle.Cancel, onClick = onDismiss),
+            AlertAction(
+                label = "Add",
+                style = AlertActionStyle.Preferred,
+                enabled = name.isNotBlank() && liveError == null,
+                onClick = {
+                    val result = onCreate(name, currency)
+                    if (result == null) onDismiss() else submitError = result
+                }
+            )
+        )
+    ) {
+        ClarityTextField(
+            value = name,
+            onValueChange = {
+                name = it
+                submitError = null
+            },
+            label = "",
+            placeholder = "e.g. Tutoring, Rental",
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Words,
+                imeAction = ImeAction.Done
+            ),
+            isError = error != null,
+            errorMessage = error,
+            containerColor = colors.card
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        SegmentedControl(
+            options = CurrencyOptions.map { it.name },
+            selectedIndex = CurrencyOptions.indexOf(currency),
+            onSelect = { index -> currency = CurrencyOptions[index] }
+        )
+    }
+}
+
+/** Trailing tile that opens [NewIncomeSourceDialog]. */
+@Composable
+private fun NewSourceTile(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = ClarityTheme.colors
+    Column(
+        modifier = modifier
+            .pressScale(onClickLabel = "Create a new income source", onClick = onClick)
+            .heightIn(min = 72.dp)
+            .clip(ClarityShapes.card)
+            .background(colors.accent.copy(alpha = if (colors.isDark) 0.22f else 0.12f))
+            .padding(horizontal = 4.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Add,
+            contentDescription = null,
+            tint = colors.accent,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "New",
+            style = ClarityType.caption1.copy(fontWeight = FontWeight.SemiBold),
+            color = colors.accent,
+            maxLines = 1
+        )
+    }
+}
+
 /** Source tile: emoji over a short name; selection shown by tint, border and weight. */
 @Composable
 private fun SourceTile(
-    source: IncomeSource,
+    source: IncomeSourceItem,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -396,7 +522,7 @@ private fun SourceTile(
         Text(text = source.icon, fontSize = 22.sp)
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = source.displayName,
+            text = source.name,
             style = ClarityType.caption1.copy(fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium),
             color = if (isSelected) colors.accent else colors.label,
             maxLines = 1,

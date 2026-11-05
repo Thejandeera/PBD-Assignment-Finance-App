@@ -6,6 +6,7 @@ import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeSource
 import com.clarity.finance.model.IncomeStatus
+import com.clarity.finance.model.toItem
 import com.clarity.finance.util.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -68,7 +69,8 @@ class IncomeViewModelTest {
         viewModel.submitIncome()
 
         val saved = repository.incomesState.value.single()
-        assertEquals(IncomeSource.SALARY, saved.source)
+        assertEquals(IncomeSource.SALARY.name, saved.sourceId)
+        assertEquals("Salary", saved.sourceName)
         assertEquals(CurrencyType.LKR, saved.currency)
         assertEquals(1.0, saved.exchangeRate, 0.0)
         assertEquals(185000.0, saved.amountLKR, 0.001)
@@ -78,7 +80,7 @@ class IncomeViewModelTest {
 
     @Test
     fun selectingAdSense_defaultsToUsdWithLiveRate() {
-        viewModel.onSourceSelected(IncomeSource.ADSENSE)
+        viewModel.onSourceSelected(IncomeSource.ADSENSE.toItem())
 
         val form = viewModel.formState.value
         assertEquals(CurrencyType.USD, form.currency)
@@ -87,7 +89,7 @@ class IncomeViewModelTest {
 
     @Test
     fun foreignIncome_keepsOriginalAmountAndStoresLkrEquivalent() {
-        viewModel.onSourceSelected(IncomeSource.ADSENSE)
+        viewModel.onSourceSelected(IncomeSource.ADSENSE.toItem())
         viewModel.onAmountChanged("120.50")
         viewModel.onRateChanged("298.75")
         viewModel.submitIncome()
@@ -101,7 +103,7 @@ class IncomeViewModelTest {
 
     @Test
     fun foreignIncomeWithoutRate_showsRateError() {
-        viewModel.onSourceSelected(IncomeSource.ADSENSE)
+        viewModel.onSourceSelected(IncomeSource.ADSENSE.toItem())
         viewModel.onAmountChanged("50")
         viewModel.onRateChanged("")
         viewModel.submitIncome()
@@ -112,22 +114,22 @@ class IncomeViewModelTest {
 
     @Test
     fun pendingStatus_isOnlyAvailableForFreelance() {
-        viewModel.onSourceSelected(IncomeSource.SALARY)
+        viewModel.onSourceSelected(IncomeSource.SALARY.toItem())
         viewModel.onStatusSelected(IncomeStatus.PENDING)
         assertEquals(IncomeStatus.RECEIVED, viewModel.formState.value.status)
 
-        viewModel.onSourceSelected(IncomeSource.FREELANCE)
+        viewModel.onSourceSelected(IncomeSource.FREELANCE.toItem())
         viewModel.onStatusSelected(IncomeStatus.PENDING)
         assertEquals(IncomeStatus.PENDING, viewModel.formState.value.status)
 
         // Switching away from freelance drops the pending status.
-        viewModel.onSourceSelected(IncomeSource.CRYPTO)
+        viewModel.onSourceSelected(IncomeSource.CRYPTO.toItem())
         assertEquals(IncomeStatus.RECEIVED, viewModel.formState.value.status)
     }
 
     @Test
     fun pendingFreelance_requiresClientSoItCanBeFollowedUp() {
-        viewModel.onSourceSelected(IncomeSource.FREELANCE)
+        viewModel.onSourceSelected(IncomeSource.FREELANCE.toItem())
         viewModel.onStatusSelected(IncomeStatus.PENDING)
         viewModel.onAmountChanged("30000")
         viewModel.submitIncome()
@@ -145,7 +147,7 @@ class IncomeViewModelTest {
 
     @Test
     fun cryptoLoss_isStoredAsNegativeAmount() {
-        viewModel.onSourceSelected(IncomeSource.CRYPTO)
+        viewModel.onSourceSelected(IncomeSource.CRYPTO.toItem())
         viewModel.onAmountChanged("40")
         viewModel.onLossSelected(true)
         viewModel.submitIncome()
@@ -157,13 +159,13 @@ class IncomeViewModelTest {
 
     @Test
     fun successfulSubmit_resetsTheForm() {
-        viewModel.onSourceSelected(IncomeSource.FREELANCE)
+        viewModel.onSourceSelected(IncomeSource.FREELANCE.toItem())
         viewModel.onAmountChanged("15000")
         viewModel.submitIncome()
 
         val form = viewModel.formState.value
         assertEquals("", form.amountInput)
-        assertEquals(IncomeSource.SALARY, form.source)
+        assertEquals(IncomeSource.SALARY.name, form.source.id)
         assertNull(form.errorMessage)
     }
 
@@ -189,9 +191,9 @@ class IncomeViewModelTest {
         assertEquals(1, state.pendingIncomes.size)
         assertEquals(30_000.0, state.pendingTotalLkr, 0.001)
 
-        val salary = state.sourceTotals.first { it.source == IncomeSource.SALARY }
-        val freelance = state.sourceTotals.first { it.source == IncomeSource.FREELANCE }
-        val crypto = state.sourceTotals.first { it.source == IncomeSource.CRYPTO }
+        val salary = state.sourceTotals.first { it.source.id == IncomeSource.SALARY.name }
+        val freelance = state.sourceTotals.first { it.source.id == IncomeSource.FREELANCE.name }
+        val crypto = state.sourceTotals.first { it.source.id == IncomeSource.CRYPTO.name }
         assertEquals(75, salary.percentage)
         assertEquals(25, freelance.percentage)
         assertEquals(0, crypto.percentage)
@@ -250,6 +252,66 @@ class IncomeViewModelTest {
         job.cancel()
     }
 
+    // -------------------------------------------------------------------------
+    // Custom income sources
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun customSource_isCreatedSelectedAndUsedForNewIncome() = runTest {
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.sources.collect {} }
+
+        assertNull(viewModel.addCustomSource("  Tutoring ", CurrencyType.USD))
+
+        val created = repository.customSourcesState.value.single()
+        assertEquals("Tutoring", created.name)
+        assertTrue(created.isCustom)
+        assertTrue(viewModel.sources.value.any { it.id == created.id })
+
+        // The new source is selected and applies its usual currency.
+        val form = viewModel.formState.value
+        assertEquals(created.id, form.source.id)
+        assertEquals(CurrencyType.USD, form.currency)
+
+        viewModel.onAmountChanged("100")
+        viewModel.submitIncome()
+
+        val saved = repository.incomesState.value.single()
+        assertEquals(created.id, saved.sourceId)
+        assertEquals("Tutoring", saved.sourceName)
+        assertTrue(saved.isCustomSource)
+
+        job.cancel()
+    }
+
+    @Test
+    fun duplicateOrBlankSourceNames_areRejected() = runTest {
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.sources.collect {} }
+
+        assertNotNull(viewModel.addCustomSource("   ", CurrencyType.LKR))
+        assertNotNull(viewModel.addCustomSource("salary", CurrencyType.LKR))
+        assertNull(viewModel.addCustomSource("Rental", CurrencyType.LKR))
+        assertNotNull(viewModel.addCustomSource("RENTAL ", CurrencyType.LKR))
+
+        assertEquals(listOf("Rental"), repository.customSourcesState.value.map { it.name })
+        job.cancel()
+    }
+
+    @Test
+    fun customSources_canBeLoggedAsPending() = runTest {
+        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.sources.collect {} }
+        viewModel.addCustomSource("Consulting", CurrencyType.LKR)
+
+        viewModel.onStatusSelected(IncomeStatus.PENDING)
+        viewModel.onProjectNameChanged("Acme Ltd")
+        viewModel.onAmountChanged("45000")
+        viewModel.submitIncome()
+
+        val saved = repository.incomesState.value.single()
+        assertEquals(IncomeStatus.PENDING, saved.status)
+        assertEquals("Acme Ltd", saved.projectName)
+        job.cancel()
+    }
+
     private fun income(
         id: String,
         source: IncomeSource,
@@ -259,7 +321,9 @@ class IncomeViewModelTest {
         project: String = ""
     ) = Income(
         id = id,
-        source = source,
+        sourceId = source.name,
+        sourceName = source.displayName,
+        sourceIcon = source.icon,
         amount = amountLkr,
         currency = CurrencyType.LKR,
         exchangeRate = 1.0,

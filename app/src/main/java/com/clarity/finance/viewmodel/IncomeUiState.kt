@@ -3,7 +3,9 @@ package com.clarity.finance.viewmodel
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeSource
+import com.clarity.finance.model.IncomeSourceItem
 import com.clarity.finance.model.IncomeStatus
+import com.clarity.finance.model.toItem
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -13,7 +15,7 @@ import java.time.format.DateTimeFormatter
  * crypto loss is expressed with [isLoss] instead of a minus sign.
  */
 data class IncomeFormState(
-    val source: IncomeSource = IncomeSource.SALARY,
+    val source: IncomeSourceItem = IncomeSource.SALARY.toItem(),
     val currency: CurrencyType = IncomeSource.SALARY.defaultCurrency,
     val amountInput: String = "",
     val isLoss: Boolean = false,
@@ -43,7 +45,7 @@ data class IncomeFormState(
 
 /** One source's share of a month's received income. */
 data class IncomeSourceTotal(
-    val source: IncomeSource,
+    val source: IncomeSourceItem,
     val amountLkr: Double,
     val entryCount: Int,
     /** Share of the month's positive income; 0 for a source that ended the month negative. */
