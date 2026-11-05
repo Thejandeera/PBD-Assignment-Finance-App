@@ -56,9 +56,7 @@ class GoalViewModel @Inject constructor(
             }
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(
-                    stopTimeoutMillis = 5_000
-                ),
+                started = SharingStarted.WhileSubscribed(5000),
                 initialValue = GoalUiState(
                     isLoading = true
                 )
@@ -123,6 +121,7 @@ class GoalViewModel @Inject constructor(
 
         val progress =
             if (targetAmount > 0.0) {
+
                 (
                         currentSavings /
                                 targetAmount
@@ -132,6 +131,7 @@ class GoalViewModel @Inject constructor(
                         0f,
                         1f
                     )
+
             } else {
                 0f
             }
@@ -143,6 +143,7 @@ class GoalViewModel @Inject constructor(
 
         val requiredMonthlySaving =
             when {
+
                 remainingAmount <= 0.0 ->
                     0.0
 
@@ -167,6 +168,17 @@ class GoalViewModel @Inject constructor(
                     monthlyDepositAverage
             )
 
+        val milestones =
+            buildMilestones(
+                targetAmount = targetAmount,
+                currentSavings = currentSavings
+            )
+
+        val nextMilestone =
+            milestones.firstOrNull {
+                !it.isReached
+            }
+
         return GoalUiState(
             isLoading = false,
             goal = goal,
@@ -181,8 +193,65 @@ class GoalViewModel @Inject constructor(
                 monthlyDepositAverage,
             projectedFinishDate =
                 projectedFinishDate,
+            milestones = milestones,
+            nextMilestone = nextMilestone,
             error = null
         )
+    }
+
+    private fun buildMilestones(
+        targetAmount: Double,
+        currentSavings: Double
+    ): List<GoalMilestone> {
+
+        if (targetAmount <= 0.0) {
+            return emptyList()
+        }
+
+        val milestoneDefinitions =
+            listOf(
+                Triple(
+                    25,
+                    "Getting Started",
+                    "A strong start toward your goal."
+                ),
+                Triple(
+                    50,
+                    "Halfway There",
+                    "You're halfway to your target."
+                ),
+                Triple(
+                    75,
+                    "Almost There",
+                    "Only one quarter left to save."
+                ),
+                Triple(
+                    100,
+                    "Goal Reached",
+                    "You reached your savings target."
+                )
+            )
+
+        return milestoneDefinitions.map {
+                definition ->
+
+            val percentage =
+                definition.first
+
+            val amount =
+                targetAmount *
+                        percentage /
+                        100.0
+
+            GoalMilestone(
+                percentage = percentage,
+                title = definition.second,
+                description = definition.third,
+                targetAmount = amount,
+                isReached =
+                    currentSavings >= amount
+            )
+        }
     }
 
     private fun calculateMonthsRemaining(
@@ -191,7 +260,9 @@ class GoalViewModel @Inject constructor(
 
         val deadlineDate =
             runCatching {
-                LocalDate.parse(deadline)
+                LocalDate.parse(
+                    deadline
+                )
             }.getOrNull()
                 ?: return 0L
 
@@ -203,7 +274,10 @@ class GoalViewModel @Inject constructor(
                 deadlineDate
             )
 
-        if (deadlineMonth < currentMonth) {
+        if (
+            deadlineMonth <
+            currentMonth
+        ) {
             return 0L
         }
 
@@ -219,6 +293,7 @@ class GoalViewModel @Inject constructor(
 
         val deposits =
             transactions.filter {
+
                 it.type ==
                         GoalTransactionType.DEPOSIT &&
                         it.amount > 0.0
@@ -229,7 +304,8 @@ class GoalViewModel @Inject constructor(
         }
 
         val depositsByMonth =
-            deposits.groupBy { transaction ->
+            deposits.groupBy {
+                    transaction ->
 
                 val date =
                     Instant
@@ -241,7 +317,9 @@ class GoalViewModel @Inject constructor(
                         )
                         .toLocalDate()
 
-                YearMonth.from(date)
+                YearMonth.from(
+                    date
+                )
             }
 
         if (depositsByMonth.isEmpty()) {
@@ -249,11 +327,14 @@ class GoalViewModel @Inject constructor(
         }
 
         val monthlyTotals =
-            depositsByMonth.values.map { group ->
-                group.sumOf {
-                    it.amount
+            depositsByMonth
+                .values
+                .map { group ->
+
+                    group.sumOf {
+                        it.amount
+                    }
                 }
-            }
 
         return monthlyTotals.average()
     }
@@ -263,11 +344,15 @@ class GoalViewModel @Inject constructor(
         monthlyDepositAverage: Double
     ): LocalDate? {
 
-        if (remainingAmount <= 0.0) {
+        if (
+            remainingAmount <= 0.0
+        ) {
             return LocalDate.now()
         }
 
-        if (monthlyDepositAverage <= 0.0) {
+        if (
+            monthlyDepositAverage <= 0.0
+        ) {
             return null
         }
 
@@ -292,8 +377,10 @@ class GoalViewModel @Inject constructor(
     ) {
 
         if (amount <= 0.0) {
+
             _actionError.value =
                 "Enter an amount greater than 0."
+
             return
         }
 
@@ -315,10 +402,6 @@ class GoalViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Returns true only when the withdrawal
-     * passes client-side validation.
-     */
     fun withdraw(
         amount: Double,
         note: String = ""
@@ -343,7 +426,10 @@ class GoalViewModel @Inject constructor(
             return false
         }
 
-        if (amount > availableSavings) {
+        if (
+            amount >
+            availableSavings
+        ) {
 
             _actionError.value =
                 "You can only withdraw up to ${
@@ -382,25 +468,33 @@ class GoalViewModel @Inject constructor(
     ) {
 
         if (name.isBlank()) {
+
             _actionError.value =
                 "Goal name cannot be empty."
+
             return
         }
 
         if (targetAmount <= 0.0) {
+
             _actionError.value =
                 "Target amount must be greater than 0."
+
             return
         }
 
         val parsedDeadline =
             runCatching {
-                LocalDate.parse(deadline)
+                LocalDate.parse(
+                    deadline
+                )
             }.getOrNull()
 
         if (parsedDeadline == null) {
+
             _actionError.value =
                 "Enter a valid target date."
+
             return
         }
 
@@ -442,16 +536,13 @@ class GoalViewModel @Inject constructor(
 
 data class GoalUiState(
     val isLoading: Boolean = false,
-
     val goal: Goal? = null,
 
     val transactions: List<GoalTransaction> =
         emptyList(),
 
     val currentSavings: Double = 0.0,
-
     val remainingAmount: Double = 0.0,
-
     val progress: Float = 0f,
 
     val monthsRemaining: Long = 0L,
@@ -462,5 +553,18 @@ data class GoalUiState(
 
     val projectedFinishDate: LocalDate? = null,
 
+    val milestones: List<GoalMilestone> =
+        emptyList(),
+
+    val nextMilestone: GoalMilestone? = null,
+
     val error: String? = null
+)
+
+data class GoalMilestone(
+    val percentage: Int,
+    val title: String,
+    val description: String,
+    val targetAmount: Double,
+    val isReached: Boolean
 )
