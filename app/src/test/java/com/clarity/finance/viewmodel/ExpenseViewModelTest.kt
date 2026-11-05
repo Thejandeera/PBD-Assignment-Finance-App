@@ -1,6 +1,12 @@
 package com.clarity.finance.viewmodel
 
+import com.clarity.finance.data.repository.FakeAccountRepository
+import com.clarity.finance.data.repository.FakeExchangeRateProvider
 import com.clarity.finance.data.repository.FakeExpenseRepository
+import com.clarity.finance.data.repository.FakePrimaryAccountProvider
+import com.clarity.finance.model.Account
+import com.clarity.finance.model.AccountType
+import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Expense
 import com.clarity.finance.model.PaymentMethod
 import com.clarity.finance.model.SpendingType
@@ -29,12 +35,21 @@ class ExpenseViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var fakeRepository: FakeExpenseRepository
+    private lateinit var fakeAccountRepository: FakeAccountRepository
+    private lateinit var fakePrimaryProvider: FakePrimaryAccountProvider
     private lateinit var viewModel: ExpenseViewModel
 
     @Before
     fun setUp() {
         fakeRepository = FakeExpenseRepository()
-        viewModel = ExpenseViewModel(fakeRepository)
+        fakeAccountRepository = FakeAccountRepository()
+        fakePrimaryProvider = FakePrimaryAccountProvider()
+        viewModel = ExpenseViewModel(
+            fakeRepository,
+            fakeAccountRepository,
+            FakeExchangeRateProvider(rate = 300.0),
+            fakePrimaryProvider
+        )
     }
 
     @Test
@@ -229,5 +244,59 @@ class ExpenseViewModelTest {
         assertTrue(fakeRepository.expensesState.value.isEmpty())
 
         job.cancel()
+    }
+
+    @Test
+    fun expenseAddAndDelete_tracksAndRefundsAccountBalance() = runTest {
+        val bank = Account(
+            id = "acc_bank",
+            name = "Commercial Bank",
+            type = AccountType.BANK,
+            currency = CurrencyType.LKR,
+            currentBalance = 100_000.0
+        )
+        fakeAccountRepository.setAccounts(listOf(bank))
+
+        viewModel.onAccountSelected(bank)
+        viewModel.onAmountChanged("2500")
+        viewModel.submitExpense()
+
+        val savedExpense = fakeRepository.expensesState.value.single()
+        assertEquals("acc_bank", savedExpense.accountId)
+        assertEquals("Commercial Bank", savedExpense.accountName)
+        assertEquals(97_500.0, fakeAccountRepository.accountsState.value.single().currentBalance, 0.01)
+
+        viewModel.deleteExpense(savedExpense)
+        assertTrue(fakeRepository.expensesState.value.isEmpty())
+        assertEquals(100_000.0, fakeAccountRepository.accountsState.value.single().currentBalance, 0.01)
+    }
+
+    @Test
+    fun usdExpense_convertsToLkrUsingConfiguredRateBeforeSaving() = runTest {
+        val bank = Account(
+            id = "acc_bank",
+            name = "Commercial Bank",
+            type = AccountType.BANK,
+            currency = CurrencyType.LKR,
+            currentBalance = 100_000.0
+        )
+        fakeAccountRepository.setAccounts(listOf(bank))
+
+        viewModel.onAccountSelected(bank)
+        viewModel.onInputCurrencySelected(CurrencyType.USD)
+        viewModel.onAmountChanged("10")
+        viewModel.submitExpense()
+
+        // FakeExchangeRateProvider is 300.0 -> 10 USD saved as 3000 LKR
+        val saved = fakeRepository.expensesState.value.single()
+        assertEquals(3000.0, saved.amount, 0.01)
+        assertEquals(97_000.0, fakeAccountRepository.accountsState.value.single().currentBalance, 0.01)
+    }
+
+    @Test
+    fun defaultCurrencyUsd_startsExpenseFormInUsd() {
+        fakePrimaryProvider.setDefaultCurrency("USD")
+        viewModel.resetFormState()
+        assertEquals(CurrencyType.USD, viewModel.formState.value.inputCurrency)
     }
 }

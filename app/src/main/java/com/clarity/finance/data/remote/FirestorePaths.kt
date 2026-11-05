@@ -14,6 +14,7 @@ object FirestorePaths {
     const val SAVINGS = "savings"
     const val CATEGORIES = "categories"
     const val DRAFTS = "drafts"
+    const val ACCOUNTS = "accounts"
 
     const val PRIMARY_GOAL_ID = "primary_goal"
 }

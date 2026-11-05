@@ -124,7 +124,7 @@ fun ClarityTextField(
                         .background(fieldColor)
                         .then(
                             if (isError) Modifier.border(1.dp, colors.redText, ClarityShapes.control)
-                            else Modifier
+                            else Modifier.border(1.dp, colors.cardBorder, ClarityShapes.control)
                         )
                         .padding(start = 14.dp, end = if (hasTrailing) 4.dp else 14.dp),
                     verticalAlignment = Alignment.CenterVertically

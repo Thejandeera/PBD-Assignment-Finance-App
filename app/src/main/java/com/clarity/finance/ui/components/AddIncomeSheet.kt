@@ -50,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clarity.finance.model.AccountBalanceCalculator
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.IncomeSourceItem
 import com.clarity.finance.model.IncomeStatus
@@ -84,6 +85,16 @@ fun AddIncomeSheet(
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val liveRate by viewModel.liveRate.collectAsStateWithLifecycle()
     val sources by viewModel.sources.collectAsStateWithLifecycle()
+    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val primaryAccountId by viewModel.primaryAccountId.collectAsStateWithLifecycle()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        viewModel.syncDefaultCurrency()
+    }
+    val resolvedSelectedAccount = formState.selectedAccount
+        ?: if (!formState.hasPickedAccount && !formState.isEditing) {
+            AccountBalanceCalculator.resolveDefaultAccount(accounts, primaryAccountId)
+        } else null
     var showDatePicker by remember { mutableStateOf(false) }
     var showNewSourceDialog by remember { mutableStateOf(false) }
 
@@ -351,6 +362,16 @@ fun AddIncomeSheet(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            AccountPickerSection(
+                accounts = accounts,
+                selectedAccount = resolvedSelectedAccount,
+                primaryAccountId = primaryAccountId,
+                onSelectAccount = { viewModel.onAccountSelected(it) },
+                title = "Deposit To Account"
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 

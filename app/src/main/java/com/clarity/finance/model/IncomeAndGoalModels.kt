@@ -62,6 +62,8 @@ data class Income(
     val month: String = "",
     val projectName: String = "",
     val note: String = "",
+    val accountId: String? = null,
+    val accountName: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 ) {
     val isPending: Boolean get() = status == IncomeStatus.PENDING
@@ -89,6 +91,8 @@ data class RecurringIncome(
     val currency: CurrencyType = CurrencyType.LKR,
     val dayOfMonth: Int = 1,
     val lastCommittedMonth: String = "",
+    val accountId: String? = null,
+    val accountName: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 

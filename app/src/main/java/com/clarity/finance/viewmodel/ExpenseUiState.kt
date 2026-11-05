@@ -1,6 +1,8 @@
 package com.clarity.finance.viewmodel
 
+import com.clarity.finance.model.Account
 import com.clarity.finance.model.CategoryItem
+import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Expense
 import com.clarity.finance.model.PaymentMethod
 import com.clarity.finance.model.SpendingType
@@ -12,13 +14,16 @@ import java.time.format.DateTimeFormatter
  */
 data class ExpenseFormState(
     val amountInput: String = "",
+    val inputCurrency: CurrencyType = CurrencyType.LKR,
     val selectedCategory: CategoryItem? = null,
     val spendingType: SpendingType = SpendingType.DISCRETIONARY,
     val paymentMethod: PaymentMethod = PaymentMethod.CARD,
+    val selectedAccount: Account? = null,
+    val hasPickedAccount: Boolean = false,
     val date: String = LocalDate.now().toString(), // YYYY-MM-DD
     val formattedDateDisplay: String = "Today, ${LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy"))}",
     val note: String = "",
-    val isQuickMode: Boolean = false,
+    val isQuickMode: Boolean = true,
     val amountError: String? = null,
     val dateError: String? = null,
     val isSubmitting: Boolean = false,

@@ -3,6 +3,7 @@ package com.clarity.finance.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clarity.finance.data.repository.ExpenseRepository
+import com.clarity.finance.model.AccountSpending
 import com.clarity.finance.model.CategorySpending
 import com.clarity.finance.model.InsightsUiState
 import com.clarity.finance.model.PaymentChannelSpending
@@ -77,6 +78,22 @@ class InsightsViewModel @Inject constructor(
                     )
                 }.filter { it.amount > 0 }
 
+                // 2b. Group by account (for expenses linked to an account)
+                val accountBreakdown = expenses
+                    .filter { !it.accountName.isNullOrBlank() }
+                    .groupBy { it.accountId to it.accountName!! }
+                    .map { (key, group) ->
+                        val accAmount = group.sumOf { it.amount }
+                        val accPct = if (total > 0) ((accAmount / total) * 100).roundToInt() else 0
+                        AccountSpending(
+                            accountId = key.first,
+                            accountName = key.second,
+                            amount = accAmount,
+                            percentageOfTotal = accPct
+                        )
+                    }
+                    .sortedByDescending { it.amount }
+
                 // 3. Velocity and Month-End Projection
                 val daysElapsed = if (isCurrentMonth) LocalDate.now().dayOfMonth.coerceAtLeast(1) else yearMonth.lengthOfMonth()
                 val totalDays = yearMonth.lengthOfMonth()
@@ -120,6 +137,7 @@ class InsightsViewModel @Inject constructor(
                     discretionaryPercentage = discretionaryPct,
                     topCategories = categories,
                     channelBreakdown = channels,
+                    accountBreakdown = accountBreakdown,
                     velocity = velocity,
                     spendingLeak = leakAlert,
                     errorMessage = null

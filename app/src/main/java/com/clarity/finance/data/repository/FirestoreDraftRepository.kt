@@ -11,7 +11,6 @@ import com.clarity.finance.util.DispatcherProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOf
@@ -41,13 +40,14 @@ class FirestoreDraftRepository @Inject constructor(
 
     override fun observePendingDrafts(): Flow<List<DraftTransaction>> {
         val uid = currentUserId ?: return flowOf(emptyList())
-        val query = firestore.collection(FirestorePaths.USERS).document(uid)
+        val collection = firestore.collection(FirestorePaths.USERS).document(uid)
             .collection(FirestorePaths.DRAFTS)
-            .whereEqualTo("status", DraftStatus.PENDING.name)
-            .orderBy("createdAt", Query.Direction.DESCENDING)
 
-        return query.asFlow { snapshot ->
-            snapshot.documents.mapNotNull { it.toDraftTransaction() }
+        return collection.asFlow { snapshot ->
+            snapshot.documents
+                .mapNotNull { it.toDraftTransaction() }
+                .filter { it.status == DraftStatus.PENDING }
+                .sortedByDescending { it.createdAt }
         }.catch { emit(emptyList()) }
     }
 

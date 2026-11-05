@@ -1,9 +1,12 @@
 package com.clarity.finance.di
 
+import com.clarity.finance.data.local.PrimaryAccountProvider
+import com.clarity.finance.data.local.UserPreferencesRepository
+import com.clarity.finance.data.repository.AccountRepository
 import com.clarity.finance.data.repository.DraftRepository
 import com.clarity.finance.data.repository.ExchangeRateProvider
-import com.clarity.finance.data.repository.ExchangeRateRepository
 import com.clarity.finance.data.repository.ExpenseRepository
+import com.clarity.finance.data.repository.FirestoreAccountRepository
 import com.clarity.finance.data.repository.FirestoreDraftRepository
 import com.clarity.finance.data.repository.FirestoreExpenseRepository
 import com.clarity.finance.data.repository.FirestoreGoalRepository
@@ -19,6 +22,18 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindAccountRepository(
+        impl: FirestoreAccountRepository
+    ): AccountRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPrimaryAccountProvider(
+        impl: UserPreferencesRepository
+    ): PrimaryAccountProvider
 
     @Binds
     @Singleton
@@ -43,5 +58,6 @@ abstract class RepositoryModule {
     abstract fun bindIncomeRepository(impl: FirestoreIncomeRepository): IncomeRepository
 
     @Binds
-    abstract fun bindExchangeRateProvider(impl: ExchangeRateRepository): ExchangeRateProvider
+    @Singleton
+    abstract fun bindExchangeRateProvider(impl: UserPreferencesRepository): ExchangeRateProvider
 }

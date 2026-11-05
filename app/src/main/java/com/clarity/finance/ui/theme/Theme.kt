@@ -24,21 +24,21 @@ object ClarityTheme {
         get() = LocalClarityColors.current
 }
 
-/** Continuous-looking corner radii used throughout (iOS inset-grouped cards use ~10–12pt). */
+/** Modern minimal corner radii used across cards, controls, sheets and alerts. */
 object ClarityShapes {
-    val card = RoundedCornerShape(12.dp)
-    val control = RoundedCornerShape(10.dp)
-    val button = RoundedCornerShape(12.dp)
-    val sheet = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-    val alert = RoundedCornerShape(14.dp)
+    val card = RoundedCornerShape(16.dp)
+    val control = RoundedCornerShape(12.dp)
+    val button = RoundedCornerShape(14.dp)
+    val sheet = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
+    val alert = RoundedCornerShape(18.dp)
 }
 
 private val ClarityMaterialShapes = Shapes(
     extraSmall = RoundedCornerShape(10.dp),
     small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(14.dp),
-    large = RoundedCornerShape(16.dp),
-    extraLarge = RoundedCornerShape(20.dp)
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(24.dp)
 )
 
 private fun ClarityColors.toMaterialColorScheme(): ColorScheme {

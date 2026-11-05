@@ -1,6 +1,7 @@
 package com.clarity.finance.data.repository
 
 import com.clarity.finance.data.remote.FirestorePaths
+import com.clarity.finance.model.Account
 import com.clarity.finance.model.AuthUser
 import com.clarity.finance.model.Goal
 import com.clarity.finance.model.UserProfile
@@ -38,7 +39,13 @@ class FirebaseAuthRepository @Inject constructor(
     override val currentUser: AuthUser?
         get() = auth.currentUser?.toAuthUser()
 
-    override suspend fun signUp(name: String, email: String, password: String, photoPath: String?): Result<AuthUser> =
+    override suspend fun signUp(
+        name: String,
+        email: String,
+        password: String,
+        photoPath: String?,
+        initialAccounts: List<Account>
+    ): Result<AuthUser> =
         runCatching {
             val user = auth.createUserWithEmailAndPassword(email, password).await().user
                 ?: error("Sign-up returned no user")
@@ -50,7 +57,7 @@ class FirebaseAuthRepository @Inject constructor(
                 userPreferencesRepository.profilePhotoPath = photoPath
             }
 
-            createProfileIfMissing(user, name, photoPath)
+            createProfileIfMissing(user, name, photoPath, initialAccounts)
             user.toAuthUser().copy(displayName = name, photoPath = photoPath)
         }
 
@@ -88,7 +95,12 @@ class FirebaseAuthRepository @Inject constructor(
      * account never ends up with a profile but no goal (or the other way round).
      * Skips the write if the profile already exists.
      */
-    private suspend fun createProfileIfMissing(user: FirebaseUser, name: String, photoPath: String? = null) {
+    private suspend fun createProfileIfMissing(
+        user: FirebaseUser,
+        name: String,
+        photoPath: String? = null,
+        initialAccounts: List<Account> = emptyList()
+    ) {
         val userDoc = firestore.collection(FirestorePaths.USERS).document(user.uid)
         if (userDoc.get().await().exists()) return
 
@@ -102,7 +114,25 @@ class FirebaseAuthRepository @Inject constructor(
             "createdAt" to FieldValue.serverTimestamp()
         )
 
-        userDoc.set(profileData).await()
+        val batch = firestore.batch()
+        batch.set(userDoc, profileData)
+        val accountsCol = userDoc.collection(FirestorePaths.ACCOUNTS)
+        val now = System.currentTimeMillis()
+        initialAccounts.forEach { account ->
+            val docRef = if (account.id.isNotBlank()) accountsCol.document(account.id) else accountsCol.document()
+            batch.set(
+                docRef,
+                mapOf(
+                    "name" to account.name.trim(),
+                    "type" to account.type.name,
+                    "currency" to account.currency.name,
+                    "currentBalance" to account.currentBalance,
+                    "createdAt" to now,
+                    "updatedAt" to now
+                )
+            )
+        }
+        batch.commit().await()
     }
 
     private fun FirebaseUser.toAuthUser() = AuthUser(

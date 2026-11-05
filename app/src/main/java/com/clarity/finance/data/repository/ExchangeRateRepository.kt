@@ -1,6 +1,8 @@
 package com.clarity.finance.data.repository
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
@@ -10,6 +12,7 @@ import javax.inject.Singleton
 /** Source of the LKR-per-USD rate, so view models can be tested without the network. */
 interface ExchangeRateProvider {
     suspend fun getLkrPerUsdRate(): Double
+    fun observeLkrPerUsdRate(): Flow<Double> = flow { emit(getLkrPerUsdRate()) }
 }
 
 /**

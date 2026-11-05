@@ -3,18 +3,29 @@ package com.clarity.finance.data.local
 import android.content.Context
 import android.util.Base64
 import androidx.biometric.BiometricManager
+import com.clarity.finance.data.repository.ExchangeRateProvider
+import com.clarity.finance.util.CurrencyFormatter
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+interface PrimaryAccountProvider {
+    val primaryAccountIdFlow: StateFlow<String?>
+    val defaultCurrencyFlow: StateFlow<String>
+    fun setPrimaryAccountId(accountId: String?)
+    fun togglePrimaryAccount(accountId: String)
+    fun clearPrimaryAccountIfMatches(accountId: String)
+}
+
 @Singleton
 class UserPreferencesRepository @Inject constructor(
     @ApplicationContext private val context: Context
-) {
+) : PrimaryAccountProvider, ExchangeRateProvider {
     private val prefs = context.getSharedPreferences("clarity_finance_prefs", Context.MODE_PRIVATE)
 
     companion object {
@@ -24,9 +35,35 @@ class UserPreferencesRepository @Inject constructor(
         private const val KEY_PROFILE_PHOTO_PATH = "key_profile_photo_path"
         private const val KEY_THEME_MODE = "key_theme_mode"
         private const val KEY_CURRENCY = "key_currency"
+        private const val KEY_USD_TO_LKR_RATE = "key_usd_to_lkr_rate"
         private const val KEY_LAST_ACTIVE_TIME = "key_last_active_time"
         private const val KEY_SMS_SCAN_ENABLED = "key_sms_scan_enabled"
         private const val KEY_DAILY_REMINDER = "key_daily_reminder"
+        private const val KEY_PRIMARY_ACCOUNT_ID = "key_primary_account_id"
+    }
+
+    private val _primaryAccountIdFlow = MutableStateFlow(
+        prefs.getString(KEY_PRIMARY_ACCOUNT_ID, null)
+    )
+    override val primaryAccountIdFlow: StateFlow<String?> = _primaryAccountIdFlow.asStateFlow()
+
+    override fun setPrimaryAccountId(accountId: String?) {
+        prefs.edit().apply {
+            if (accountId.isNullOrBlank()) remove(KEY_PRIMARY_ACCOUNT_ID)
+            else putString(KEY_PRIMARY_ACCOUNT_ID, accountId)
+        }.apply()
+        _primaryAccountIdFlow.value = accountId?.takeIf { it.isNotBlank() }
+    }
+
+    override fun togglePrimaryAccount(accountId: String) {
+        val next = if (_primaryAccountIdFlow.value == accountId) null else accountId
+        setPrimaryAccountId(next)
+    }
+
+    override fun clearPrimaryAccountIfMatches(accountId: String) {
+        if (_primaryAccountIdFlow.value == accountId) {
+            setPrimaryAccountId(null)
+        }
     }
 
     var profilePhotoPath: String?
@@ -52,6 +89,31 @@ class UserPreferencesRepository @Inject constructor(
 
     private val _currencyFlow = MutableStateFlow(currency)
     val currencyFlow: StateFlow<String> = _currencyFlow.asStateFlow()
+    override val defaultCurrencyFlow: StateFlow<String> = currencyFlow
+
+    var usdToLkrRate: Double
+        get() {
+            val stored = java.lang.Double.longBitsToDouble(
+                prefs.getLong(
+                    KEY_USD_TO_LKR_RATE,
+                    java.lang.Double.doubleToRawLongBits(CurrencyFormatter.FALLBACK_LKR_PER_USD)
+                )
+            )
+            return if (stored > 0.0 && stored.isFinite()) stored else CurrencyFormatter.FALLBACK_LKR_PER_USD
+        }
+        set(value) {
+            if (value > 0.0 && value.isFinite()) {
+                prefs.edit().putLong(KEY_USD_TO_LKR_RATE, java.lang.Double.doubleToRawLongBits(value)).apply()
+                _usdToLkrRateFlow.value = value
+            }
+        }
+
+    private val _usdToLkrRateFlow = MutableStateFlow(usdToLkrRate)
+    val usdToLkrRateFlow: StateFlow<Double> = _usdToLkrRateFlow.asStateFlow()
+
+    override suspend fun getLkrPerUsdRate(): Double = usdToLkrRate
+
+    override fun observeLkrPerUsdRate(): Flow<Double> = usdToLkrRateFlow
 
     var lastActiveTimestamp: Long
         get() = prefs.getLong(KEY_LAST_ACTIVE_TIME, 0L)

@@ -124,11 +124,19 @@ fun IncomeScreen(
 
     if (showAddRecurringSheet || editingRecurring != null) {
         val sources by viewModel.sources.collectAsStateWithLifecycle()
+        val accounts by viewModel.accounts.collectAsStateWithLifecycle()
         val targetRecurring = editingRecurring
+        val defaultCurr = if (currentCurrency.equals("USD", ignoreCase = true)) {
+            com.clarity.finance.model.CurrencyType.USD
+        } else {
+            com.clarity.finance.model.CurrencyType.LKR
+        }
         AddEditRecurringIncomeSheet(
             recurring = targetRecurring,
             sources = sources,
-            onSave = { name, amount, sourceId, sourceName, sourceIcon, dayOfMonth, currency ->
+            accounts = accounts,
+            defaultCurrency = defaultCurr,
+            onSave = { name, amount, sourceId, sourceName, sourceIcon, dayOfMonth, currency, accountId, accountName ->
                 if (targetRecurring != null) {
                     viewModel.updateRecurringIncome(
                         targetRecurring.copy(
@@ -138,7 +146,9 @@ fun IncomeScreen(
                             sourceName = sourceName,
                             sourceIcon = sourceIcon,
                             dayOfMonth = dayOfMonth,
-                            currency = currency
+                            currency = currency,
+                            accountId = accountId,
+                            accountName = accountName
                         )
                     )
                 } else {
@@ -149,7 +159,9 @@ fun IncomeScreen(
                         sourceName = sourceName,
                         sourceIcon = sourceIcon,
                         dayOfMonth = dayOfMonth,
-                        currency = currency
+                        currency = currency,
+                        accountId = accountId,
+                        accountName = accountName
                     )
                 }
                 showAddRecurringSheet = false

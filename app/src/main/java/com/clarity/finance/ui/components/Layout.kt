@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -337,6 +338,7 @@ fun ClarityCard(
             )
             .clip(ClarityShapes.card)
             .background(color)
+            .border(1.dp, ClarityTheme.colors.cardBorder, ClarityShapes.card)
             .padding(contentPadding),
         content = content
     )
@@ -361,7 +363,8 @@ fun GroupedSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(ClarityShapes.card)
-                .background(containerColor),
+                .background(containerColor)
+                .border(1.dp, ClarityTheme.colors.cardBorder, ClarityShapes.card),
             content = content
         )
         if (footer != null) SectionFooterLabel(footer)

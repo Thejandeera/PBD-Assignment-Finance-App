@@ -2,14 +2,19 @@ package com.clarity.finance.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clarity.finance.data.local.PrimaryAccountProvider
+import com.clarity.finance.data.repository.AccountRepository
 import com.clarity.finance.data.repository.ExchangeRateProvider
 import com.clarity.finance.data.repository.IncomeRepository
+import com.clarity.finance.model.Account
+import com.clarity.finance.model.AccountBalanceCalculator
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeSourceItem
 import com.clarity.finance.model.IncomeStatus
 import com.clarity.finance.model.RecurringIncome
 import com.clarity.finance.model.getDefaultIncomeSources
+import com.clarity.finance.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,8 +45,20 @@ import kotlin.math.roundToInt
 @HiltViewModel
 class IncomeViewModel @Inject constructor(
     private val incomeRepository: IncomeRepository,
-    private val exchangeRateProvider: ExchangeRateProvider
+    private val exchangeRateProvider: ExchangeRateProvider,
+    private val accountRepository: AccountRepository,
+    private val primaryAccountProvider: PrimaryAccountProvider
 ) : ViewModel() {
+
+    val primaryAccountId: StateFlow<String?> = primaryAccountProvider.primaryAccountIdFlow
+
+    val accounts: StateFlow<List<Account>> = accountRepository.observeAccounts()
+        .catch { emit(emptyList()) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
 
     // Declared before init, which reads it.
     private val _formState = MutableStateFlow(IncomeFormState())
@@ -55,17 +72,41 @@ class IncomeViewModel @Inject constructor(
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 
+    private fun defaultInputCurrency(): CurrencyType =
+        if (primaryAccountProvider.defaultCurrencyFlow.value.equals("USD", ignoreCase = true)) {
+            CurrencyType.USD
+        } else {
+            CurrencyType.LKR
+        }
+
     init {
         viewModelScope.launch {
             incomeRepository.processAutoCommitRecurringIncomes()
-            _liveRate.value = exchangeRateProvider.getLkrPerUsdRate()
-            // Fill the rate if a foreign currency was chosen before the rate arrived.
-            _formState.update { state ->
-                if (state.isForeignCurrency && state.rateInput.isBlank()) {
-                    state.copy(rateInput = defaultRateInput())
-                } else {
-                    state
+        }
+        viewModelScope.launch {
+            exchangeRateProvider.observeLkrPerUsdRate().collect { rate ->
+                _liveRate.value = rate
+                _formState.update { state ->
+                    if (state.isForeignCurrency && state.rateInput.isBlank()) {
+                        state.copy(rateInput = defaultRateInput())
+                    } else {
+                        state
+                    }
                 }
+            }
+        }
+    }
+
+    fun syncDefaultCurrency() {
+        val defaultCurr = defaultInputCurrency()
+        _formState.update { state ->
+            if (!state.isEditing && state.amountInput.isEmpty()) {
+                state.copy(
+                    currency = defaultCurr,
+                    rateInput = rateInputFor(defaultCurr, state)
+                )
+            } else {
+                state
             }
         }
     }
@@ -106,6 +147,7 @@ class IncomeViewModel @Inject constructor(
             isCustom = true
         )
         onSourceSelected(source)
+        onCurrencySelected(defaultCurrency)
         viewModelScope.launch {
             incomeRepository.addCustomIncomeSource(source).onFailure {
                 _formState.update { it.copy(errorMessage = "Couldn't save the source \"${source.name}\". Try again.") }
@@ -127,6 +169,7 @@ class IncomeViewModel @Inject constructor(
             defaultCurrency = income.currency,
             isCustom = income.isCustomSource
         )
+        val matchedAccount = income.accountId?.let { id -> accounts.value.firstOrNull { it.id == id } }
         _formState.value = IncomeFormState(
             source = source,
             currency = income.currency,
@@ -137,18 +180,23 @@ class IncomeViewModel @Inject constructor(
             date = income.date,
             projectName = income.projectName,
             note = income.note,
+            selectedAccount = matchedAccount,
+            hasPickedAccount = true,
             editingIncomeId = income.id,
-            editingCreatedAt = income.createdAt
+            editingCreatedAt = income.createdAt,
+            editingOriginalIncome = income
         )
     }
 
-    /** Picking a source applies its usual currency and clears options it doesn't support. */
+    fun onAccountSelected(account: Account?) {
+        _formState.update { it.copy(selectedAccount = account, hasPickedAccount = true) }
+    }
+
+    /** Picking a source keeps the user's selected/default currency and clears unsupported options. */
     fun onSourceSelected(source: IncomeSourceItem) {
         _formState.update { state ->
             state.copy(
                 source = source,
-                currency = source.defaultCurrency,
-                rateInput = rateInputFor(source.defaultCurrency, state),
                 status = if (source.canBePending) state.status else IncomeStatus.RECEIVED,
                 isLoss = if (source.allowsLoss) state.isLoss else false,
                 rateError = null,
@@ -199,7 +247,16 @@ class IncomeViewModel @Inject constructor(
     }
 
     fun resetFormState() {
-        _formState.value = IncomeFormState()
+        val defaultCurr = defaultInputCurrency()
+        _formState.value = IncomeFormState(
+            currency = defaultCurr,
+            rateInput = if (defaultCurr != CurrencyType.LKR) defaultRateInput() else "",
+            selectedAccount = AccountBalanceCalculator.resolveDefaultAccount(
+                accounts.value,
+                primaryAccountId.value
+            ),
+            hasPickedAccount = false
+        )
     }
 
     fun submitIncome(onSuccess: (() -> Unit)? = null) {
@@ -238,6 +295,10 @@ class IncomeViewModel @Inject constructor(
             return
         }
 
+        val resolvedAccount = state.selectedAccount
+            ?: if (!state.hasPickedAccount && !state.isEditing) {
+                AccountBalanceCalculator.resolveDefaultAccount(accounts.value, primaryAccountId.value)
+            } else null
         val signedAmount = if (state.isLoss && state.source.allowsLoss) -amount else amount
         val income = Income(
             id = state.editingIncomeId ?: UUID.randomUUID().toString(),
@@ -253,6 +314,8 @@ class IncomeViewModel @Inject constructor(
             month = state.date.take(7),
             projectName = projectName,
             note = state.note.trim(),
+            accountId = resolvedAccount?.id ?: if (state.isEditing && state.hasPickedAccount && state.selectedAccount == null) null else state.editingOriginalIncome?.accountId,
+            accountName = resolvedAccount?.name ?: if (state.isEditing && state.hasPickedAccount && state.selectedAccount == null) null else state.editingOriginalIncome?.accountName,
             createdAt = state.editingCreatedAt ?: System.currentTimeMillis()
         )
 
@@ -265,6 +328,25 @@ class IncomeViewModel @Inject constructor(
             }
             result
                 .onSuccess {
+                    val liveLkrPerUsd = _liveRate.value ?: CurrencyFormatter.FALLBACK_LKR_PER_USD
+                    val oldIncome = state.editingOriginalIncome
+                    if (state.isEditing && oldIncome != null && oldIncome.status == IncomeStatus.RECEIVED && !oldIncome.accountId.isNullOrBlank()) {
+                        val oldAcc = accounts.value.firstOrNull { it.id == oldIncome.accountId }
+                            ?: accountRepository.getAccount(oldIncome.accountId)
+                        if (oldAcc != null) {
+                            val oldDelta = AccountBalanceCalculator.incomeDelta(oldIncome, oldAcc.currency, liveLkrPerUsd)
+                            accountRepository.adjustBalance(oldAcc.id, -oldDelta)
+                        }
+                    }
+                    if (income.status == IncomeStatus.RECEIVED && !income.accountId.isNullOrBlank()) {
+                        val newAcc = resolvedAccount
+                            ?: accounts.value.firstOrNull { it.id == income.accountId }
+                            ?: accountRepository.getAccount(income.accountId)
+                        if (newAcc != null) {
+                            val newDelta = AccountBalanceCalculator.incomeDelta(income, newAcc.currency, liveLkrPerUsd)
+                            accountRepository.adjustBalance(newAcc.id, newDelta)
+                        }
+                    }
                     if (state.isEditing) _userMessage.value = "${income.title} updated"
                     onSuccess?.invoke()
                     resetFormState()
@@ -395,6 +477,8 @@ class IncomeViewModel @Inject constructor(
         sourceIcon: String,
         dayOfMonth: Int,
         currency: CurrencyType = CurrencyType.LKR,
+        accountId: String? = null,
+        accountName: String? = null,
         onSuccess: (() -> Unit)? = null
     ) {
         viewModelScope.launch {
@@ -405,7 +489,9 @@ class IncomeViewModel @Inject constructor(
                 sourceName = sourceName,
                 sourceIcon = sourceIcon,
                 dayOfMonth = dayOfMonth.coerceIn(1, 31),
-                currency = currency
+                currency = currency,
+                accountId = accountId,
+                accountName = accountName
             )
             incomeRepository.addRecurringIncome(recurring)
                 .onSuccess {
@@ -459,11 +545,21 @@ class IncomeViewModel @Inject constructor(
     fun markAsReceived(income: Income) {
         if (!income.isPending) return
         val today = LocalDate.now().toString()
+        val updated = income.copy(status = IncomeStatus.RECEIVED, date = today, month = today.take(7))
         viewModelScope.launch {
-            incomeRepository.updateIncome(
-                income.copy(status = IncomeStatus.RECEIVED, date = today, month = today.take(7))
-            )
-                .onSuccess { _userMessage.value = "${income.title} marked as received" }
+            incomeRepository.updateIncome(updated)
+                .onSuccess {
+                    if (!updated.accountId.isNullOrBlank()) {
+                        val acc = accounts.value.firstOrNull { it.id == updated.accountId }
+                            ?: accountRepository.getAccount(updated.accountId)
+                        if (acc != null) {
+                            val rate = _liveRate.value ?: CurrencyFormatter.FALLBACK_LKR_PER_USD
+                            val delta = AccountBalanceCalculator.incomeDelta(updated, acc.currency, rate)
+                            accountRepository.adjustBalance(acc.id, delta)
+                        }
+                    }
+                    _userMessage.value = "${income.title} marked as received"
+                }
                 .onFailure { _userMessage.value = "Couldn't update ${income.title}. Try again." }
         }
     }
@@ -471,6 +567,17 @@ class IncomeViewModel @Inject constructor(
     fun deleteIncome(income: Income) {
         viewModelScope.launch {
             incomeRepository.deleteIncome(income.id)
+                .onSuccess {
+                    if (income.status == IncomeStatus.RECEIVED && !income.accountId.isNullOrBlank()) {
+                        val acc = accounts.value.firstOrNull { it.id == income.accountId }
+                            ?: accountRepository.getAccount(income.accountId)
+                        if (acc != null) {
+                            val rate = _liveRate.value ?: CurrencyFormatter.FALLBACK_LKR_PER_USD
+                            val delta = AccountBalanceCalculator.incomeDelta(income, acc.currency, rate)
+                            accountRepository.adjustBalance(acc.id, -delta)
+                        }
+                    }
+                }
                 .onFailure { _userMessage.value = "Couldn't delete ${income.title}. Try again." }
         }
     }

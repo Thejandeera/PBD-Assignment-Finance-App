@@ -97,12 +97,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val LightGoalPurple =
-    Color(0xFF6200EE)
-
-private val DarkGoalPurple =
-    Color(0xFFB388FF)
-
 private val GoalGreen =
     Color(0xFF30D158)
 
@@ -408,8 +402,8 @@ fun GoalScreen(
 
                 viewModel.addGoal(
                     name = name,
-                    targetAmount = target,
-                    startingAmount = starting,
+                    targetAmount = inputToLkr(target, currentCurrency, exchangeRate),
+                    startingAmount = inputToLkr(starting, currentCurrency, exchangeRate),
                     deadline = deadline
                 ) {
                     showAddGoalDialog = false
@@ -420,11 +414,20 @@ fun GoalScreen(
 
     if (showEditGoalDialog && uiState.goal != null) {
         val currentGoal = uiState.goal!!
+        val initialTargetDisplay = if (currentGoal.targetAmount > 0) {
+            val converted = if (currentCurrency.equals("USD", ignoreCase = true) && exchangeRate > 0.0) {
+                currentGoal.targetAmount / exchangeRate
+            } else {
+                currentGoal.targetAmount
+            }
+            if (converted % 1.0 == 0.0) converted.toLong().toString()
+            else String.format(Locale.US, "%.2f", converted)
+        } else ""
         AddGoalDialog(
             title = "Edit Goal",
             confirmLabel = "Save Changes",
             initialName = currentGoal.name,
-            initialTarget = if (currentGoal.targetAmount > 0) currentGoal.targetAmount.toLong().toString() else "",
+            initialTarget = initialTargetDisplay,
             initialDeadline = currentGoal.deadline.ifBlank { LocalDate.now().plusYears(1).toString() },
             isEdit = true,
             currency = currentCurrency,
@@ -441,7 +444,7 @@ fun GoalScreen(
             onConfirm = { name, target, _, deadline ->
                 viewModel.updateGoal(
                     name = name,
-                    targetAmount = target,
+                    targetAmount = inputToLkr(target, currentCurrency, exchangeRate),
                     deadline = deadline
                 ) {
                     showEditGoalDialog = false
@@ -512,7 +515,7 @@ fun GoalScreen(
                     note ->
 
                 viewModel.deposit(
-                    amount = amount,
+                    amount = inputToLkr(amount, currentCurrency, exchangeRate),
                     note = note
                 )
 
@@ -558,7 +561,7 @@ fun GoalScreen(
 
                 val accepted =
                     viewModel.withdraw(
-                        amount = amount,
+                        amount = inputToLkr(amount, currentCurrency, exchangeRate),
                         note = note
                     )
 
@@ -1141,7 +1144,7 @@ private fun MilestoneProgressRing(
                     val ringColors = if (animatedProgress >= 1f) {
                         listOf(completeColor.copy(alpha = 0.8f), completeColor, Color(0xFF86EFAC))
                     } else {
-                        listOf(accent.copy(alpha = 0.8f), accent, Color(0xFFC084FC))
+                        listOf(accent.copy(alpha = 0.8f), accent, Color(0xFF86EFAC))
                     }
                     val sweepGradient = Brush.sweepGradient(
                         colors = ringColors,
@@ -2677,23 +2680,11 @@ private fun EmptyGoalCard(
 
 @Composable
 private fun goalAccent(): Color =
-    if (
-        ClarityTheme.colors.isDark
-    ) {
-        DarkGoalPurple
-    } else {
-        LightGoalPurple
-    }
+    ClarityTheme.colors.accent
 
 @Composable
 private fun goalSoftBackground(): Color =
-    if (
-        ClarityTheme.colors.isDark
-    ) {
-        Color(0xFF2D2238)
-    } else {
-        Color(0xFFF4E9FF)
-    }
+    successSoftBackground()
 
 @Composable
 private fun successSoftBackground(): Color =
@@ -2746,6 +2737,13 @@ private fun sanitizeAmountInput(
                     )
     }
 }
+
+private fun inputToLkr(
+    amount: Double,
+    currency: String,
+    exchangeRate: Double
+): Double =
+    if (currency.equals("USD", ignoreCase = true) && exchangeRate > 0.0) amount * exchangeRate else amount
 
 private fun formatLkr(
     amount: Double,

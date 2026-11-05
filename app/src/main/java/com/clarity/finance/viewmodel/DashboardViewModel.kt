@@ -2,9 +2,14 @@ package com.clarity.finance.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clarity.finance.data.local.PrimaryAccountProvider
+import com.clarity.finance.data.repository.AccountRepository
+import com.clarity.finance.data.repository.ExchangeRateProvider
 import com.clarity.finance.data.repository.ExpenseRepository
 import com.clarity.finance.data.repository.GoalRepository
 import com.clarity.finance.data.repository.IncomeRepository
+import com.clarity.finance.model.Account
+import com.clarity.finance.model.AccountBalanceCalculator
 import com.clarity.finance.model.Expense
 import com.clarity.finance.model.Goal
 import com.clarity.finance.model.GoalTransaction
@@ -12,11 +17,13 @@ import com.clarity.finance.model.GoalTransactionType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeStatus
 import com.clarity.finance.model.SpendingType
+import com.clarity.finance.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 import java.time.YearMonth
@@ -28,35 +35,52 @@ import kotlin.math.roundToInt
 class DashboardViewModel @Inject constructor(
     incomeRepository: IncomeRepository,
     expenseRepository: ExpenseRepository,
-    goalRepository: GoalRepository
+    goalRepository: GoalRepository,
+    accountRepository: AccountRepository,
+    exchangeRateProvider: ExchangeRateProvider,
+    primaryAccountProvider: PrimaryAccountProvider
 ) : ViewModel() {
 
     private val currentMonth =
         YearMonth.now().toString()
 
+    private val accountsWithTotalFlow = combine(
+        accountRepository.observeAccounts().catch { emit(emptyList()) },
+        exchangeRateProvider.observeLkrPerUsdRate().catch { emit(CurrencyFormatter.FALLBACK_LKR_PER_USD) },
+        primaryAccountProvider.primaryAccountIdFlow
+    ) { accounts, rate, primaryId ->
+        val totalLkr = accounts.sumOf { AccountBalanceCalculator.toLkr(it.currentBalance, it.currency, rate) }
+        val sorted = accounts.sortedByDescending { it.id == primaryId }
+        Triple(sorted, totalLkr, primaryId)
+    }
+
+    private val goalWithTxFlow = combine(
+        goalRepository.observeGoal(),
+        goalRepository.observeTransactions()
+    ) { goal, transactions -> goal to transactions }
+
     val uiState: StateFlow<DashboardUiState> =
         combine(
-            incomeRepository.observeIncomesForMonth(
-                currentMonth
-            ),
+            incomeRepository.observeIncomesForMonth(currentMonth),
             incomeRepository.observePendingIncomes(),
-            expenseRepository.observeExpensesForMonth(
-                currentMonth
-            ),
-            goalRepository.observeGoal(),
-            goalRepository.observeTransactions()
+            expenseRepository.observeExpensesForMonth(currentMonth),
+            goalWithTxFlow,
+            accountsWithTotalFlow
         ) { monthIncomes,
             pendingIncomes,
             expenses,
-            goal,
-            goalTransactions ->
+            (goal, goalTransactions),
+            (accounts, totalAccountsBalanceLkr, primaryAccountId) ->
 
             buildDashboardState(
                 monthIncomes = monthIncomes,
                 pendingIncomes = pendingIncomes,
                 expenses = expenses,
                 goal = goal,
-                goalTransactions = goalTransactions
+                goalTransactions = goalTransactions,
+                accounts = accounts,
+                totalAccountsBalanceLkr = totalAccountsBalanceLkr,
+                primaryAccountId = primaryAccountId
             )
         }
             .catch { error ->
@@ -85,7 +109,10 @@ class DashboardViewModel @Inject constructor(
         pendingIncomes: List<Income>,
         expenses: List<Expense>,
         goal: Goal?,
-        goalTransactions: List<GoalTransaction>
+        goalTransactions: List<GoalTransaction>,
+        accounts: List<Account>,
+        totalAccountsBalanceLkr: Double,
+        primaryAccountId: String?
     ): DashboardUiState {
 
         // ---------------------------------------------------------
@@ -346,6 +373,10 @@ class DashboardViewModel @Inject constructor(
             goalStatus =
                 goalStatus,
 
+            accounts = accounts,
+            totalAccountsBalanceLkr = totalAccountsBalanceLkr,
+            primaryAccountId = primaryAccountId,
+
             errorMessage =
                 null
         )
@@ -432,6 +463,11 @@ data class DashboardUiState(
     val monthsRemaining: Int = 0,
     val requiredMonthlySavingLkr: Double = 0.0,
     val goalStatus: String = "No goal",
+
+    // Accounts
+    val accounts: List<Account> = emptyList(),
+    val totalAccountsBalanceLkr: Double = 0.0,
+    val primaryAccountId: String? = null,
 
     val errorMessage: String? = null
 )

@@ -5,9 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clarity.finance.data.local.UserPreferencesRepository
 import com.clarity.finance.data.repository.AuthRepository
-import com.clarity.finance.data.repository.ExchangeRateRepository
+import com.clarity.finance.model.Account
 import com.clarity.finance.model.AuthUser
-import com.clarity.finance.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -31,8 +30,7 @@ sealed interface AuthUiState {
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val profileImageManager: ProfileImageManager,
-    private val exchangeRateRepository: ExchangeRateRepository
+    private val profileImageManager: ProfileImageManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
@@ -41,9 +39,8 @@ class AuthViewModel @Inject constructor(
     private val _canUseBiometrics = MutableStateFlow(userPreferencesRepository.canUseBiometrics())
     val canUseBiometrics: StateFlow<Boolean> = _canUseBiometrics.asStateFlow()
 
-    /** Live LKR-per-USD exchange rate. Starts at fallback (330) and updates async. */
-    private val _exchangeRate = MutableStateFlow(CurrencyFormatter.FALLBACK_LKR_PER_USD)
-    val exchangeRateFlow: StateFlow<Double> = _exchangeRate.asStateFlow()
+    /** User-configured LKR-per-USD exchange rate (reactive across the whole app). */
+    val exchangeRateFlow: StateFlow<Double> = userPreferencesRepository.usdToLkrRateFlow
 
     val savedUserEmail: String?
         get() = userPreferencesRepository.getSavedEmail()
@@ -57,17 +54,6 @@ class AuthViewModel @Inject constructor(
 
     val isUserLoggedIn: Boolean
         get() = authRepository.currentUser != null
-
-    init {
-        fetchLiveExchangeRate()
-    }
-
-    private fun fetchLiveExchangeRate() {
-        viewModelScope.launch {
-            val rate = exchangeRateRepository.getLkrPerUsdRate()
-            _exchangeRate.value = rate
-        }
-    }
 
     fun checkBiometricStatus() {
         _canUseBiometrics.value = userPreferencesRepository.canUseBiometrics()
@@ -103,37 +89,48 @@ class AuthViewModel @Inject constructor(
         }
     }
 
-    fun signUp(name: String, email: String, password: String, confirmPassword: String, photoUri: Uri? = null) {
+    fun validateSignUpStepOne(
+        name: String,
+        email: String,
+        password: String,
+        confirmPassword: String
+    ): Boolean {
         val trimmedName = name.trim()
         val trimmedEmail = email.trim()
+        val error = when {
+            trimmedName.isEmpty() -> "Please enter your full name."
+            trimmedEmail.isEmpty() -> "Please enter your email address."
+            !Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches() -> "Please enter a valid email address."
+            password.length < 8 -> "Password must be at least 8 characters."
+            password != confirmPassword -> "Passwords do not match."
+            else -> null
+        }
+        if (error != null) {
+            _uiState.value = AuthUiState.Error(error)
+            return false
+        }
+        resetState()
+        return true
+    }
 
-        if (trimmedName.isEmpty()) {
-            _uiState.value = AuthUiState.Error("Please enter your full name.")
-            return
-        }
-        if (trimmedEmail.isEmpty()) {
-            _uiState.value = AuthUiState.Error("Please enter your email address.")
-            return
-        }
-        if (!Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
-            _uiState.value = AuthUiState.Error("Please enter a valid email address.")
-            return
-        }
-        if (password.length < 8) {
-            _uiState.value = AuthUiState.Error("Password must be at least 8 characters.")
-            return
-        }
-        if (password != confirmPassword) {
-            _uiState.value = AuthUiState.Error("Passwords do not match.")
-            return
-        }
+    fun signUp(
+        name: String,
+        email: String,
+        password: String,
+        confirmPassword: String,
+        photoUri: Uri? = null,
+        initialAccounts: List<Account> = emptyList()
+    ) {
+        if (!validateSignUpStepOne(name, email, password, confirmPassword)) return
+        val trimmedName = name.trim()
+        val trimmedEmail = email.trim()
 
         _uiState.value = AuthUiState.Loading
         viewModelScope.launch {
             val tempId = java.util.UUID.randomUUID().toString()
             val initialSavedPath = photoUri?.let { profileImageManager.saveProfileImage(tempId, it) }
 
-            authRepository.signUp(trimmedName, trimmedEmail, password, initialSavedPath)
+            authRepository.signUp(trimmedName, trimmedEmail, password, initialSavedPath, initialAccounts)
                 .onSuccess { user ->
                     if (photoUri != null) {
                         val permanentPath = profileImageManager.saveProfileImage(user.uid, photoUri)
@@ -183,8 +180,12 @@ class AuthViewModel @Inject constructor(
 
     fun setCurrency(newCurrency: String) {
         userPreferencesRepository.currency = newCurrency
-        // Refresh exchange rate whenever currency changes
-        fetchLiveExchangeRate()
+    }
+
+    fun setUsdToLkrRate(rate: Double): Boolean {
+        if (rate <= 0.0 || !rate.isFinite()) return false
+        userPreferencesRepository.usdToLkrRate = rate
+        return true
     }
 
     fun updateSessionActivity() {

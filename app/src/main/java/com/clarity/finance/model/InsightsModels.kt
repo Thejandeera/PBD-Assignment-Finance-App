@@ -22,6 +22,16 @@ data class PaymentChannelSpending(
 )
 
 /**
+ * Aggregated spending distribution across user accounts.
+ */
+data class AccountSpending(
+    val accountId: String?,
+    val accountName: String,
+    val amount: Double,
+    val percentageOfTotal: Int
+)
+
+/**
  * Daily velocity metrics and month-end projection to eliminate end-of-month shock.
  */
 data class VelocityMetrics(
@@ -58,6 +68,7 @@ data class InsightsUiState(
     val discretionaryPercentage: Int = 0,
     val topCategories: List<CategorySpending> = emptyList(),
     val channelBreakdown: List<PaymentChannelSpending> = emptyList(),
+    val accountBreakdown: List<AccountSpending> = emptyList(),
     val velocity: VelocityMetrics = VelocityMetrics(),
     val spendingLeak: SpendingLeakAlert? = null,
     val errorMessage: String? = null

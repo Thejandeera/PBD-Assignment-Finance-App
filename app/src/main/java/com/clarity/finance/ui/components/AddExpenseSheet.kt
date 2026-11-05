@@ -57,25 +57,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clarity.finance.model.ACCOUNT_CURRENCIES
+import com.clarity.finance.model.AccountBalanceCalculator
 import com.clarity.finance.model.CategoryItem
-import com.clarity.finance.model.PaymentMethod
+import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.SpendingType
 import com.clarity.finance.ui.theme.ClarityShapes
 import com.clarity.finance.ui.theme.ClarityTheme
 import com.clarity.finance.ui.theme.ClarityType
+import com.clarity.finance.util.CurrencyFormatter
 import com.clarity.finance.viewmodel.ExpenseViewModel
 import kotlinx.coroutines.launch
 
-private val PaymentOptions = listOf(
-    "Cash" to PaymentMethod.CASH,
-    "Card" to PaymentMethod.CARD,
-    "Digital" to PaymentMethod.SECONDARY
-)
-
 /**
  * Add-expense sheet (HIG > Sheets): Cancel / title / Add navigation row, a large Apple Cash
- * style amount, then category, obligation type and payment method. Quick mode trims the form
- * to the three essentials for sub-five-second logging.
+ * style amount, then category, obligation type and account. Quick mode trims the form
+ * to the essentials for sub-five-second logging.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,6 +88,18 @@ fun AddExpenseSheet(
     val scope = rememberCoroutineScope()
     val formState by viewModel.formState.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
+    val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val primaryAccountId by viewModel.primaryAccountId.collectAsStateWithLifecycle()
+    val lkrPerUsdRate by viewModel.lkrPerUsdRate.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.syncDefaultCurrency()
+    }
+
+    val resolvedSelectedAccount = formState.selectedAccount
+        ?: if (!formState.hasPickedAccount) {
+            AccountBalanceCalculator.resolveDefaultAccount(accounts, primaryAccountId)
+        } else null
 
     var showAddCategoryDialog by remember { mutableStateOf(false) }
 
@@ -184,15 +193,22 @@ fun AddExpenseSheet(
                 }
             }
 
-            // Amount
+            // Amount + Currency (always saved in LKR)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 16.dp, end = 16.dp, top = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                SegmentedControl(
+                    options = ACCOUNT_CURRENCIES.map { it.name },
+                    selectedIndex = ACCOUNT_CURRENCIES.indexOf(formState.inputCurrency).coerceAtLeast(0),
+                    onSelect = { index -> viewModel.onInputCurrencySelected(ACCOUNT_CURRENCIES[index]) },
+                    modifier = Modifier.padding(horizontal = 48.dp)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "LKR",
+                    text = formState.inputCurrency.name,
                     style = ClarityType.headline,
                     color = colors.secondaryLabel
                 )
@@ -226,6 +242,15 @@ fun AddExpenseSheet(
                         }
                     }
                 )
+
+                val enteredAmount = formState.amountInput.toDoubleOrNull() ?: 0.0
+                if (formState.inputCurrency == CurrencyType.USD && enteredAmount > 0.0) {
+                    Text(
+                        text = "≈ ${CurrencyFormatter.formatOriginal(enteredAmount * lkrPerUsdRate, "LKR")}",
+                        style = ClarityType.subheadline,
+                        color = colors.secondaryLabel
+                    )
+                }
 
                 AnimatedVisibility(visible = formState.amountError != null) {
                     Text(
@@ -295,43 +320,38 @@ fun AddExpenseSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            if (!formState.isQuickMode) {
+                Spacer(modifier = Modifier.height(24.dp))
 
-            // Obligation type
-            SectionHeaderLabel(text = "Type", modifier = Modifier.padding(horizontal = 16.dp))
-            SegmentedControl(
-                options = listOf("Committed", "Discretionary"),
-                selectedIndex = if (formState.spendingType == SpendingType.COMMITTED) 0 else 1,
-                onSelect = { index ->
-                    viewModel.onSpendingTypeSelected(
-                        if (index == 0) SpendingType.COMMITTED else SpendingType.DISCRETIONARY
-                    )
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-            SectionFooterLabel(
-                text = if (formState.spendingType == SpendingType.COMMITTED) {
-                    "Fixed obligations such as rent, utilities and subscriptions."
-                } else {
-                    "Flexible spending such as food, transport and shopping."
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+                // Obligation type (auto-mapped from category in Quick mode)
+                SectionHeaderLabel(text = "Type", modifier = Modifier.padding(horizontal = 16.dp))
+                SegmentedControl(
+                    options = listOf("Committed", "Discretionary"),
+                    selectedIndex = if (formState.spendingType == SpendingType.COMMITTED) 0 else 1,
+                    onSelect = { index ->
+                        viewModel.onSpendingTypeSelected(
+                            if (index == 0) SpendingType.COMMITTED else SpendingType.DISCRETIONARY
+                        )
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                SectionFooterLabel(
+                    text = if (formState.spendingType == SpendingType.COMMITTED) {
+                        "Fixed obligations such as rent, utilities and subscriptions."
+                    } else {
+                        "Flexible spending such as food, transport and shopping."
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Payment method
-            SectionHeaderLabel(text = "Paid With", modifier = Modifier.padding(horizontal = 16.dp))
-            val paymentIndex = when (formState.paymentMethod) {
-                PaymentMethod.CASH -> 0
-                PaymentMethod.CARD -> 1
-                PaymentMethod.SECONDARY, PaymentMethod.ONLINE -> 2
-            }
-            SegmentedControl(
-                options = PaymentOptions.map { it.first },
-                selectedIndex = paymentIndex,
-                onSelect = { index -> viewModel.onPaymentMethodSelected(PaymentOptions[index].second) },
-                modifier = Modifier.padding(horizontal = 16.dp)
+            AccountPickerSection(
+                accounts = accounts,
+                selectedAccount = resolvedSelectedAccount,
+                primaryAccountId = primaryAccountId,
+                onSelectAccount = { viewModel.onAccountSelected(it) }
             )
 
             Spacer(modifier = Modifier.height(24.dp))

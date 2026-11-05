@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Lightbulb
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clarity.finance.model.AccountSpending
 import com.clarity.finance.model.CategorySpending
 import com.clarity.finance.model.PaymentChannelSpending
 import com.clarity.finance.model.PaymentMethod
@@ -217,6 +219,15 @@ fun InsightsScreen(
                             currency = currentCurrency,
                             exchangeRate = exchangeRate
                         )
+
+                        if (state.accountBreakdown.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(24.dp))
+                            AccountBreakdownSection(
+                                accounts = state.accountBreakdown,
+                                currency = currentCurrency,
+                                exchangeRate = exchangeRate
+                            )
+                        }
                     }
                 }
 
@@ -345,8 +356,9 @@ private fun SpendingLeakCard(
             color = colors.label
         )
         Spacer(modifier = Modifier.height(6.dp))
+        val savingsFormatted = CurrencyFormatter.format(leak.potentialMonthlySavings, currency, exchangeRate)
         Text(
-            text = leak.recommendationText,
+            text = "Cutting this by 25% frees up $savingsFormatted/mo for your MacBook Pro M4 fund!",
             style = ClarityType.subheadline,
             color = colors.secondaryLabel
         )
@@ -484,5 +496,34 @@ private fun channelAppearance(method: PaymentMethod): Pair<ImageVector, Color> {
         PaymentMethod.CARD -> Icons.Rounded.CreditCard to colors.blue
         PaymentMethod.SECONDARY -> Icons.Rounded.Smartphone to colors.indigo
         PaymentMethod.ONLINE -> Icons.Rounded.SwapHoriz to colors.teal
+    }
+}
+
+@Composable
+private fun AccountBreakdownSection(
+    accounts: List<AccountSpending>,
+    currency: String,
+    exchangeRate: Double
+) {
+    val colors = ClarityTheme.colors
+    SectionTitle(title = "By Account")
+    Spacer(modifier = Modifier.height(4.dp))
+    GroupedSection {
+        accounts.forEachIndexed { index, account ->
+            ListRow(
+                title = account.accountName,
+                subtitle = "${account.percentageOfTotal}% of spending",
+                leading = { IconTile(icon = Icons.Rounded.AccountBalance, background = colors.blue) },
+                trailing = {
+                    Text(
+                        text = CurrencyFormatter.format(account.amount, currency, exchangeRate),
+                        style = ClarityType.amountBody,
+                        color = colors.label,
+                        maxLines = 1
+                    )
+                },
+                showDivider = index < accounts.lastIndex
+            )
+        }
     }
 }

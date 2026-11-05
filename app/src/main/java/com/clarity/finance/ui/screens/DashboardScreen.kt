@@ -3,9 +3,11 @@ package com.clarity.finance.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,13 +20,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.LaptopMac
+import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.NotificationsNone
 import androidx.compose.material.icons.rounded.Receipt
 import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Sms
@@ -47,8 +54,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clarity.finance.model.Account
 import com.clarity.finance.model.Expense
 import com.clarity.finance.model.Income
 import com.clarity.finance.ui.components.AddExpenseSheet
@@ -101,7 +110,8 @@ fun DashboardScreen(
     onNavigateToSettings: () -> Unit = {},
     onNavigateToDrafts: () -> Unit = {},
     onNavigateToIncome: () -> Unit = {},
-    onNavigateToGoal: () -> Unit = {}
+    onNavigateToGoal: () -> Unit = {},
+    onNavigateToAccounts: () -> Unit = {}
 ) {
     val colors = ClarityTheme.colors
 
@@ -186,7 +196,7 @@ fun DashboardScreen(
             },
             onDelete = {
                 expenseViewModel.deleteExpense(
-                    expense.id
+                    expense
                 )
                 selectedExpense = null
             }
@@ -269,35 +279,65 @@ fun DashboardScreen(
                         DisplayDates.todayEyebrow(),
 
                     trailing = {
-
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .pressFade(
-                                    onClickLabel =
-                                        "Open settings",
-
-                                    onClick =
-                                        onNavigateToSettings
-                                ),
-
-                            contentAlignment =
-                                Alignment.Center
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .pressFade(
+                                        onClickLabel = "Open drafted bank messages",
+                                        onClick = onNavigateToDrafts
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (draftCount > 0) {
+                                        Icons.Rounded.Notifications
+                                    } else {
+                                        Icons.Rounded.NotificationsNone
+                                    },
+                                    contentDescription = "Bank SMS drafts",
+                                    tint = if (draftCount > 0) colors.accent else colors.secondaryLabel,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                if (draftCount > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(top = 6.dp, end = 6.dp)
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(colors.red),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (draftCount > 9) "9+" else "$draftCount",
+                                            color = Color.White,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
 
-                            ProfileAvatar(
-                                bitmap =
-                                    avatarBitmap,
-
-                                name =
-                                    displayName,
-
-                                size =
-                                    36.dp,
-
-                                contentDescription =
-                                    "Profile and settings"
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .pressFade(
+                                        onClickLabel = "Open settings",
+                                        onClick = onNavigateToSettings
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                ProfileAvatar(
+                                    bitmap = avatarBitmap,
+                                    name = displayName,
+                                    size = 36.dp,
+                                    contentDescription = "Profile and settings"
+                                )
+                            }
                         }
                     }
                 )
@@ -316,6 +356,12 @@ fun DashboardScreen(
 
                     exchangeRate =
                         exchangeRate,
+
+                    onIncomeClick =
+                        onNavigateToIncome,
+
+                    onExpensesClick =
+                        onNavigateToExpensesHistory,
 
                     modifier =
                         Modifier.padding(
@@ -399,6 +445,22 @@ fun DashboardScreen(
                         )
                     }
                 }
+
+                AccountsOverviewSection(
+                    accounts = dashboardState.accounts,
+                    primaryAccountId = dashboardState.primaryAccountId,
+                    totalBalanceLkr = dashboardState.totalAccountsBalanceLkr,
+                    currency = currentCurrency,
+                    exchangeRate = exchangeRate,
+                    onManageClick = onNavigateToAccounts
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            16.dp
+                        )
+                )
 
                 SavingsGoalCard(
                     goalName =
@@ -541,11 +603,101 @@ fun DashboardScreen(
 }
 
 @Composable
+private fun AccountsOverviewSection(
+    accounts: List<Account>,
+    primaryAccountId: String?,
+    totalBalanceLkr: Double,
+    currency: String,
+    exchangeRate: Double,
+    onManageClick: () -> Unit
+) {
+    val colors = ClarityTheme.colors
+    SectionTitle(
+        title = "Accounts",
+        actionLabel = if (accounts.isEmpty()) "Add" else "Manage",
+        onAction = onManageClick
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+
+    if (accounts.isEmpty()) {
+        GroupedSection {
+            ListRow(
+                title = "No accounts added",
+                subtitle = "Add bank, cash or crypto accounts to track balances",
+                leading = { IconTile(icon = Icons.Rounded.AccountBalance, background = colors.blue) },
+                showChevron = true,
+                onClick = onManageClick
+            )
+        }
+    } else {
+        ClarityCard(
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .clickable(onClick = onManageClick)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Total Balance",
+                    style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                    color = colors.secondaryLabel,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = CurrencyFormatter.format(totalBalanceLkr, currency, exchangeRate),
+                    style = ClarityType.headline,
+                    color = colors.label,
+                    maxLines = 1
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(items = accounts, key = { it.id }) { account ->
+                    val isPrimary = account.id == primaryAccountId
+                    Column(
+                        modifier = Modifier
+                            .clip(com.clarity.finance.ui.theme.ClarityShapes.control)
+                            .background(
+                                if (isPrimary) colors.accent.copy(alpha = if (colors.isDark) 0.2f else 0.1f)
+                                else colors.tertiaryFill
+                            )
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = account.type.icon, fontSize = 15.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (isPrimary) "★ ${account.name}" else account.name,
+                                style = ClarityType.caption1.copy(fontWeight = FontWeight.SemiBold),
+                                color = if (isPrimary) colors.accent else colors.label,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = CurrencyFormatter.formatOriginal(account.currentBalance, account.currency.name),
+                            style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                            color = if (account.currentBalance < 0) colors.redText else colors.accent,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun BalanceCard(
     income: Double,
     expenses: Double,
     currency: String,
     exchangeRate: Double,
+    onIncomeClick: () -> Unit = {},
+    onExpensesClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors =
@@ -736,9 +888,9 @@ private fun BalanceCard(
                     colors.income,
 
                 modifier =
-                    Modifier.weight(
-                        1f
-                    )
+                    Modifier
+                        .weight(1f)
+                        .pressFade(onClickLabel = "Open Income", onClick = onIncomeClick)
             )
 
             VerticalHairline(
@@ -768,9 +920,8 @@ private fun BalanceCard(
 
                 modifier =
                     Modifier
-                        .weight(
-                            1f
-                        )
+                        .weight(1f)
+                        .pressFade(onClickLabel = "Open Expenses", onClick = onExpensesClick)
                         .padding(
                             start =
                                 14.dp

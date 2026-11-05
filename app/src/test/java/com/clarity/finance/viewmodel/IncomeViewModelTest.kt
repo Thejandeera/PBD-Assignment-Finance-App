@@ -1,7 +1,11 @@
 package com.clarity.finance.viewmodel
 
+import com.clarity.finance.data.repository.FakeAccountRepository
 import com.clarity.finance.data.repository.FakeExchangeRateProvider
 import com.clarity.finance.data.repository.FakeIncomeRepository
+import com.clarity.finance.data.repository.FakePrimaryAccountProvider
+import com.clarity.finance.model.Account
+import com.clarity.finance.model.AccountType
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeSource
@@ -31,6 +35,8 @@ class IncomeViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var repository: FakeIncomeRepository
+    private lateinit var accountRepository: FakeAccountRepository
+    private lateinit var primaryProvider: FakePrimaryAccountProvider
     private lateinit var viewModel: IncomeViewModel
 
     private val thisMonth = YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy-MM"))
@@ -38,7 +44,14 @@ class IncomeViewModelTest {
     @Before
     fun setUp() {
         repository = FakeIncomeRepository()
-        viewModel = IncomeViewModel(repository, FakeExchangeRateProvider(rate = 300.0))
+        accountRepository = FakeAccountRepository()
+        primaryProvider = FakePrimaryAccountProvider()
+        viewModel = IncomeViewModel(
+            repository,
+            FakeExchangeRateProvider(rate = 300.0),
+            accountRepository,
+            primaryProvider
+        )
     }
 
     // -------------------------------------------------------------------------
@@ -80,8 +93,10 @@ class IncomeViewModelTest {
     }
 
     @Test
-    fun selectingAdSense_defaultsToUsdWithLiveRate() {
-        viewModel.onSourceSelected(IncomeSource.ADSENSE.toItem())
+    fun defaultCurrencyUsd_startsFormInUsdWithLiveRateAcrossAllSources() {
+        primaryProvider.setDefaultCurrency("USD")
+        viewModel.resetFormState()
+        viewModel.onSourceSelected(IncomeSource.SALARY.toItem())
 
         val form = viewModel.formState.value
         assertEquals(CurrencyType.USD, form.currency)
@@ -91,6 +106,7 @@ class IncomeViewModelTest {
     @Test
     fun foreignIncome_keepsOriginalAmountAndStoresLkrEquivalent() {
         viewModel.onSourceSelected(IncomeSource.ADSENSE.toItem())
+        viewModel.onCurrencySelected(CurrencyType.USD)
         viewModel.onAmountChanged("120.50")
         viewModel.onRateChanged("298.75")
         viewModel.submitIncome()
@@ -105,6 +121,7 @@ class IncomeViewModelTest {
     @Test
     fun foreignIncomeWithoutRate_showsRateError() {
         viewModel.onSourceSelected(IncomeSource.ADSENSE.toItem())
+        viewModel.onCurrencySelected(CurrencyType.USD)
         viewModel.onAmountChanged("50")
         viewModel.onRateChanged("")
         viewModel.submitIncome()
@@ -149,6 +166,7 @@ class IncomeViewModelTest {
     @Test
     fun cryptoLoss_isStoredAsNegativeAmount() {
         viewModel.onSourceSelected(IncomeSource.CRYPTO.toItem())
+        viewModel.onCurrencySelected(CurrencyType.USDT)
         viewModel.onAmountChanged("40")
         viewModel.onLossSelected(true)
         viewModel.submitIncome()
@@ -483,6 +501,37 @@ class IncomeViewModelTest {
         assertEquals(100_000.0, committedEntry!!.amountLKR, 0.001)
 
         collectJob.cancel()
+    }
+
+    @Test
+    fun receivedAndPendingIncome_tracksAccountBalanceCorrectly() {
+        val bank = Account(
+            id = "acc_combank",
+            name = "Commercial Bank",
+            type = AccountType.BANK,
+            currency = CurrencyType.LKR,
+            currentBalance = 50_000.0
+        )
+        accountRepository.setAccounts(listOf(bank))
+
+        // Pending invoice must not change account balance until marked received
+        viewModel.onSourceSelected(IncomeSource.FREELANCE.toItem())
+        viewModel.onAccountSelected(bank)
+        viewModel.onStatusSelected(IncomeStatus.PENDING)
+        viewModel.onProjectNameChanged("Client X")
+        viewModel.onAmountChanged("20000")
+        viewModel.submitIncome()
+
+        assertEquals(50_000.0, accountRepository.accountsState.value.single().currentBalance, 0.01)
+
+        val pending = repository.incomesState.value.single()
+        viewModel.markAsReceived(pending)
+        assertEquals(70_000.0, accountRepository.accountsState.value.single().currentBalance, 0.01)
+
+        // Delete received income -> reverses balance
+        val received = repository.incomesState.value.single()
+        viewModel.deleteIncome(received)
+        assertEquals(50_000.0, accountRepository.accountsState.value.single().currentBalance, 0.01)
     }
 
     private fun income(

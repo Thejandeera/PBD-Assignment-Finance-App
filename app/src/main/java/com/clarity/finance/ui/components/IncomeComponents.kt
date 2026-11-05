@@ -39,6 +39,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import com.clarity.finance.model.ACCOUNT_CURRENCIES
+import com.clarity.finance.model.Account
+import com.clarity.finance.model.AccountBalanceCalculator
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeSource
@@ -108,11 +111,12 @@ fun IncomeRow(
         } else if (showDate) {
             add(DisplayDates.short(income.date))
         }
+        income.accountName?.takeIf { it.isNotBlank() }?.let { add(it) }
     }.joinToString(" · ").ifEmpty { income.status.displayName }
     val note = income.note.takeIf { it.isNotBlank() }
-    val original = CurrencyFormatter.formatOriginal(income.amount, income.currency.name)
-    val converted = if (!income.currency.name.equals(currency, ignoreCase = true)) {
-        "≈ " + CurrencyFormatter.format(income.amountLKR, currency, exchangeRate)
+    val displayAmount = CurrencyFormatter.format(income.amountLKR, currency, exchangeRate)
+    val originalSubtitle = if (!income.currency.name.equals(currency, ignoreCase = true)) {
+        CurrencyFormatter.formatOriginal(income.amount, income.currency.name)
     } else {
         null
     }
@@ -136,14 +140,14 @@ fun IncomeRow(
         trailing = {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = if (income.amount > 0 && !income.isPending) "+$original" else original,
+                    text = if (income.amount > 0 && !income.isPending) "+$displayAmount" else displayAmount,
                     style = ClarityType.amountBody,
                     color = if (income.amount > 0 && !income.isPending) colors.greenText else colors.label,
                     maxLines = 1
                 )
-                if (converted != null) {
+                if (originalSubtitle != null) {
                     Text(
-                        text = converted,
+                        text = originalSubtitle,
                         style = ClarityType.footnote,
                         color = colors.secondaryLabel,
                         maxLines = 1
@@ -263,13 +267,13 @@ fun IncomeDetailSheet(
                 EmojiBadge(emoji = income.sourceIcon, tint = incomeSourceColor(income.sourceId), size = 64.dp)
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = CurrencyFormatter.formatOriginal(income.amount, income.currency.name),
+                    text = CurrencyFormatter.format(income.amountLKR, currency, exchangeRate),
                     style = ClarityType.amountHero,
                     color = colors.label
                 )
-                if (income.isForeignCurrency) {
+                if (!income.currency.name.equals(currency, ignoreCase = true)) {
                     Text(
-                        text = "≈ " + CurrencyFormatter.formatOriginal(income.amountLKR, "LKR"),
+                        text = "Original: " + CurrencyFormatter.formatOriginal(income.amount, income.currency.name),
                         style = ClarityType.subheadline,
                         color = colors.secondaryLabel
                     )
@@ -291,11 +295,16 @@ fun IncomeDetailSheet(
                     value = if (income.isPending) "Pending · ${pendingAgeLabel(income.date)}" else income.status.displayName,
                     showDivider = true
                 )
+                val hasAccount = !income.accountName.isNullOrBlank()
+                val hasExtra = income.isForeignCurrency || income.projectName.isNotBlank() || income.note.isNotBlank()
                 DetailRow(
                     label = if (income.isPending) "Invoice Date" else "Received",
                     value = DisplayDates.long(income.date),
-                    showDivider = income.isForeignCurrency || income.projectName.isNotBlank() || income.note.isNotBlank()
+                    showDivider = hasAccount || hasExtra
                 )
+                income.accountName?.takeIf { it.isNotBlank() }?.let { accName ->
+                    DetailRow(label = "Account", value = accName, showDivider = hasExtra)
+                }
                 if (income.isForeignCurrency) {
                     DetailRow(
                         label = "Rate",
@@ -433,7 +442,8 @@ fun RecurringIncomeRow(
 ) {
     val colors = ClarityTheme.colors
     val isCommittedThisMonth = recurring.lastCommittedMonth == currentMonth
-    val formattedAmount = CurrencyFormatter.format(recurring.amount, currency, exchangeRate)
+    val amountInLkr = AccountBalanceCalculator.toLkr(recurring.amount, recurring.currency, exchangeRate)
+    val formattedAmount = CurrencyFormatter.format(amountInLkr, currency, exchangeRate)
 
     ListRow(
         title = recurring.name,
@@ -486,7 +496,9 @@ fun DeleteRecurringAlert(
 fun AddEditRecurringIncomeSheet(
     recurring: RecurringIncome?,
     sources: List<IncomeSourceItem>,
-    onSave: (name: String, amount: Double, sourceId: String, sourceName: String, sourceIcon: String, dayOfMonth: Int, currency: CurrencyType) -> Unit,
+    accounts: List<Account> = emptyList(),
+    defaultCurrency: CurrencyType = CurrencyType.LKR,
+    onSave: (name: String, amount: Double, sourceId: String, sourceName: String, sourceIcon: String, dayOfMonth: Int, currency: CurrencyType, accountId: String?, accountName: String?) -> Unit,
     onDelete: (() -> Unit)? = null,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -504,11 +516,22 @@ fun AddEditRecurringIncomeSheet(
         )
     }
     var dayText by remember(recurring) { mutableStateOf(recurring?.dayOfMonth?.toString() ?: "1") }
+    var selectedCurrency by remember(recurring, defaultCurrency) {
+        mutableStateOf(
+            if ((recurring?.currency ?: defaultCurrency) == CurrencyType.USD) CurrencyType.USD else CurrencyType.LKR
+        )
+    }
     var selectedSource by remember(recurring, sources) {
         mutableStateOf(
             sources.find { it.id == recurring?.sourceId }
                 ?: sources.firstOrNull()
                 ?: IncomeSource.SALARY.toItem()
+        )
+    }
+    var selectedAccount by remember(recurring, accounts) {
+        mutableStateOf(
+            if (recurring != null) accounts.find { it.id == recurring.accountId }
+            else accounts.firstOrNull()
         )
     }
 
@@ -557,7 +580,9 @@ fun AddEditRecurringIncomeSheet(
                         selectedSource.name,
                         selectedSource.icon,
                         day,
-                        recurring?.currency ?: CurrencyType.LKR
+                        selectedCurrency,
+                        selectedAccount?.id,
+                        selectedAccount?.name
                     )
                     hideThen(onDismiss)
                 },
@@ -586,9 +611,23 @@ fun AddEditRecurringIncomeSheet(
             ClarityTextField(
                 value = amountText,
                 onValueChange = { amountText = it.filter { ch -> ch.isDigit() || ch == '.' } },
-                label = "Amount",
+                label = "Amount (${selectedCurrency.name})",
                 placeholder = "0.00",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Currency",
+                style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                color = colors.secondaryLabel
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            SegmentedControl(
+                options = ACCOUNT_CURRENCIES.map { it.name },
+                selectedIndex = ACCOUNT_CURRENCIES.indexOf(selectedCurrency).coerceAtLeast(0),
+                onSelect = { index -> selectedCurrency = ACCOUNT_CURRENCIES[index] }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -634,6 +673,15 @@ fun AddEditRecurringIncomeSheet(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            AccountPickerSection(
+                accounts = accounts,
+                selectedAccount = selectedAccount,
+                onSelectAccount = { selectedAccount = it },
+                title = "Deposit To Account"
+            )
 
             Spacer(modifier = Modifier.height(12.dp))
 

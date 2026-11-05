@@ -2,6 +2,7 @@ package com.clarity.finance.data.repository
 
 import com.clarity.finance.data.remote.FirestorePaths
 import com.clarity.finance.data.remote.asFlow
+import com.clarity.finance.model.AccountBalanceCalculator
 import com.clarity.finance.model.CategoryItem
 import com.clarity.finance.model.Expense
 import com.clarity.finance.model.PaymentMethod
@@ -29,7 +30,9 @@ import javax.inject.Singleton
 class FirestoreExpenseRepository @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
-    private val dispatchers: DispatcherProvider
+    private val dispatchers: DispatcherProvider,
+    private val accountRepository: AccountRepository,
+    private val exchangeRateProvider: ExchangeRateProvider
 ) : ExpenseRepository {
 
     private val currentUserId: String?
@@ -189,6 +192,8 @@ class FirestoreExpenseRepository @Inject constructor(
                         categoryIcon = rule.categoryIcon,
                         type = rule.type,
                         paymentMethod = rule.paymentMethod,
+                        accountId = rule.accountId,
+                        accountName = rule.accountName,
                         date = formattedDate,
                         month = currentMonth,
                         note = rule.note ?: "Recurring: ${rule.categoryName}",
@@ -202,6 +207,15 @@ class FirestoreExpenseRepository @Inject constructor(
                         .update(recurringCollection.document(rule.id), "lastAppliedMonth", currentMonth)
                         .commit()
                         .await()
+
+                    rule.accountId?.let { accId ->
+                        val account = accountRepository.getAccount(accId)
+                        if (account != null) {
+                            val rate = exchangeRateProvider.getLkrPerUsdRate()
+                            val delta = AccountBalanceCalculator.expenseDelta(rule.amount, account.currency, rate)
+                            accountRepository.adjustBalance(accId, delta)
+                        }
+                    }
                 }
             }
         }
@@ -268,6 +282,8 @@ class FirestoreExpenseRepository @Inject constructor(
             categoryIcon = getString("categoryIcon") ?: "📦",
             type = type,
             paymentMethod = paymentMethod,
+            accountId = getString("accountId"),
+            accountName = getString("accountName"),
             date = getString("date").orEmpty(),
             month = getString("month").orEmpty(),
             note = getString("note"),
@@ -284,6 +300,8 @@ class FirestoreExpenseRepository @Inject constructor(
         "categoryIcon" to categoryIcon,
         "type" to type.name,
         "paymentMethod" to paymentMethod.name,
+        "accountId" to accountId,
+        "accountName" to accountName,
         "date" to date,
         "month" to month,
         "note" to note,
@@ -308,6 +326,8 @@ class FirestoreExpenseRepository @Inject constructor(
             dayOfMonth = getLong("dayOfMonth")?.toInt() ?: 1,
             type = type,
             paymentMethod = paymentMethod,
+            accountId = getString("accountId"),
+            accountName = getString("accountName"),
             note = getString("note"),
             active = getBoolean("active") ?: true,
             lastAppliedMonth = getString("lastAppliedMonth").orEmpty()
@@ -323,6 +343,8 @@ class FirestoreExpenseRepository @Inject constructor(
         "dayOfMonth" to dayOfMonth,
         "type" to type.name,
         "paymentMethod" to paymentMethod.name,
+        "accountId" to accountId,
+        "accountName" to accountName,
         "note" to note,
         "active" to active,
         "lastAppliedMonth" to lastAppliedMonth

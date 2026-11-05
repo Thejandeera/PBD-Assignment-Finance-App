@@ -22,6 +22,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.clarity.finance.ui.components.ClarityNavTab
+import com.clarity.finance.ui.screens.AccountsScreen
 import com.clarity.finance.ui.screens.GoalScreen
 import com.clarity.finance.ui.screens.DashboardScreen
 import com.clarity.finance.ui.screens.DraftsScreen
@@ -42,6 +43,7 @@ sealed class Screen(val route: String) {
     data object Drafts : Screen("drafts")
     data object Income : Screen("income")
     data object Goal : Screen("goal")
+    data object Accounts : Screen("accounts")
 }
 
 private val TabRoutes = setOf(
@@ -240,6 +242,9 @@ fun ClarityNavHost(
                 },
                 onNavigateToGoal = {
                     entry.ifResumed { navController.navigateToTab(ClarityNavTab.GOAL) }
+                },
+                onNavigateToAccounts = {
+                    entry.ifResumed { navController.navigate(Screen.Accounts.route) }
                 }
             )
         }
@@ -304,6 +309,18 @@ fun ClarityNavHost(
                 },
                 onNavigateToDrafts = {
                     entry.ifResumed { navController.navigate(Screen.Drafts.route) }
+                },
+                onNavigateToAccounts = {
+                    entry.ifResumed { navController.navigate(Screen.Accounts.route) }
+                }
+            )
+        }
+
+        composable(Screen.Accounts.route) { entry ->
+            AccountsScreen(
+                authViewModel = authViewModel,
+                onNavigateBack = {
+                    entry.ifResumed { navController.popBackStack() }
                 }
             )
         }

@@ -1,0 +1,734 @@
+SE3092 · Platform Based Development · Assignment 01
+Team Technical Guide
+Building the Personal Finance Management System for Kavindu Silva
+Work division for three members · step-by-step guides · critical stage playbooks · Mermaid flow diagrams
+Item
+Detail
+Platform
+Android (Kotlin · Jetpack Compose · MVVM · Firebase)
+Min / Target SDK
+API 26 (Android 8.0) / API 34+
+Issued / Deadline
+23 Sep 2026 / 30 Oct 2026
+Document date
+3 Oct 2026 (about 4 weeks remain)
+Member A
+Name: ____________________   ID: ____________
+Member B
+Name: ____________________   ID: ____________
+Member C
+Name: ____________________   ID: ____________
+Contents
+1. Purpose of the Project and How to Use This Guide4
+1.1 Mandatory rules (a single failure can zero a criterion)4
+1.2 How this document is organised4
+2. Work Division – Three Members, Equal Weight5
+2.1 Principle: vertical slices plus one cross-cutting responsibility each5
+2.2 Equal weight evidence5
+2.3 Who depends on whom6
+3. Prerequisites – Before Anyone Writes Code7
+4. Personal Guides – “Do This First, Then That”8
+4.1 Member A – Data and Income (Firebase Lead)8
+4.2 Member B – Architecture and Expenses (Codebase Lead)8
+4.3 Member C – UX and Goal (Design Lead)9
+5. Critical Stage Playbooks10
+5.1 Create the codebase and repository10
+5.2 Give access to members (Git, Firebase and signing keys)10
+5.3 Set up Firebase11
+5.4 Create Firestore security rules and indexes13
+5.5 Authentication flow13
+5.6 Hilt dependency injection and MVVM base14
+5.7 Real-time listeners (dashboard and lists)14
+5.8 Offline support with Room and Firestore persistence15
+5.9 Git workflow and merge conflicts17
+5.10 Build and validate the APK17
+5.11 Create the Technical Design Document (15+ pages)17
+5.12 Prepare the live demo17
+6. Mermaid Flow Diagrams19
+6.1 System architecture (MVVM layers)19
+6.2 Add expense request flow19
+6.3 Add multi-currency income flow20
+6.4 Goal progress and status logic21
+6.5 Recurring expense generation22
+6.6 Firestore data model23
+6.7 Kavindu’s first-week journey24
+6.8 Project timeline24
+9. Risks, Quality Gates and Final Checklists25
+9.1 Risks and mitigation25
+9.2 Quality gates before each merge into develop25
+9.3 Final submission checklist25
+Appendix A – Firestore Rules and Indexes27
+Appendix B – Gradle, Manifest and Kotlin Snippets28
+Appendix C – Glossary30
+1. Purpose of the Project and How to Use This Guide
+What we are building. Kavindu Silva (25, junior engineer in Colombo) earns roughly LKR 1.6 million a year from four sources, yet has only LKR 11,200 saved. He cannot say where his money goes and wants a MacBook Pro M4 (about LKR 490,000) within 12 months. Four earlier tools failed him because they were too manual, too rigid, single-currency or unpleasant to open daily.
+Our app must do two things: (1) reveal what he really earns and where it goes, and (2) make progress toward the MacBook goal feel real. Everything we build is judged against that.
+Grading reminder: marks reward problem understanding, architecture and the live demo, not feature count. A focused app with clean MVVM beats a feature-heavy app with structural weaknesses.
+1.1 Mandatory rules (a single failure can zero a criterion)
+Rule
+Consequence if broken
+Kotlin 100%, Jetpack Compose only (no XML, no Java)
+Architecture/UI marks lost
+MVVM strictly: no logic in Composables, no data-layer calls from UI
+Architecture marks lost
+Firebase Authentication manages identity; no hard-coded user data
+Zero for the Firebase criterion
+Firestore is the primary store; firestore.rules must be submitted
+Zero for Firebase if rules missing
+Runs on API 26+, targets 34+; APK must install
+Zero for the criterion if it fails to install
+No crashes, no blank screens offline, no crashes on empty data
+Marks lost in several criteria
+Genuine iterative commit history (not a single commit)
+Referred for academic integrity review
+Design PDF of at least 15 pages, specific to Kavindu
+Documentation penalised if generic
+Attend the 15-minute live demo
+Zero for Demo criterion
+Disclose AI help; all work must be our own
+Automatic zero + disciplinary referral
+1.2 How this document is organised
+Section 2 – how the work is split so all three members carry equal weight.
+Section 3 – tools and accounts everyone needs before day 1.
+Section 4 – a personal “first do this, then that” guide for Member A, B and C.
+Section 5 – playbooks for critical stages: codebase, Firebase, access, rules, Auth, Hilt, listeners, offline cache, Git, APK, documents, demo.
+Section 6 – Mermaid diagrams that show how requests and data flow.
+Section 7–9 – timeline, team rules, shared contracts, risks and final checklists.
+Appendix – ready-to-use snippets (rules, indexes, Gradle, Kotlin).
+2. Work Division – Three Members, Equal Weight
+2.1 Principle: vertical slices plus one cross-cutting responsibility each
+Splitting by layer (one person does all UI, another all database) is unfair and leaves people unable to explain the whole system at the demo. Instead, each member owns one feature slice end-to-end (data → repository → ViewModel → screen) and one cross-cutting responsibility. Every member therefore touches Firebase, MVVM and Compose, writes documentation and demos part of the system.
+Member A – Data & Income
+Member B – Architecture & Expenses
+Member C – UX & Goal
+Cross-cutting role
+Firebase lead: project, Auth logic, Firestore, rules, indexes, offline persistence
+Architecture lead: repo, Gradle, Hilt, MVVM base classes, error handling, code review gate
+UX lead: wireframes, Material 3 theme, reusable components, navigation, README and PDF assembly
+Feature slice
+Income: 4 sources, multi-currency, freelance invoices, crypto net position
+Expenses: quick add, categories, committed vs discretionary, recurring, Insights charts
+Goal and Dashboard: progress, required monthly saving, projection, savings history, Settings
+Kavindu problem solved
+“I don’t know what I really earn”
+“I don’t know where my money goes”
+“My goal is emotionally present and financially invisible”
+Phase 1 analysis questions
+Q1 income structure
+Q2 why tools failed, Q4 expense entry friction
+Q3 goal visibility, Q5 discretionary vs committed views
+Documentation owned
+Firestore schema, indexing, multi-currency, security rules, income requirements
+SRS (FR/NFR/constraints), use case diagram, MVVM diagram, design decisions
+Annotated wireframes, navigation graph, README, final PDF assembly
+Demo topics (15 min)
+Firebase, Firestore queries, rules, offline (about 5 min)
+MVVM, StateFlow, Hilt, coroutines (about 5 min)
+Live app flow, UX decisions, goal logic (about 5 min)
+2.2 Equal weight evidence
+Marks each member leads (rubric total 100). Every criterion has a lead, but all three contribute to every criterion.
+Rubric criterion (marks)
+Member A
+Member B
+Member C
+Problem analysis (15)
+5 – Q1
+5 – Q2, Q4
+5 – Q3, Q5
+Architecture and code quality (15)
+support
+15 lead
+support
+Compose UI and UX (15)
+support
+support
+15 lead
+Firebase integration (15)
+15 lead
+support
+support
+Feature completeness (10)
+3 – income
+3 – expense
+4 – goal, dashboard
+Technical documentation (10)
+3
+4
+3
+Demo and presentation (20)
+7
+7
+6
+Total led
+33
+34
+33
+Estimated effort in hours (about 60 h each, over four weeks):
+Activity
+Member A
+Member B
+Member C
+Cross-cutting foundation
+20 (Firebase, rules, offline)
+18 (skeleton, Hilt, base classes)
+18 (theme, components, navigation)
+Feature slice (data to UI)
+14
+16
+16
+Analysis and requirements
+6
+6
+6
+Documentation
+8
+8
+8
+Testing and demo preparation
+8
+8
+8
+Peer code review
+4
+4
+4
+Total
+60
+60
+60
+Rotation rule for fairness: each member reviews one pull request from each teammate every week. At the end of week 2, swap the “support” responsibilities if anyone is overloaded. Keep a shared log of hours and commits.
+2.3 Who depends on whom
+Parallel work is possible only if three early hand-offs happen on time:
+Hand-off
+From
+To
+Due
+Android skeleton + repo + Hilt + base classes pushed
+B
+A, C
+Day 2
+Firebase project, Auth enabled, Firestore created, team added
+A
+B, C
+Day 1–2
+Shared models + repository interfaces agreed (Section 8)
+B with A and C
+All
+Day 3
+Theme + reusable components + navigation skeleton
+C
+A, B
+Day 4
+Firestore rules v1 + indexes deployed
+A
+All
+Day 5
+MERMAID – ownership and dependencies
+3. Prerequisites – Before Anyone Writes Code
+Tool / account
+Why
+Notes
+Android Studio (current stable)
+IDE and emulator
+Install Android SDK Platform 34 and an API 26 system image for testing
+JDK 17
+Build toolchain
+Bundled with recent Android Studio
+Git + GitHub or GitLab account
+Source control
+Private repo; all three members as collaborators
+Google account
+Firebase Console
+Use one team owner; add others as Editors
+Node.js + Firebase CLI (optional)
+Deploy rules and indexes from files
+npm i -g firebase-tools then firebase login
+Figma or draw.io
+Wireframes and diagrams
+Free tiers are enough
+Physical Android device (8.0+)
+Real validation
+Enable Developer options and USB debugging
+Mermaid Live (mermaid.live) or VS Code Mermaid extension
+Render diagrams in Section 6
+Export PNG to embed in the design PDF
+Agree on names on day 1 and never change them: package com.clarity.finance (it becomes the Firebase app id), Firebase project name, branch names and the Firestore field names in Section 8.
+4. Personal Guides – “Do This First, Then That”
+Each guide is an ordered checklist. Details of the critical steps are in Section 5; the guide tells you when to use them.
+4.1 Member A – Data and Income (Firebase Lead)
+Day 1 – Create the Firebase project and enable Email/Password sign-in and Firestore (Playbook 5.3). Share the console with B and C (Playbook 5.2).
+Day 1 – Collect SHA-1 fingerprints from all three machines and add them to the Firebase Android app.
+Day 2 – Write the schema document (collections, fields, indexes, multi-currency). Review it with B and C so models match.
+Day 2–3 – Build `AuthRepository` (register, login, logout, current user as a Flow) and AuthViewModel. Give C the UI state classes so the login screens can be built (Playbook 5.5).
+Day 3–5 – Write `firestore.rules` and `firestore.indexes.json`, test them in the Rules Playground and deploy (Playbook 5.4).
+Week 2 – Create `FirestoreDataSource`: generic helpers that turn snapshot listeners into Flow using callbackFlow (Playbook 5.7).
+Week 2 – Income slice, data layer: IncomeRepository, Room entity and DAO, and mapping between Firestore, Room and the domain model.
+Week 2 – Income ViewModel: convert foreign currency to LKR with a stored rate snapshot, compute received vs pending, overdue invoices and crypto year-to-date net.
+Week 3 – Income screens (Income list, Add Income sheet, pending invoices) using C’s components.
+Week 3 – Offline persistence and error states: turn on persistence, test airplane mode, show offline banner and retry (Playbook 5.8).
+Week 3 – Unit tests: currency conversion, overdue logic, crypto net calculation.
+Week 4 – Documentation: Q1 analysis, Firestore schema diagram, indexing and multi-currency justification, rules explanation, income requirements.
+Week 4 – Demo rehearsal: explain every query, index and rule line. Be ready to show a rule rejecting another user’s read.
+A’s definition of done: a fresh install can register, add income in LKR and USD, kill the network, add more entries, reconnect and see everything synced; rules block cross-user access.
+4.2 Member B – Architecture and Expenses (Codebase Lead)
+Day 1 – Create the Android project and private repository exactly as in Playbook 5.1; push the first commit and invite A and C (Playbook 5.2).
+Day 1–2 – Add Gradle dependencies (Compose BOM, Navigation, Hilt, Firebase BOM, Room, coroutines) and the google-services.json once A shares it.
+Day 2 – Create the package structure (ui, viewmodel, data, model, di, util) and base classes: UiState, Result, DispatcherProvider, AppModule (Playbook 5.6). Push to develop.
+Day 3 – Publish the shared contracts (models and repository interfaces, Section 8). Get both teammates’ approval in a pull request.
+Week 1 – Expense domain: Expense, RecurringExpense, default category list with committed/discretionary mapping, user-defined custom categories support, and nullable optional note field for each expense.
+Week 2 – `ExpenseRepository` (with A’s data source and Room), including recurring-expense generation at app start.
+Week 2 – `ExpenseViewModel`: validation (amount greater than 0, date not in the future), add/edit/delete, Add Expense sheet using C’s components.
+Week 3 – `InsightsViewModel`: committed vs discretionary ratio, category totals, payment-channel totals, daily average, month-end projection, top leak.
+Week 3 – Insights screen: donut chart, category bars, filter chips, expense list.
+Week 3 – Review gate: run through every pull request and check “no logic in Composables, no data calls from UI, no raw MutableStateFlow exposed”.
+Week 3 – Unit tests for ViewModels with fake repositories.
+Week 4 – Documentation: SRS (functional, non-functional, constraints), use case diagram, MVVM diagram, Q2 and Q4 analysis, design decision list.
+Week 4 – Demo rehearsal: be able to trace one tap from Composable to Firestore and back, and explain why each layer exists.
+B’s definition of done: adding an expense updates Home, Insights and charts within a second; the code passes the “three questions” check (Section 8.3); the app builds from a clean clone.
+4.3 Member C – UX and Goal (Design Lead)
+Day 1–3 – Design before code. Draw annotated wireframes for Dashboard, Add Expense, Insights and Goal. Each annotation names the Kavindu problem it solves (for example, “donut shows committed vs discretionary, which he has never seen”). Get team approval.
+Day 3–4 – Material 3 theme: light background, calm accent, typography scale. Add Theme.kt and colour tokens.
+Day 4–5 – Reusable components: AmountField, CategoryChip, SummaryCard, ProgressRing, DonutChart, MonthSwitcher, EmptyState, ErrorState, LoadingState. Publish them for A and B.
+Week 1–2 – Navigation: sealed Route class, NavHost, bottom bar with centre “+” action, auth gate (start at Login or Dashboard).
+Week 2 – Login and Register screens using A’s AuthViewModel state (validation messages, loading, errors).
+Week 2 – Goal slice: GoalRepository, GoalViewModel (required monthly saving, saved this month, projected finish date, deposit and withdraw), Goal screen.
+Week 3 – Dashboard: DashboardViewModel combining income, expense and goal flows into one UiState; real-time updates; pending-invoice alert; goal status chip.
+Week 3 – Settings: exchange rates, recurring-expense list, sign out.
+Week 3 – UX pass: empty states, error states, 48dp touch targets, contrast, test on an API 26 emulator and a real device.
+Week 4 – README (overview, Firebase steps, build instructions, architecture summary) and final PDF assembly (at least 15 pages).
+Week 4 – Demo script: write the 15-minute running order and prepare the demo account with realistic Kavindu data.
+Week 4 – Build the APK and test install on a clean device (Playbook 5.10).
+C’s definition of done: a new user understands the Dashboard in five seconds; no screen is ever blank; every wireframe annotation maps to a real implemented feature.
+5. Critical Stage Playbooks
+5.1 Create the codebase and repository
+Owner: Member B. Do this once; everyone else clones afterwards.
+In Android Studio choose New Project → Empty Activity (the Compose template). Name: Clarity Finance. Package: com.clarity.finance. Language: Kotlin. Minimum SDK: API 26. Build configuration: Kotlin DSL.
+Open app/build.gradle.kts and confirm minSdk = 26, targetSdk = 34 (or higher) and compose = true.
+Create the package folders: ui, viewmodel, data/repository, data/remote, data/local, model, di, util.
+Open a terminal in the project root: git init, then add a Android .gitignore (exclude build/, .gradle/, local.properties, *.jks, *.keystore, .idea/ and any service-account JSON).
+Create a private repository on GitHub or GitLab (no auto-generated README), then run git remote add origin <url>, git add ., git commit -m "chore: initial Compose project", git branch -M main, git push -u origin main.
+Create the develop branch: git checkout -b develop and push it. All feature branches start from develop.
+Add a first README.md stub (the final one is C’s job) and push.
+Invite A and C (Playbook 5.2), then message them: “Clone, checkout develop, create feature/<name>.”
+Everyday Git commands
+git clone <repo-url>
+cd clarity-finance
+git checkout develop
+git checkout -b feature/income-data      # example for Member A
+# ...work, then:
+git add .
+git commit -m "feat(income): add IncomeRepository with Firestore listener"
+git push -u origin feature/income-data   # open a Pull Request into develop
+Commit history matters. Make small, frequent commits from all three members. The marking scheme refers single-commit repositories for academic integrity review.
+5.2 Give access to members (Git, Firebase and signing keys)
+GitHub / GitLab
+GitHub: repository Settings → Collaborators → Add people (GitLab: Manage → Members → Invite members, role Developer or Maintainer).
+Each member accepts the e-mail invitation and clones with HTTPS or SSH.
+Turn on branch protection for main and develop: require a pull request and at least one review.
+Submit the repository access link on the LMS before the deadline and also add the lecturer account if the brief asks for it.
+Firebase Console
+Open the Firebase project → gear icon → Users and permissions → Add member.
+Add each teammate’s Google account with the Editor role (Owner stays with one person).
+Each member runs ./gradlew signingReport (Windows: gradlew signingReport) and copies the SHA-1 of the debug variant.
+In Firebase: Project settings → Your apps → Android app → Add fingerprint and paste every member’s SHA-1. This is required for Google Sign-In and avoids sign-in failures on teammates’ machines.
+Share google-services.json through the private repository (acceptable for a private coursework repo) or a private chat. Never share or commit service-account keys, keystore passwords or *.jks files.
+If Google Sign-In works for one member but fails for another, a missing SHA-1 fingerprint is the cause in almost every case.
+5.3 Set up Firebase
+Owner: Member A.
+Go to console.firebase.google.com → Add project → name it clarity-finance (Google Analytics can stay off).
+Add app → Android. Package name must exactly match applicationId (com.clarity.finance). Add the SHA-1 now.
+Download `google-services.json` and place it in the app/ folder (not the project root).
+Add the Google services Gradle plugin to the project and app modules and the Firebase BOM, Auth and Firestore dependencies (see Appendix B).
+Build → Authentication → Get started → Sign-in method: enable Email/Password (mandatory). Enable Google as bonus and set the support e-mail.
+Build → Firestore Database → Create database. Choose production mode (our own rules replace the default) and a nearby region such as asia-south1 (Mumbai) or asia-southeast1 (Singapore). The region cannot be changed later.
+Sync Gradle, run the app and register a test user. Confirm it appears under Authentication → Users.
+Write a test document from the app and confirm it appears in the Firestore console.
+Tell B and C: “Firebase is ready, pull the latest google-services.json.”
+MERMAID – Firebase setup flow
+5.4 Create Firestore security rules and indexes
+Owner: Member A. Rules are a mandatory deliverable. Missing rules score zero for the Firebase criterion.
+In the project root create firestore.rules (full text in Appendix A).
+Principle: a signed-in user may read and write only documents under `users/{their own uid}`. Everything else is denied by default.
+Add validation: amount must be a number, expense amount must be greater than 0, currency must be one of LKR/USD/USDT, source and type must be allowed values.
+Test in the console: Firestore → Rules → Rules Playground. Simulate (1) an authenticated read of your own path – allowed; (2) a read of another uid – denied; (3) an unauthenticated read – denied.
+Deploy: either paste into Firestore → Rules → Publish, or with the CLI run firebase init firestore once, then firebase deploy --only firestore:rules,firestore:indexes.
+Create firestore.indexes.json for composite indexes (Appendix A). If a query needs an index, Logcat prints an error containing a link; open it to create the index, then copy it into the JSON file.
+Commit both files to the repository root and mention them in the README.
+Do not leave the “test mode” rule (allow read, write: if true) in the project. It exposes all data and will be penalised.
+5.5 Authentication flow
+A builds AuthRepository (signUp, signIn, signOut, currentUserFlow) around FirebaseAuth.
+AuthViewModel validates email format and password length (6+), exposes StateFlow<AuthUiState> (Idle, Loading, Success, Error) and never touches the UI.
+C’s Login and Register screens collect the state, show inline errors and navigate on success.
+Navigation start destination: Dashboard if currentUser != null, otherwise Login.
+On sign-up create the user profile document users/{uid} with name, email, default rates and a default goal.
+Map Firebase exceptions to friendly messages (wrong password, user not found, email already in use, network error).
+MERMAID – login request flow
+5.6 Hilt dependency injection and MVVM base
+Add the Hilt Gradle plugin, KSP and dependencies (Appendix B).
+Create ClarityApp : Application annotated with @HiltAndroidApp and register it in the manifest.
+Annotate MainActivity with @AndroidEntryPoint (single-activity architecture).
+Create AppModule that provides FirebaseAuth, FirebaseFirestore, the Room database and DAOs, and binds repository interfaces to implementations.
+Annotate every ViewModel with @HiltViewModel and @Inject constructor(...).
+In Composables obtain ViewModels with hiltViewModel() only – never ViewModel() constructors.
+Expose state as StateFlow (private MutableStateFlow, public read-only asStateFlow()). Collect in UI with collectAsStateWithLifecycle().
+Launch all asynchronous work in viewModelScope.
+Three-question review for every pull request: (1) Is there any if/calculation logic inside a Composable beyond display? (2) Does any Composable import a repository, Firestore or Room class? (3) Is any MutableStateFlow public? If yes to any, request changes.
+5.7 Real-time listeners (dashboard and lists)
+Wrap addSnapshotListener in a callbackFlow and always call awaitClose { registration.remove() } to avoid leaks.
+Query only the visible month using the denormalised month field (for example "2026-10").
+Repository returns Flow<List<T>>; ViewModel uses combine to merge income, expense and goal flows into one summary.
+Add .catch { } so listener errors become UiState.Error instead of crashes.
+Use SnapshotListenOptions or metadata (isFromCache) to show a small “offline – showing saved data” indicator.
+MERMAID – dashboard real-time updates
+5.8 Offline support with Room and Firestore persistence
+Firestore offline persistence is on by default on Android; confirm it in FirebaseFirestoreSettings and keep it enabled.
+Add Room entities mirroring the domain models (income, expense, goal, savings) plus DAOs that return Flow.
+Repository pattern: the UI reads from Room; Firestore listeners write incoming changes into Room; writes go to Firestore (queued automatically when offline).
+Never block the UI on network: show cached data immediately, then update.
+Test: enable airplane mode, add an expense, confirm it shows, disable airplane mode and confirm it reaches Firestore.
+Show a non-blocking banner when offline (see C’s OfflineBanner).
+MERMAID – offline-first write path
+5.9 Git workflow and merge conflicts
+Branch names: feature/<area>-<task>, fix/<bug>, docs/<section>. Never commit directly to main.
+Commit messages: feat:, fix:, docs:, refactor:, test: prefix plus a short sentence.
+Open a pull request into develop; one teammate reviews using the three-question check.
+Pull develop into your branch daily (git pull origin develop) to keep conflicts small.
+If a conflict occurs: open the file, keep both intended changes, remove markers (<<<<<<<, =======, >>>>>>>), build, then git add and git commit.
+Merge develop into main only for milestone builds (end of week 2, 3 and final).
+5.10 Build and validate the APK
+Run the app on an API 26 emulator and a real device; test sign-up, add data, airplane mode and sign-out.
+Debug APK: Build → Build Bundle(s)/APK(s) → Build APK(s). It is acceptable if connected to the live Firebase project.
+Release APK (optional, stronger): Build → Generate Signed Bundle / APK → APK, create a keystore, store it outside the repository and keep the password safe.
+Copy the APK to a different phone and install it from scratch to prove it installs.
+Confirm the app talks to the live Firebase project (data appears in the console). Local emulator configuration is not accepted.
+Name the file clearly, for example ClarityFinance-v1.0.apk, and upload it to the LMS with the other deliverables.
+5.11 Create the Technical Design Document (15+ pages)
+Each member writes their own sections in a shared document (Section 4 lists ownership). C merges and formats.
+Mention Kavindu’s scenario and our implementation in every section; generic text is penalised.
+Embed rendered Mermaid diagrams (Section 6) and wireframes as images with captions.
+Required content: requirements analysis, Firestore schema, MVVM diagram, annotated wireframes (3+), design decision justifications; the rubric also lists a use case diagram and SRS.
+Suggested outline: Introduction · Persona and problem analysis · Failed-tools analysis · Requirements · Firestore schema and rules · MVVM architecture · Wireframes and navigation · Implementation notes · Testing · Limitations and future work · Team contributions and AI disclosure.
+Export to PDF, check page count (at least 15) and read it once together.
+5.12 Prepare the live demo
+Prepare a demo account loaded with realistic Kavindu data (salary, freelance, AdSense, crypto, rent, coffee, a pending invoice, a goal).
+Run order (15 min): 1 min problem statement · 6 min core flows (register, add income USD, add expense, dashboard, insights, goal) · 5 min architecture and Firestore · 3 min questions.
+Practise the offline demo and the “rules block another user” demo.
+Each member answers questions in their own area, but everyone must be able to explain the full flow.
+Bring the APK on a charged phone and a backup emulator. Check Wi-Fi.
+Likely question
+Best owner
+How did you derive requirements from the scenario?
+B (with C)
+Why these Firestore collections and indexes? What does each query do?
+A
+Why store amountLKR and exchangeRate?
+A
+How do your rules protect user data?
+A
+Trace one expense from tap to database and back.
+B
+Why StateFlow and a private MutableStateFlow?
+B
+Why Hilt? Where are ViewModels created?
+B
+How does the app behave offline or with an empty dataset?
+A and C
+Why would Kavindu still use this in six months?
+C
+How is goal progress calculated?
+C
+6. Mermaid Flow Diagrams
+6.1 System architecture (MVVM layers)
+MERMAID – layered architecture
+6.2 Add expense request flow
+MERMAID – saving an expense
+6.3 Add multi-currency income flow
+MERMAID – income handling
+6.4 Goal progress and status logic
+MERMAID – goal calculation
+6.5 Recurring expense generation
+MERMAID – recurring rules
+6.6 Firestore data model
+MERMAID – Firestore entities
+6.7 Kavindu’s first-week journey
+MERMAID – user journey the app must support
+6.8 Project timeline
+MERMAID – schedule
+7. Timeline and Weekly Milestones
+Week
+Member A
+Member B
+Member C
+Team milestone
+1
+3–9 Oct
+Firebase project, access, schema doc, Auth repository
+Repo, skeleton, Hilt, shared contracts
+Wireframes, theme, components
+Everyone can build and run the skeleton; contracts approved
+2
+10–16 Oct
+Rules, indexes, data source, income data layer
+Expense data and ViewModel
+Navigation, Auth screens, Goal logic
+Login works end to end; first Firestore writes
+3
+17–23 Oct
+Income screens, offline, tests
+Insights, recurring, ViewModel tests
+Dashboard, Goal screen, Settings, UX pass
+Feature complete; internal demo; PDF drafts done
+4
+24–30 Oct
+Docs, rule demos, bug fixes
+Docs, review, bug fixes
+README, PDF, APK, demo script
+Final PDF, APK, repo link submitted on LMS by 30 Oct
+Feature-freeze at the end of week 3. Week 4 is for testing, documentation and rehearsal, not new features.
+9. Risks, Quality Gates and Final Checklists
+9.1 Risks and mitigation
+Risk
+Impact
+Mitigation
+One member falls behind
+Unequal weight, missed deadline
+Check hours every week; rebalance “support” tasks at week 2
+Contract changes late
+Breaks other members’ code
+Freeze models and interfaces after day 3; changes need all three approvals
+Firebase sign-in fails on a teammate’s machine
+Lost time
+Add every SHA-1 early (Playbook 5.2)
+Missing Firestore index error
+Blank list
+Open the Logcat link, create the index, save it to firestore.indexes.json
+Logic ends up in Composables
+Architecture marks lost
+Three-question review on every pull request
+Late discovery of API 26 crashes
+APK failure = zero
+Test on an API 26 emulator from week 2
+Documentation left to the last day
+Generic or short PDF
+Draft sections in weeks 2–3; assemble in week 4
+Rules left in test mode or not submitted
+Zero for Firebase
+Rules deployed by day 5 and kept in the repository
+9.2 Quality gates before each merge into develop
+Project builds from a clean clone.
+No TODO crashes; empty list, loading and error states exist for new screens.
+Composables contain only display logic.
+No MutableStateFlow exposed; async work uses viewModelScope.
+Firestore queries are covered by indexes or have been tested.
+A teammate has reviewed the pull request.
+9.3 Final submission checklist
+Item
+Done
+Owner
+Private repo link on LMS with iterative commits
+☐
+B
+README: overview, Firebase steps, build instructions, architecture summary
+☐
+C
+Design PDF, 15+ pages, Kavindu-specific
+☐
+C (all contribute)
+Requirements: FR, NFR, constraints + use case diagram
+☐
+B
+Firestore schema + indexes + multi-currency justification
+☐
+A
+firestore.rules and firestore.indexes.json in repo and PDF
+☐
+A
+MVVM architecture diagram
+☐
+B
+3+ annotated wireframes + navigation graph
+☐
+C
+APK (live Firebase), installs on Android 8.0+
+☐
+C with B
+Real-time listener on dashboard; offline behaviour tested
+☐
+A
+Error, empty and offline states on every screen
+☐
+All
+Email/password Auth working; Google Sign-In (bonus)
+☐
+A
+AI usage disclosed; no copied code
+☐
+All
+Demo rehearsed; all three attend
+☐
+All
+Appendix A – Firestore Rules and Indexes
+firestore.rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+ 
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+ 
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+ 
+      match /incomes/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.amount is number
+          && request.resource.data.currency in ['LKR', 'USD', 'USDT']
+          && request.resource.data.source in ['SALARY', 'FREELANCE', 'ADSENSE', 'CRYPTO']
+          && request.resource.data.status in ['RECEIVED', 'PENDING'];
+      }
+ 
+      match /expenses/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.amount is number
+          && request.resource.data.amount > 0
+          && request.resource.data.type in ['COMMITTED', 'DISCRETIONARY']
+          && request.resource.data.paymentMethod in ['CARD', 'CASH', 'SECONDARY'];
+      }
+ 
+      match /{document=**} {
+        allow read, write: if isOwner(uid);   // recurring, goals, savings, categories
+      }
+    }
+  }
+}
+firestore.indexes.json
+{
+  "indexes": [
+    { "collectionGroup": "expenses", "queryScope": "COLLECTION",
+      "fields": [ {"fieldPath":"month","order":"ASCENDING"}, {"fieldPath":"date","order":"DESCENDING"} ] },
+    { "collectionGroup": "expenses", "queryScope": "COLLECTION",
+      "fields": [ {"fieldPath":"month","order":"ASCENDING"}, {"fieldPath":"type","order":"ASCENDING"},
+                  {"fieldPath":"date","order":"DESCENDING"} ] },
+    { "collectionGroup": "incomes", "queryScope": "COLLECTION",
+      "fields": [ {"fieldPath":"month","order":"ASCENDING"}, {"fieldPath":"date","order":"DESCENDING"} ] },
+    { "collectionGroup": "incomes", "queryScope": "COLLECTION",
+      "fields": [ {"fieldPath":"status","order":"ASCENDING"}, {"fieldPath":"date","order":"ASCENDING"} ] },
+    { "collectionGroup": "incomes", "queryScope": "COLLECTION",
+      "fields": [ {"fieldPath":"source","order":"ASCENDING"}, {"fieldPath":"date","order":"ASCENDING"} ] }
+  ],
+  "fieldOverrides": []
+}
+Why these indexes: the monthly lists for Home, Insights and Income filter by month and sort by date; the Waiting for payment list filters by status; the crypto year-to-date position filters by source and a date range; the Insights filter chips add type.
+Appendix B – Gradle, Manifest and Kotlin Snippets
+Gradle (replace <ver> using Android Studio suggestions)
+// settings / project build.gradle.kts (plugins block)
+plugins {
+    id("com.android.application") version "<agp>" apply false
+    id("org.jetbrains.kotlin.android") version "<kotlin>" apply false
+    id("com.google.gms.google-services") version "<ver>" apply false
+    id("com.google.dagger.hilt.android") version "<ver>" apply false
+    id("com.google.devtools.ksp") version "<ksp>" apply false
+}
+ 
+// app/build.gradle.kts
+plugins {
+    id("com.android.application"); id("org.jetbrains.kotlin.android")
+    id("com.google.gms.google-services")
+    id("com.google.dagger.hilt.android"); id("com.google.devtools.ksp")
+}
+android {
+    namespace = "com.clarity.finance"
+    compileSdk = 34
+    defaultConfig { applicationId = "com.clarity.finance"; minSdk = 26; targetSdk = 34 }
+    buildFeatures { compose = true }
+}
+dependencies {
+    implementation(platform("androidx.compose:compose-bom:<ver>"))
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.navigation:navigation-compose:<ver>")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:<ver>")
+    implementation("androidx.hilt:hilt-navigation-compose:<ver>")
+    implementation("com.google.dagger:hilt-android:<ver>"); ksp("com.google.dagger:hilt-compiler:<ver>")
+    implementation(platform("com.google.firebase:firebase-bom:<ver>"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("androidx.room:room-runtime:<ver>"); implementation("androidx.room:room-ktx:<ver>")
+    ksp("androidx.room:room-compiler:<ver>")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:<ver>")
+}
+Kotlin patterns
+// Application + Activity
+@HiltAndroidApp class ClarityApp : Application()
+@AndroidEntryPoint class MainActivity : ComponentActivity() { /* setContent { ClarityTheme { NavHost... } } */ }
+ 
+// Generic UI state
+sealed interface UiState<out T> {
+    data object Loading : UiState<Nothing>
+    data object Empty : UiState<Nothing>
+    data class Success<T>(val data: T) : UiState<T>
+    data class Error(val message: String) : UiState<Nothing>
+}
+ 
+// Firestore listener as Flow (data layer)
+fun <T> Query.asFlow(mapper: (QuerySnapshot) -> List<T>): Flow<List<T>> = callbackFlow {
+    val reg = addSnapshotListener { snap, err ->
+        if (err != null) { close(err); return@addSnapshotListener }
+        if (snap != null) trySend(mapper(snap))
+    }
+    awaitClose { reg.remove() }
+}
+ 
+// ViewModel pattern
+@HiltViewModel
+class DashboardViewModel @Inject constructor(
+    private val income: IncomeRepository,
+    private val expenses: ExpenseRepository,
+    private val goals: GoalRepository
+) : ViewModel() {
+    private val _state = MutableStateFlow<UiState<Summary>>(UiState.Loading)
+    val state: StateFlow<UiState<Summary>> = _state.asStateFlow()
+ 
+    init {
+        viewModelScope.launch {
+            combine(income.observeMonth(month()), expenses.observeMonth(month()), goals.observeGoal()) { i, e, g ->
+                Summary.from(i, e, g)
+            }.catch { _state.value = UiState.Error(it.message ?: "Something went wrong") }
+             .collect { _state.value = UiState.Success(it) }
+        }
+    }
+}
+ 
+// Composable: collects state only
+@Composable
+fun DashboardScreen(vm: DashboardViewModel = hiltViewModel()) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    when (val s = state) {
+        UiState.Loading -> LoadingState()
+        UiState.Empty -> EmptyState("Log your first expense with +")
+        is UiState.Error -> ErrorState(s.message)
+        is UiState.Success -> DashboardContent(s.data)
+    }
+}
+Appendix C – Glossary
+Term
+Meaning in this project
+Committed expense
+Fixed or unavoidable cost such as rent, utilities, gym, subscriptions
+Discretionary expense
+Spending by choice, such as coffee, delivery, shopping, fun
+Rate snapshot
+The LKR exchange rate saved with each USD or USDT income at transfer time
+Pending invoice
+Freelance payment not yet received; excluded from actual monthly income
+Required monthly saving
+(Target − saved) divided by months left until the deadline
+Vertical slice
+One feature built across data, repository, ViewModel and UI by one member
+UiState
+Sealed class describing Loading, Empty, Success or Error for a screen
+Snapshot listener
+Firestore feature that pushes changes in real time
+SHA-1
+Signing fingerprint registered in Firebase so sign-in works on each developer machine

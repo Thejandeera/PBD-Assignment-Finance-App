@@ -116,7 +116,7 @@ fun ExpensesHistoryScreen(
             currency = currentCurrency,
             exchangeRate = exchangeRate,
             onConfirm = {
-                viewModel.deleteExpense(expense.id)
+                viewModel.deleteExpense(expense)
                 expenseToDelete = null
             },
             onDismiss = { expenseToDelete = null }
@@ -129,7 +129,7 @@ fun ExpensesHistoryScreen(
             currency = currentCurrency,
             exchangeRate = exchangeRate,
             onDismiss = { selectedExpense = null },
-            onDelete = { viewModel.deleteExpense(expense.id) }
+            onDelete = { viewModel.deleteExpense(expense) }
         )
     }
 

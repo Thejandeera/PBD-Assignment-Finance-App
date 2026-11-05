@@ -1,9 +1,10 @@
 package com.clarity.finance.ui.screens
 
-import android.Manifest
-import android.content.pm.PackageManager
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.provider.Settings
+import androidx.core.app.NotificationManagerCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -31,6 +32,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Fingerprint
 import androidx.compose.material.icons.rounded.Inbox
@@ -56,10 +58,10 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarity.finance.ui.components.AlertAction
 import com.clarity.finance.ui.components.AlertActionStyle
@@ -67,6 +69,7 @@ import com.clarity.finance.ui.components.CheckmarkRow
 import com.clarity.finance.ui.components.ClarityAlertDialog
 import com.clarity.finance.ui.components.ClarityNavigationBar
 import com.clarity.finance.ui.components.ClaritySnackbarHost
+import com.clarity.finance.ui.components.ClarityTextField
 import com.clarity.finance.ui.components.DetailRow
 import com.clarity.finance.ui.components.GroupedSection
 import com.clarity.finance.ui.components.Hairline
@@ -95,7 +98,8 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onSignOutSuccess: () -> Unit,
     modifier: Modifier = Modifier,
-    onNavigateToDrafts: () -> Unit = {}
+    onNavigateToDrafts: () -> Unit = {},
+    onNavigateToAccounts: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val colors = ClarityTheme.colors
@@ -113,25 +117,11 @@ fun SettingsScreen(
     // Settings states
     val themeMode by authViewModel.themeModeFlow.collectAsStateWithLifecycle()
     val currentCurrency by authViewModel.currencyFlow.collectAsStateWithLifecycle()
+    val exchangeRate by authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
+    var showRateDialog by remember { mutableStateOf(false) }
     var isSmsEnabled by remember { mutableStateOf(authViewModel.isSmsScanEnabled) }
     var isDailyReminderEnabled by remember { mutableStateOf(authViewModel.isDailyReminderEnabled) }
     val canUseBiometrics by authViewModel.canUseBiometrics.collectAsStateWithLifecycle()
-
-    var hasSmsPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
-    val smsPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasSmsPermission = isGranted
-        if (isGranted) {
-            authViewModel.setSmsScanEnabled(true)
-            isSmsEnabled = true
-        }
-    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -301,6 +291,23 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // =================================================================
+            // Accounts
+            // =================================================================
+            GroupedSection(
+                header = "Accounts",
+                footer = "Add, edit, or delete your bank, cash, crypto, savings and investment accounts."
+            ) {
+                ListRow(
+                    title = "Manage Accounts",
+                    leading = { IconTile(icon = Icons.Rounded.AccountBalance, background = colors.blue) },
+                    showChevron = true,
+                    onClick = onNavigateToAccounts
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // =================================================================
             // Appearance
             // =================================================================
             GroupedSection(
@@ -322,7 +329,7 @@ fun SettingsScreen(
             // =================================================================
             GroupedSection(
                 header = "Currency",
-                footer = "Amounts are stored in LKR. US dollar values use the latest exchange rate."
+                footer = "All amounts are stored in LKR and displayed in your selected currency using the USD rate above."
             ) {
                 CheckmarkRow(
                     title = "Sri Lankan Rupee",
@@ -335,7 +342,21 @@ fun SettingsScreen(
                     title = "US Dollar",
                     detail = "USD",
                     selected = currentCurrency.equals("USD", ignoreCase = true),
-                    onClick = { authViewModel.setCurrency("USD") }
+                    onClick = { authViewModel.setCurrency("USD") },
+                    showDivider = true
+                )
+                ListRow(
+                    title = "Dollar Rate (1 USD in LKR)",
+                    subtitle = "Tap to update conversion rate",
+                    trailing = {
+                        Text(
+                            text = "${String.format(java.util.Locale.US, "%.2f", exchangeRate)} LKR",
+                            style = ClarityType.body,
+                            color = colors.accent
+                        )
+                    },
+                    showChevron = true,
+                    onClick = { showRateDialog = true }
                 )
             }
 
@@ -344,12 +365,19 @@ fun SettingsScreen(
             // =================================================================
             // Automation
             // =================================================================
+            val hasNotificationAccess = NotificationManagerCompat
+                .getEnabledListenerPackages(context)
+                .contains(context.packageName)
+            val openNotificationAccessSettings = {
+                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            }
+
             GroupedSection(
                 header = "Automation",
-                footer = if (hasSmsPermission) {
-                    "Detects BOC and ComBank debit and credit messages and drafts them for your review."
+                footer = if (hasNotificationAccess) {
+                    "Listening for incoming BOC, ComBank, and bank notifications to draft transactions automatically."
                 } else {
-                    "SMS access lets Clarity read BOC and ComBank messages and draft them as transactions for you to review."
+                    "Allow Notification Access so Clarity can auto-draft incoming bank SMS and card withdrawal alerts without READ_SMS."
                 }
             ) {
                 SwitchRow(
@@ -358,11 +386,10 @@ fun SettingsScreen(
                     leading = { IconTile(icon = Icons.Rounded.Sms, background = colors.indigo) },
                     showDivider = true,
                     onCheckedChange = { checked ->
-                        if (checked && !hasSmsPermission) {
-                            smsPermissionLauncher.launch(Manifest.permission.READ_SMS)
-                        } else {
-                            isSmsEnabled = checked
-                            authViewModel.setSmsScanEnabled(checked)
+                        isSmsEnabled = checked
+                        authViewModel.setSmsScanEnabled(checked)
+                        if (checked && !hasNotificationAccess) {
+                            openNotificationAccessSettings()
                         }
                     }
                 )
@@ -373,11 +400,11 @@ fun SettingsScreen(
                     onClick = onNavigateToDrafts,
                     showDivider = true
                 )
-                if (!hasSmsPermission) {
+                if (!hasNotificationAccess) {
                     ListRow(
-                        title = "Allow SMS Access",
+                        title = "Allow Notification Access",
                         titleColor = colors.accent,
-                        onClick = { smsPermissionLauncher.launch(Manifest.permission.READ_SMS) },
+                        onClick = openNotificationAccessSettings,
                         showDivider = true
                     )
                 }
@@ -442,6 +469,51 @@ fun SettingsScreen(
             )
 
             Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
+        }
+    }
+
+    if (showRateDialog) {
+        var rateInput by remember(exchangeRate) {
+            mutableStateOf(String.format(java.util.Locale.US, "%.2f", exchangeRate))
+        }
+        var rateError by remember { mutableStateOf<String?>(null) }
+        ClarityAlertDialog(
+            title = "Dollar Rate in LKR",
+            message = "Enter how many LKR equal 1 USD.",
+            onDismissRequest = { showRateDialog = false },
+            actions = listOf(
+                AlertAction(label = "Cancel", style = AlertActionStyle.Cancel) { showRateDialog = false },
+                AlertAction(
+                    label = "Save",
+                    style = AlertActionStyle.Preferred,
+                    onClick = {
+                        val parsed = rateInput.trim().toDoubleOrNull()
+                        if (parsed == null || parsed <= 0.0 || !parsed.isFinite()) {
+                            rateError = "Enter a valid rate above 0"
+                        } else {
+                            authViewModel.setUsdToLkrRate(parsed)
+                            showRateDialog = false
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Dollar rate updated to ${String.format(java.util.Locale.US, "%.2f", parsed)} LKR")
+                            }
+                        }
+                    }
+                )
+            )
+        ) {
+            ClarityTextField(
+                value = rateInput,
+                onValueChange = { raw ->
+                    rateInput = raw.filter { it.isDigit() || it == '.' }
+                    rateError = null
+                },
+                label = "1 USD = LKR",
+                placeholder = "e.g. 330.00",
+                isError = rateError != null,
+                errorMessage = rateError,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                containerColor = colors.card
+            )
         }
     }
 }

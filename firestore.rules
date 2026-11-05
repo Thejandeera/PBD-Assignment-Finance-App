@@ -67,6 +67,15 @@ service cloud.firestore {
       match /categories/{categoryId} {
         allow read, write: if isOwner(uid);
       }
+
+      match /drafts/{draftId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /accounts/{accountId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isValidAccount(request.resource.data);
+      }
     }
 
     function isValidIncome(data) {
@@ -74,10 +83,12 @@ service cloud.firestore {
                                  'amountLKR', 'status', 'date', 'month'])
         && data.keys().hasOnly(['source', 'sourceName', 'sourceIcon', 'amount', 'currency',
                                 'exchangeRate', 'amountLKR', 'status', 'date', 'month',
-                                'projectName', 'note', 'createdAt'])
+                                'projectName', 'note', 'accountId', 'accountName', 'createdAt'])
         // A built-in source id or a custom source's document id.
         && data.source is string && data.source.size() > 0 && data.source.size() <= 64
         && (!('sourceName' in data) || (data.sourceName is string && data.sourceName.size() <= 40))
+        && (!('accountId' in data) || data.accountId == null || data.accountId is string)
+        && (!('accountName' in data) || data.accountName == null || data.accountName is string)
         && data.currency in ['LKR', 'USD', 'USDT']
         && data.status in ['RECEIVED', 'PENDING']
         && data.amount is number
@@ -110,7 +121,17 @@ service cloud.firestore {
       return data.amount is number
         && data.amount > 0
         && data.type in ['COMMITTED', 'DISCRETIONARY']
-        && data.paymentMethod in ['CARD', 'CASH', 'SECONDARY'];
+        && data.paymentMethod in ['CARD', 'CASH', 'SECONDARY', 'ONLINE']
+        && (!('accountId' in data) || data.accountId == null || data.accountId is string)
+        && (!('accountName' in data) || data.accountName == null || data.accountName is string);
+    }
+
+    function isValidAccount(data) {
+      return data.keys().hasAll(['name', 'type', 'currency', 'currentBalance'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 60
+        && data.type in ['BANK', 'CASH', 'CRYPTO', 'SAVINGS', 'INVESTMENTS', 'OTHERS']
+        && data.currency in ['LKR', 'USD']
+        && data.currentBalance is number;
     }
   }
 }

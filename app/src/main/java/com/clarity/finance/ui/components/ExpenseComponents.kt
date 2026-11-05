@@ -123,7 +123,7 @@ fun ExpenseRow(
     val meta = buildList {
         if (showDate) add(DisplayDates.short(expense.date))
         add(expense.type.displayName)
-        add(expense.paymentMethod.displayName)
+        expense.accountName?.takeIf { it.isNotBlank() }?.let { add(it) }
     }.joinToString(" · ")
     val note = expense.note?.takeIf { it.isNotBlank() }
     val accessibilityModifier = if (onDeleteRequest != null) {
@@ -323,12 +323,16 @@ fun ExpenseDetailSheet(
 
             GroupedSection(containerColor = colors.elevatedCard) {
                 DetailRow(label = "Date", value = DisplayDates.long(expense.date), showDivider = true)
-                DetailRow(label = "Type", value = expense.type.displayName, showDivider = true)
+                val hasAccount = !expense.accountName.isNullOrBlank()
+                val hasNote = !expense.note.isNullOrBlank()
                 DetailRow(
-                    label = "Paid With",
-                    value = expense.paymentMethod.displayName,
-                    showDivider = !expense.note.isNullOrBlank()
+                    label = "Type",
+                    value = expense.type.displayName,
+                    showDivider = hasAccount || hasNote
                 )
+                expense.accountName?.takeIf { it.isNotBlank() }?.let { accName ->
+                    DetailRow(label = "Account", value = accName, showDivider = hasNote)
+                }
                 expense.note?.takeIf { it.isNotBlank() }?.let { note ->
                     DetailRow(label = "Note", value = note)
                 }

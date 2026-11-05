@@ -37,6 +37,8 @@ data class Expense(
     val categoryIcon: String = "📦",
     val type: SpendingType = SpendingType.DISCRETIONARY,
     val paymentMethod: PaymentMethod = PaymentMethod.CARD,
+    val accountId: String? = null,
+    val accountName: String? = null,
     val date: String = "", // "YYYY-MM-DD"
     val month: String = "", // "YYYY-MM"
     val note: String? = null, // Optional, can be null
@@ -56,6 +58,8 @@ data class RecurringExpense(
     val dayOfMonth: Int = 1,
     val type: SpendingType = SpendingType.COMMITTED,
     val paymentMethod: PaymentMethod = PaymentMethod.CARD,
+    val accountId: String? = null,
+    val accountName: String? = null,
     val note: String? = null, // Optional, can be null
     val active: Boolean = true,
     val lastAppliedMonth: String = ""

@@ -2,12 +2,20 @@ package com.clarity.finance.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clarity.finance.data.local.PrimaryAccountProvider
+import com.clarity.finance.data.repository.AccountRepository
+import com.clarity.finance.data.repository.ExchangeRateProvider
 import com.clarity.finance.data.repository.ExpenseRepository
+import com.clarity.finance.model.Account
+import com.clarity.finance.model.AccountBalanceCalculator
+import com.clarity.finance.model.AccountType
 import com.clarity.finance.model.CategoryItem
+import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Expense
 import com.clarity.finance.model.PaymentMethod
 import com.clarity.finance.model.SpendingType
 import com.clarity.finance.model.getDefaultCategories
+import com.clarity.finance.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,8 +37,43 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ExpenseViewModel @Inject constructor(
-    private val expenseRepository: ExpenseRepository
+    private val expenseRepository: ExpenseRepository,
+    private val accountRepository: AccountRepository,
+    private val exchangeRateProvider: ExchangeRateProvider,
+    private val primaryAccountProvider: PrimaryAccountProvider
 ) : ViewModel() {
+
+    val primaryAccountId: StateFlow<String?> = primaryAccountProvider.primaryAccountIdFlow
+
+    val accounts: StateFlow<List<Account>> = accountRepository.observeAccounts()
+        .catch { emit(emptyList()) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
+
+    val lkrPerUsdRate: StateFlow<Double> = exchangeRateProvider.observeLkrPerUsdRate()
+        .catch { emit(CurrencyFormatter.FALLBACK_LKR_PER_USD) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = CurrencyFormatter.FALLBACK_LKR_PER_USD
+        )
+
+    private fun defaultInputCurrency(): CurrencyType =
+        if (primaryAccountProvider.defaultCurrencyFlow.value.equals("USD", ignoreCase = true)) {
+            CurrencyType.USD
+        } else {
+            CurrencyType.LKR
+        }
+
+    fun syncDefaultCurrency() {
+        val resolved = defaultInputCurrency()
+        _formState.update { state ->
+            if (state.amountInput.isEmpty()) state.copy(inputCurrency = resolved) else state
+        }
+    }
 
     // =========================================================================
     // Form State & Actions (Wireframes 1 & 2)
@@ -91,6 +134,15 @@ class ExpenseViewModel @Inject constructor(
         _formState.update { it.copy(paymentMethod = method) }
     }
 
+    fun onAccountSelected(account: Account?) {
+        _formState.update { it.copy(selectedAccount = account, hasPickedAccount = true) }
+    }
+
+    fun onInputCurrencySelected(currency: CurrencyType) {
+        val resolved = if (currency == CurrencyType.USD) CurrencyType.USD else CurrencyType.LKR
+        _formState.update { it.copy(inputCurrency = resolved) }
+    }
+
     fun onDateChanged(dateString: String) {
         try {
             val parsed = LocalDate.parse(dateString)
@@ -127,8 +179,14 @@ class ExpenseViewModel @Inject constructor(
         val today = LocalDate.now()
         val defaultCategory = categories.value.firstOrNull() ?: getDefaultCategories().firstOrNull()
         _formState.value = ExpenseFormState(
+            inputCurrency = defaultInputCurrency(),
             selectedCategory = defaultCategory,
             spendingType = defaultCategory?.defaultType ?: SpendingType.DISCRETIONARY,
+            selectedAccount = AccountBalanceCalculator.resolveDefaultAccount(
+                accounts.value,
+                primaryAccountId.value
+            ),
+            hasPickedAccount = false,
             date = today.toString(),
             formattedDateDisplay = "Today, ${today.format(DateTimeFormatter.ofPattern("dd MMM yyyy"))}"
         )
@@ -158,17 +216,31 @@ class ExpenseViewModel @Inject constructor(
             defaultType = SpendingType.DISCRETIONARY
         )
 
+        val rate = lkrPerUsdRate.value
+        val amountInLkr = AccountBalanceCalculator.toLkr(amount, state.inputCurrency, rate)
+
+        val resolvedAccount = state.selectedAccount
+            ?: if (!state.hasPickedAccount) {
+                AccountBalanceCalculator.resolveDefaultAccount(accounts.value, primaryAccountId.value)
+            } else null
+        val resolvedPaymentMethod = when (resolvedAccount?.type) {
+            AccountType.CASH -> PaymentMethod.CASH
+            AccountType.CRYPTO -> PaymentMethod.SECONDARY
+            else -> state.paymentMethod
+        }
         val resolvedMonth = state.date.take(7) // "YYYY-MM"
         val optionalNote = state.note.trim().ifEmpty { null }
 
         val expense = Expense(
             id = UUID.randomUUID().toString(),
-            amount = amount,
+            amount = amountInLkr,
             categoryId = category.id,
             categoryName = category.name,
             categoryIcon = category.icon,
             type = state.spendingType,
-            paymentMethod = state.paymentMethod,
+            paymentMethod = resolvedPaymentMethod,
+            accountId = resolvedAccount?.id,
+            accountName = resolvedAccount?.name,
             date = state.date,
             month = resolvedMonth,
             note = optionalNote,
@@ -179,6 +251,10 @@ class ExpenseViewModel @Inject constructor(
             _formState.update { it.copy(isSubmitting = true, errorMessage = null) }
             val result = expenseRepository.addExpense(expense)
             if (result.isSuccess) {
+                if (resolvedAccount != null) {
+                    val delta = AccountBalanceCalculator.expenseDelta(amountInLkr, resolvedAccount.currency, rate)
+                    accountRepository.adjustBalance(resolvedAccount.id, delta)
+                }
                 _formState.update { it.copy(isSubmitting = false, isSuccess = true) }
                 onSuccess?.invoke()
                 resetFormState()
@@ -271,8 +347,27 @@ class ExpenseViewModel @Inject constructor(
         )
 
     fun deleteExpense(expenseId: String) {
+        val existing = historyState.value.expenses.firstOrNull { it.id == expenseId }
+        if (existing != null) {
+            deleteExpense(existing)
+        } else {
+            viewModelScope.launch {
+                expenseRepository.deleteExpense(expenseId)
+            }
+        }
+    }
+
+    fun deleteExpense(expense: Expense) {
         viewModelScope.launch {
-            expenseRepository.deleteExpense(expenseId)
+            val result = expenseRepository.deleteExpense(expense.id)
+            if (result.isSuccess && !expense.accountId.isNullOrBlank()) {
+                val account = accounts.value.firstOrNull { it.id == expense.accountId }
+                    ?: accountRepository.getAccount(expense.accountId)
+                if (account != null) {
+                    val refund = -AccountBalanceCalculator.expenseDelta(expense.amount, account.currency, lkrPerUsdRate.value)
+                    accountRepository.adjustBalance(account.id, refund)
+                }
+            }
         }
     }
 

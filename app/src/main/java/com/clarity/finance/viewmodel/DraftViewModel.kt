@@ -1,22 +1,32 @@
 package com.clarity.finance.viewmodel
 
-import android.content.Context
-import android.provider.Telephony
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clarity.finance.data.local.PrimaryAccountProvider
+import com.clarity.finance.data.repository.AccountRepository
 import com.clarity.finance.data.repository.DraftRepository
+import com.clarity.finance.data.repository.ExchangeRateProvider
 import com.clarity.finance.data.repository.ExpenseRepository
+import com.clarity.finance.data.repository.IncomeRepository
+import com.clarity.finance.model.Account
+import com.clarity.finance.model.AccountBalanceCalculator
+import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.DraftTransaction
 import com.clarity.finance.model.DraftTransactionType
 import com.clarity.finance.model.Expense
+import com.clarity.finance.model.Income
+import com.clarity.finance.model.IncomeSource
+import com.clarity.finance.model.IncomeStatus
 import com.clarity.finance.model.SpendingType
 import com.clarity.finance.model.getDefaultCategories
 import com.clarity.finance.util.BankSmsParser
+import com.clarity.finance.util.CurrencyFormatter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -32,8 +42,20 @@ data class DraftUiState(
 @HiltViewModel
 class DraftViewModel @Inject constructor(
     private val draftRepository: DraftRepository,
-    private val expenseRepository: ExpenseRepository
+    private val expenseRepository: ExpenseRepository,
+    private val incomeRepository: IncomeRepository,
+    private val accountRepository: AccountRepository,
+    private val exchangeRateProvider: ExchangeRateProvider,
+    private val primaryAccountProvider: PrimaryAccountProvider
 ) : ViewModel() {
+
+    val accounts: StateFlow<List<Account>> = accountRepository.observeAccounts()
+        .catch { emit(emptyList()) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
 
     private val _uiState = MutableStateFlow(DraftUiState())
     val uiState: StateFlow<DraftUiState> = _uiState.asStateFlow()
@@ -54,60 +76,31 @@ class DraftViewModel @Inject constructor(
     }
 
     /**
-     * Reads the real SMS inbox on physical devices when READ_SMS permission is granted.
+     * Parses a bank SMS pasted by the user without requiring READ_SMS permission.
      */
-    fun scanDeviceInbox(context: Context) {
+    fun parsePastedSms(body: String, sender: String = "BANK") {
+        val trimmed = body.trim()
+        if (trimmed.isEmpty()) {
+            _uiState.update { it.copy(feedbackMessage = "Paste a bank SMS message first.") }
+            return
+        }
         viewModelScope.launch {
-            _uiState.update { it.copy(isScanning = true, feedbackMessage = null) }
-            try {
-                val cursor = context.contentResolver.query(
-                    Telephony.Sms.Inbox.CONTENT_URI,
-                    arrayOf(Telephony.Sms.Inbox.ADDRESS, Telephony.Sms.Inbox.BODY, Telephony.Sms.Inbox.DATE),
-                    null,
-                    null,
-                    "${Telephony.Sms.Inbox.DATE} DESC LIMIT 50"
-                )
-
-                val detectedDrafts = mutableListOf<DraftTransaction>()
-                cursor?.use { c ->
-                    val addressIdx = c.getColumnIndex(Telephony.Sms.Inbox.ADDRESS)
-                    val bodyIdx = c.getColumnIndex(Telephony.Sms.Inbox.BODY)
-                    val dateIdx = c.getColumnIndex(Telephony.Sms.Inbox.DATE)
-
-                    while (c.moveToNext()) {
-                        val sender = if (addressIdx != -1) c.getString(addressIdx) else ""
-                        val body = if (bodyIdx != -1) c.getString(bodyIdx) else ""
-                        val date = if (dateIdx != -1) c.getLong(dateIdx) else System.currentTimeMillis()
-
-                        val parsed = BankSmsParser.parseSms(sender, body, date)
-                        if (parsed != null) {
-                            detectedDrafts.add(parsed)
+            val parsed = BankSmsParser.parseSms(sender, trimmed)
+            if (parsed != null) {
+                draftRepository.saveDrafts(listOf(parsed))
+                    .onSuccess {
+                        _uiState.update {
+                            it.copy(feedbackMessage = "Drafted ${parsed.merchantOrTitle} (${parsed.amount} ${parsed.currency}).")
                         }
                     }
-                }
-
-                if (detectedDrafts.isNotEmpty()) {
-                    draftRepository.saveDrafts(detectedDrafts)
-                    _uiState.update {
-                        it.copy(
-                            isScanning = false,
-                            feedbackMessage = "Found and drafted ${detectedDrafts.size} bank transactions!"
-                        )
+                    .onFailure { err ->
+                        _uiState.update {
+                            it.copy(feedbackMessage = "Failed to save draft: ${err.message}")
+                        }
                     }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            isScanning = false,
-                            feedbackMessage = "No new bank transaction SMS detected in inbox."
-                        )
-                    }
-                }
-            } catch (e: Exception) {
+            } else {
                 _uiState.update {
-                    it.copy(
-                        isScanning = false,
-                        feedbackMessage = "Could not read SMS: ${e.message}"
-                    )
+                    it.copy(feedbackMessage = "Could not detect a BOC or ComBank transaction in that message.")
                 }
             }
         }
@@ -125,12 +118,22 @@ class DraftViewModel @Inject constructor(
                 BankSmsParser.parseSms(sender, body)
             }
             draftRepository.saveDrafts(parsedList)
-            _uiState.update {
-                it.copy(
-                    isScanning = false,
-                    feedbackMessage = "Imported ${parsedList.size} sample bank SMS drafts (BOC & COMBANK)!"
-                )
-            }
+                .onSuccess {
+                    _uiState.update {
+                        it.copy(
+                            isScanning = false,
+                            feedbackMessage = "Imported ${parsedList.size} sample bank SMS drafts (BOC & COMBANK)!"
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    _uiState.update {
+                        it.copy(
+                            isScanning = false,
+                            feedbackMessage = "Failed to import sample drafts: ${err.message}"
+                        )
+                    }
+                }
         }
     }
 
@@ -138,9 +141,13 @@ class DraftViewModel @Inject constructor(
         draft: DraftTransaction,
         selectedCategoryId: String? = null,
         selectedCategoryName: String? = null,
-        spendingType: SpendingType? = null
+        spendingType: SpendingType? = null,
+        selectedAccount: Account? = null
     ) {
         viewModelScope.launch {
+            val resolvedAccount = selectedAccount ?: suggestAccountForDraft(draft)
+            val rate = exchangeRateProvider.getLkrPerUsdRate()
+
             if (draft.type == DraftTransactionType.EXPENSE) {
                 val catId = selectedCategoryId ?: draft.suggestedCategoryId
                 val catName = selectedCategoryName ?: draft.suggestedCategoryName
@@ -157,17 +164,59 @@ class DraftViewModel @Inject constructor(
                     categoryIcon = icon,
                     type = sType,
                     paymentMethod = draft.paymentMethod,
+                    accountId = resolvedAccount?.id,
+                    accountName = resolvedAccount?.name,
                     date = draft.date,
                     month = draft.date.take(7),
                     note = "Auto-Drafted from ${draft.sender}: ${draft.merchantOrTitle}",
                     createdAt = System.currentTimeMillis()
                 )
-                expenseRepository.addExpense(expense)
+                val addResult = expenseRepository.addExpense(expense)
+                if (addResult.isSuccess && resolvedAccount != null) {
+                    val delta = AccountBalanceCalculator.expenseDelta(draft.amount, resolvedAccount.currency, rate)
+                    accountRepository.adjustBalance(resolvedAccount.id, delta)
+                }
+            } else {
+                val income = Income(
+                    id = UUID.randomUUID().toString(),
+                    sourceId = IncomeSource.FREELANCE.name,
+                    sourceName = IncomeSource.FREELANCE.displayName,
+                    sourceIcon = IncomeSource.FREELANCE.icon,
+                    amount = draft.amount,
+                    currency = CurrencyType.LKR,
+                    exchangeRate = 1.0,
+                    amountLKR = draft.amount,
+                    status = IncomeStatus.RECEIVED,
+                    date = draft.date,
+                    month = draft.date.take(7),
+                    projectName = draft.merchantOrTitle,
+                    note = "Auto-Drafted from ${draft.sender}",
+                    accountId = resolvedAccount?.id,
+                    accountName = resolvedAccount?.name,
+                    createdAt = System.currentTimeMillis()
+                )
+                val addResult = incomeRepository.addIncome(income)
+                if (addResult.isSuccess && resolvedAccount != null) {
+                    val delta = AccountBalanceCalculator.incomeDelta(income, resolvedAccount.currency, rate)
+                    accountRepository.adjustBalance(resolvedAccount.id, delta)
+                }
             }
 
             draftRepository.markDraftApproved(draft.id)
             _uiState.update { it.copy(feedbackMessage = "Approved: ${draft.merchantOrTitle} (LKR ${draft.amount.toLong()})") }
         }
+    }
+
+    fun suggestAccountForDraft(draft: DraftTransaction): Account? {
+        val list = accounts.value
+        if (list.isEmpty()) return null
+        val senderUpper = draft.sender.uppercase()
+        return list.firstOrNull { acc ->
+            val nameUpper = acc.name.uppercase()
+            (senderUpper.contains("COMBANK") && (nameUpper.contains("COMMERCIAL") || nameUpper.contains("COMBANK"))) ||
+                (senderUpper.contains("BOC") && (nameUpper.contains("BOC") || nameUpper.contains("CEYLON"))) ||
+                nameUpper.contains(senderUpper)
+        } ?: AccountBalanceCalculator.resolveDefaultAccount(list, primaryAccountProvider.primaryAccountIdFlow.value)
     }
 
     fun approveAll() {

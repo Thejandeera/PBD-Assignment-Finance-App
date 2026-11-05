@@ -31,6 +31,7 @@ data class ClarityColors(
 
     // Separators, fills and control chrome
     val separator: Color,
+    val cardBorder: Color,
     val fill: Color,
     val secondaryFill: Color,
     val tertiaryFill: Color,
@@ -94,6 +95,7 @@ val LightClarityColors = ClarityColors(
     tertiaryLabel = Color(0xFFAEAEB2),
     placeholder = Color(0xFF8E8E93),
     separator = Color(0xFFC6C6C8),
+    cardBorder = Color(0x140F172A),
     fill = Color(0x33787880),
     secondaryFill = Color(0x29787880),
     tertiaryFill = Color(0x1F767680),
@@ -136,6 +138,7 @@ val DarkClarityColors = ClarityColors(
     tertiaryLabel = Color(0xFF636366),
     placeholder = Color(0xFF8E8E93),
     separator = Color(0xFF38383A),
+    cardBorder = Color(0x1FFFFFFF),
     fill = Color(0x5C787880),
     secondaryFill = Color(0x52787880),
     tertiaryFill = Color(0x3D767680),

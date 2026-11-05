@@ -1,5 +1,6 @@
 package com.clarity.finance.viewmodel
 
+import com.clarity.finance.model.Account
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeSource
@@ -25,6 +26,8 @@ data class IncomeFormState(
     val date: String = LocalDate.now().toString(), // YYYY-MM-DD
     val projectName: String = "",
     val note: String = "",
+    val selectedAccount: Account? = null,
+    val hasPickedAccount: Boolean = false,
     val amountError: String? = null,
     val rateError: String? = null,
     val dateError: String? = null,
@@ -33,7 +36,8 @@ data class IncomeFormState(
     val errorMessage: String? = null,
     /** Set while an existing entry is being edited; null when adding a new one. */
     val editingIncomeId: String? = null,
-    val editingCreatedAt: Long? = null
+    val editingCreatedAt: Long? = null,
+    val editingOriginalIncome: Income? = null
 ) {
     val isEditing: Boolean get() = editingIncomeId != null
 

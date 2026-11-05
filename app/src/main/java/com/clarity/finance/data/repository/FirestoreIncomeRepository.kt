@@ -3,6 +3,7 @@ package com.clarity.finance.data.repository
 import android.util.Log
 import com.clarity.finance.data.remote.FirestorePaths
 import com.clarity.finance.data.remote.asFlow
+import com.clarity.finance.model.AccountBalanceCalculator
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.RecurringIncome
@@ -34,7 +35,9 @@ import javax.inject.Singleton
 class FirestoreIncomeRepository @Inject constructor(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
-    private val dispatchers: DispatcherProvider
+    private val dispatchers: DispatcherProvider,
+    private val accountRepository: AccountRepository,
+    private val exchangeRateProvider: ExchangeRateProvider
 ) : IncomeRepository {
 
     private fun incomesOrNull(): CollectionReference? {
@@ -196,6 +199,7 @@ class FirestoreIncomeRepository @Inject constructor(
                     val targetDay = rec.dayOfMonth.coerceIn(1, daysInMonth)
                     if (today.dayOfMonth >= targetDay) {
                         val incomeDate = java.time.LocalDate.of(today.year, today.month, targetDay).toString()
+                        val rate = if (rec.currency == CurrencyType.LKR) 1.0 else exchangeRateProvider.getLkrPerUsdRate()
                         val autoIncome = Income(
                             id = "rec_${rec.id}_$currentMonth",
                             sourceId = rec.sourceId,
@@ -203,16 +207,25 @@ class FirestoreIncomeRepository @Inject constructor(
                             sourceIcon = rec.sourceIcon,
                             amount = rec.amount,
                             currency = rec.currency,
-                            exchangeRate = 1.0,
-                            amountLKR = rec.amount,
+                            exchangeRate = rate,
+                            amountLKR = rec.amount * rate,
                             status = IncomeStatus.RECEIVED,
                             date = incomeDate,
                             month = currentMonth,
                             projectName = rec.name.ifBlank { rec.sourceName },
-                            note = "Auto-committed monthly recurring income"
+                            note = "Auto-committed monthly recurring income",
+                            accountId = rec.accountId,
+                            accountName = rec.accountName
                         )
                         addIncome(autoIncome)
                         collection.document(rec.id).update("lastCommittedMonth", currentMonth).await()
+                        rec.accountId?.let { accId ->
+                            val account = accountRepository.getAccount(accId)
+                            if (account != null) {
+                                val delta = AccountBalanceCalculator.incomeDelta(autoIncome, account.currency, rate)
+                                accountRepository.adjustBalance(accId, delta)
+                            }
+                        }
                     }
                 }
             }
@@ -234,21 +247,23 @@ class FirestoreIncomeRepository @Inject constructor(
         )
     }
 
-    private fun Income.toMap(): Map<String, Any> = mapOf(
-        "source" to sourceId,
-        "sourceName" to sourceName,
-        "sourceIcon" to sourceIcon,
-        "amount" to amount,
-        "currency" to currency.name,
-        "exchangeRate" to exchangeRate,
-        "amountLKR" to amountLKR,
-        "status" to status.name,
-        "date" to date,
-        "month" to month,
-        "projectName" to projectName,
-        "note" to note,
-        "createdAt" to createdAt
-    )
+    private fun Income.toMap(): Map<String, Any> = buildMap {
+        put("source", sourceId)
+        put("sourceName", sourceName)
+        put("sourceIcon", sourceIcon)
+        put("amount", amount)
+        put("currency", currency.name)
+        put("exchangeRate", exchangeRate)
+        put("amountLKR", amountLKR)
+        put("status", status.name)
+        put("date", date)
+        put("month", month)
+        put("projectName", projectName)
+        put("note", note)
+        put("createdAt", createdAt)
+        accountId?.let { put("accountId", it) }
+        accountName?.let { put("accountName", it) }
+    }
 
     private fun DocumentSnapshot.toIncome(): Income? {
         if (!exists()) return null
@@ -278,6 +293,8 @@ class FirestoreIncomeRepository @Inject constructor(
             month = getString("month").orEmpty(),
             projectName = getString("projectName").orEmpty(),
             note = getString("note").orEmpty(),
+            accountId = getString("accountId"),
+            accountName = getString("accountName"),
             createdAt = getLong("createdAt") ?: 0L
         )
     }
@@ -305,6 +322,8 @@ class FirestoreIncomeRepository @Inject constructor(
         "currency" to currency.name,
         "dayOfMonth" to dayOfMonth,
         "lastCommittedMonth" to lastCommittedMonth,
+        "accountId" to accountId,
+        "accountName" to accountName,
         "createdAt" to createdAt
     )
 
@@ -320,6 +339,8 @@ class FirestoreIncomeRepository @Inject constructor(
             currency = getString("currency")?.let { runCatching { CurrencyType.valueOf(it) }.getOrNull() } ?: CurrencyType.LKR,
             dayOfMonth = (getLong("dayOfMonth") ?: 1L).toInt(),
             lastCommittedMonth = getString("lastCommittedMonth").orEmpty(),
+            accountId = getString("accountId"),
+            accountName = getString("accountName"),
             createdAt = getLong("createdAt") ?: 0L
         )
     }
