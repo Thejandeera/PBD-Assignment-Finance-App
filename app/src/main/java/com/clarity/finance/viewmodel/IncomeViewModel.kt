@@ -8,6 +8,7 @@ import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeSourceItem
 import com.clarity.finance.model.IncomeStatus
+import com.clarity.finance.model.RecurringIncome
 import com.clarity.finance.model.getDefaultIncomeSources
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -56,6 +57,7 @@ class IncomeViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            incomeRepository.processAutoCommitRecurringIncomes()
             _liveRate.value = exchangeRateProvider.getLkrPerUsdRate()
             // Fill the rate if a foreign currency was chosen before the rate arrived.
             _formState.update { state ->
@@ -319,9 +321,10 @@ class IncomeViewModel @Inject constructor(
             val monthKey = yearMonth.format(MONTH_KEY)
             combine(
                 incomeRepository.observeIncomesForMonth(monthKey),
-                incomeRepository.observePendingIncomes()
-            ) { monthIncomes, pending ->
-                buildUiState(yearMonth, monthKey, monthIncomes, pending)
+                incomeRepository.observePendingIncomes(),
+                incomeRepository.observeRecurringIncomes()
+            ) { monthIncomes, pending, recurring ->
+                buildUiState(yearMonth, monthKey, monthIncomes, pending, recurring)
             }
         }
         .catch { error ->
@@ -344,7 +347,8 @@ class IncomeViewModel @Inject constructor(
         yearMonth: YearMonth,
         monthKey: String,
         monthIncomes: List<Income>,
-        pending: List<Income>
+        pending: List<Income>,
+        recurring: List<RecurringIncome>
     ): IncomeUiState {
         val received = monthIncomes
             .filter { it.status == IncomeStatus.RECEIVED }
@@ -378,8 +382,74 @@ class IncomeViewModel @Inject constructor(
             sourceTotals = sourceTotals,
             pendingIncomes = pending.sortedBy { it.date },
             pendingTotalLkr = pending.sumOf { it.amountLKR },
+            recurringIncomes = recurring,
             errorMessage = null
         )
+    }
+
+    fun addRecurringIncome(
+        name: String,
+        amount: Double,
+        sourceId: String,
+        sourceName: String,
+        sourceIcon: String,
+        dayOfMonth: Int,
+        currency: CurrencyType = CurrencyType.LKR,
+        onSuccess: (() -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            val recurring = RecurringIncome(
+                name = name.trim(),
+                amount = amount,
+                sourceId = sourceId,
+                sourceName = sourceName,
+                sourceIcon = sourceIcon,
+                dayOfMonth = dayOfMonth.coerceIn(1, 31),
+                currency = currency
+            )
+            incomeRepository.addRecurringIncome(recurring)
+                .onSuccess {
+                    incomeRepository.processAutoCommitRecurringIncomes()
+                    _userMessage.value = "Recurring income added"
+                    onSuccess?.invoke()
+                }
+                .onFailure { error ->
+                    _userMessage.value = error.message ?: "Failed to add recurring income"
+                }
+        }
+    }
+
+    fun updateRecurringIncome(
+        recurring: RecurringIncome,
+        onSuccess: (() -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            incomeRepository.updateRecurringIncome(recurring)
+                .onSuccess {
+                    incomeRepository.processAutoCommitRecurringIncomes()
+                    _userMessage.value = "Recurring income updated"
+                    onSuccess?.invoke()
+                }
+                .onFailure { error ->
+                    _userMessage.value = error.message ?: "Failed to update recurring income"
+                }
+        }
+    }
+
+    fun deleteRecurringIncome(
+        recurringId: String,
+        onSuccess: (() -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            incomeRepository.deleteRecurringIncome(recurringId)
+                .onSuccess {
+                    _userMessage.value = "Recurring income deleted"
+                    onSuccess?.invoke()
+                }
+                .onFailure { error ->
+                    _userMessage.value = error.message ?: "Failed to delete recurring income"
+                }
+        }
     }
 
     /**

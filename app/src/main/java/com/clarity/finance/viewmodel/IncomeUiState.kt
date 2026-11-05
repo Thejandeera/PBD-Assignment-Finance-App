@@ -70,5 +70,6 @@ data class IncomeUiState(
     /** Outstanding freelance payments from every month, oldest first (FR-05, FR-06). */
     val pendingIncomes: List<Income> = emptyList(),
     val pendingTotalLkr: Double = 0.0,
+    val recurringIncomes: List<com.clarity.finance.model.RecurringIncome> = emptyList(),
     val errorMessage: String? = null
 )

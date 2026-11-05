@@ -50,6 +50,63 @@ class FakeIncomeRepository : IncomeRepository {
         _customSources.value = _customSources.value + source
         return Result.success(Unit)
     }
+
+    private val _recurringIncomes = MutableStateFlow<List<com.clarity.finance.model.RecurringIncome>>(emptyList())
+    val recurringIncomesState = _recurringIncomes.asStateFlow()
+
+    override fun observeRecurringIncomes(): Flow<List<com.clarity.finance.model.RecurringIncome>> =
+        _recurringIncomes.asStateFlow()
+
+    override suspend fun addRecurringIncome(recurring: com.clarity.finance.model.RecurringIncome): Result<Unit> {
+        val id = recurring.id.ifEmpty { java.util.UUID.randomUUID().toString() }
+        _recurringIncomes.value = _recurringIncomes.value + recurring.copy(id = id)
+        processAutoCommitRecurringIncomes()
+        return Result.success(Unit)
+    }
+
+    override suspend fun updateRecurringIncome(recurring: com.clarity.finance.model.RecurringIncome): Result<Unit> {
+        _recurringIncomes.value = _recurringIncomes.value.map { if (it.id == recurring.id) recurring else it }
+        processAutoCommitRecurringIncomes()
+        return Result.success(Unit)
+    }
+
+    override suspend fun deleteRecurringIncome(recurringId: String): Result<Unit> {
+        _recurringIncomes.value = _recurringIncomes.value.filterNot { it.id == recurringId }
+        return Result.success(Unit)
+    }
+
+    override suspend fun processAutoCommitRecurringIncomes(): Result<Unit> {
+        val today = java.time.LocalDate.now()
+        val currentMonth = java.time.YearMonth.now().toString()
+        val daysInMonth = today.lengthOfMonth()
+        _recurringIncomes.value = _recurringIncomes.value.map { rec ->
+            if (rec.lastCommittedMonth != currentMonth) {
+                val targetDay = rec.dayOfMonth.coerceIn(1, daysInMonth)
+                if (today.dayOfMonth >= targetDay) {
+                    val incomeDate = java.time.LocalDate.of(today.year, today.month, targetDay).toString()
+                    addIncome(
+                        Income(
+                            id = "rec_${rec.id}_$currentMonth",
+                            sourceId = rec.sourceId,
+                            sourceName = rec.sourceName,
+                            sourceIcon = rec.sourceIcon,
+                            amount = rec.amount,
+                            currency = rec.currency,
+                            exchangeRate = 1.0,
+                            amountLKR = rec.amount,
+                            status = IncomeStatus.RECEIVED,
+                            date = incomeDate,
+                            month = currentMonth,
+                            projectName = rec.name.ifBlank { rec.sourceName },
+                            note = "Auto-committed monthly recurring income"
+                        )
+                    )
+                    rec.copy(lastCommittedMonth = currentMonth)
+                } else rec
+            } else rec
+        }
+        return Result.success(Unit)
+    }
 }
 
 /** Fixed rate so tests never touch the network. */

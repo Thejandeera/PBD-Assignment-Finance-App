@@ -5,6 +5,7 @@ import com.clarity.finance.data.remote.FirestorePaths
 import com.clarity.finance.data.remote.asFlow
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
+import com.clarity.finance.model.RecurringIncome
 import com.clarity.finance.model.CUSTOM_INCOME_SOURCE_ICON
 import com.clarity.finance.model.IncomeSource
 import com.clarity.finance.model.IncomeSourceItem
@@ -48,6 +49,14 @@ class FirestoreIncomeRepository @Inject constructor(
         val uid = auth.currentUser?.uid ?: return null
         return firestore.collection(FirestorePaths.USERS).document(uid).collection(FirestorePaths.INCOME_SOURCES)
     }
+
+    private fun recurringIncomesOrNull(): CollectionReference? {
+        val uid = auth.currentUser?.uid ?: return null
+        return firestore.collection(FirestorePaths.USERS).document(uid).collection(FirestorePaths.RECURRING)
+    }
+
+    private fun recurringIncomes(): CollectionReference =
+        recurringIncomesOrNull() ?: throw IllegalStateException("User is not authenticated")
 
     // Stream errors are rethrown so the view model can show a meaningful error state (FR-18).
 
@@ -135,6 +144,82 @@ class FirestoreIncomeRepository @Inject constructor(
             }
         }
 
+    override fun observeRecurringIncomes(): Flow<List<RecurringIncome>> {
+        val collection = recurringIncomesOrNull() ?: return flowOf(emptyList())
+        return collection
+            .orderBy("dayOfMonth", Query.Direction.ASCENDING)
+            .asFlow { snapshot -> snapshot.documents.mapNotNull { it.toRecurringIncome() } }
+            .catch { error ->
+                Log.e(TAG, "Recurring income stream error: ${error.message}", error)
+                emit(emptyList())
+            }
+    }
+
+    override suspend fun addRecurringIncome(recurring: RecurringIncome): Result<Unit> = withContext(dispatchers.io) {
+        runCatching {
+            val collection = recurringIncomes()
+            val id = recurring.id.ifEmpty { collection.document().id }
+            collection.document(id).set(recurring.copy(id = id).toMap()).await()
+            processAutoCommitRecurringIncomes()
+            Unit
+        }
+    }
+
+    override suspend fun updateRecurringIncome(recurring: RecurringIncome): Result<Unit> = withContext(dispatchers.io) {
+        runCatching {
+            require(recurring.id.isNotEmpty()) { "ID cannot be empty" }
+            recurringIncomes().document(recurring.id).set(recurring.toMap()).await()
+            processAutoCommitRecurringIncomes()
+            Unit
+        }
+    }
+
+    override suspend fun deleteRecurringIncome(recurringId: String): Result<Unit> = withContext(dispatchers.io) {
+        runCatching {
+            require(recurringId.isNotEmpty()) { "ID cannot be empty" }
+            recurringIncomes().document(recurringId).delete().await()
+            Unit
+        }
+    }
+
+    override suspend fun processAutoCommitRecurringIncomes(): Result<Unit> = withContext(dispatchers.io) {
+        runCatching {
+            val collection = recurringIncomesOrNull() ?: return@runCatching Unit
+            val snapshot = collection.get().await()
+            val recurringList = snapshot.documents.mapNotNull { it.toRecurringIncome() }
+            val today = java.time.LocalDate.now()
+            val currentMonth = java.time.YearMonth.now().toString()
+            val daysInMonth = today.lengthOfMonth()
+
+            for (rec in recurringList) {
+                if (rec.lastCommittedMonth != currentMonth) {
+                    val targetDay = rec.dayOfMonth.coerceIn(1, daysInMonth)
+                    if (today.dayOfMonth >= targetDay) {
+                        val incomeDate = java.time.LocalDate.of(today.year, today.month, targetDay).toString()
+                        val autoIncome = Income(
+                            id = "rec_${rec.id}_$currentMonth",
+                            sourceId = rec.sourceId,
+                            sourceName = rec.sourceName,
+                            sourceIcon = rec.sourceIcon,
+                            amount = rec.amount,
+                            currency = rec.currency,
+                            exchangeRate = 1.0,
+                            amountLKR = rec.amount,
+                            status = IncomeStatus.RECEIVED,
+                            date = incomeDate,
+                            month = currentMonth,
+                            projectName = rec.name.ifBlank { rec.sourceName },
+                            note = "Auto-committed monthly recurring income"
+                        )
+                        addIncome(autoIncome)
+                        collection.document(rec.id).update("lastCommittedMonth", currentMonth).await()
+                    }
+                }
+            }
+            Unit
+        }
+    }
+
     // =========================================================================
     // Mappers
     // =========================================================================
@@ -208,6 +293,34 @@ class FirestoreIncomeRepository @Inject constructor(
                 ?.let { runCatching { CurrencyType.valueOf(it) }.getOrNull() }
                 ?: CurrencyType.LKR,
             isCustom = true
+        )
+    }
+
+    private fun RecurringIncome.toMap(): Map<String, Any?> = mapOf(
+        "name" to name,
+        "sourceId" to sourceId,
+        "sourceName" to sourceName,
+        "sourceIcon" to sourceIcon,
+        "amount" to amount,
+        "currency" to currency.name,
+        "dayOfMonth" to dayOfMonth,
+        "lastCommittedMonth" to lastCommittedMonth,
+        "createdAt" to createdAt
+    )
+
+    private fun DocumentSnapshot.toRecurringIncome(): RecurringIncome? {
+        if (!exists()) return null
+        return RecurringIncome(
+            id = id,
+            name = getString("name").orEmpty(),
+            sourceId = getString("sourceId") ?: IncomeSource.SALARY.name,
+            sourceName = getString("sourceName") ?: IncomeSource.SALARY.displayName,
+            sourceIcon = getString("sourceIcon") ?: IncomeSource.SALARY.icon,
+            amount = getDouble("amount") ?: 0.0,
+            currency = getString("currency")?.let { runCatching { CurrencyType.valueOf(it) }.getOrNull() } ?: CurrencyType.LKR,
+            dayOfMonth = (getLong("dayOfMonth") ?: 1L).toInt(),
+            lastCommittedMonth = getString("lastCommittedMonth").orEmpty(),
+            createdAt = getLong("createdAt") ?: 0L
         )
     }
 

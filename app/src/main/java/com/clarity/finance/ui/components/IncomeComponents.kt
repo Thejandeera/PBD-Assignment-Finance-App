@@ -35,8 +35,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
 import com.clarity.finance.model.IncomeSource
+import com.clarity.finance.model.IncomeSourceItem
+import com.clarity.finance.model.RecurringIncome
+import com.clarity.finance.model.toItem
 import com.clarity.finance.ui.theme.ClarityTheme
 import com.clarity.finance.ui.theme.ClarityType
 import com.clarity.finance.util.CurrencyFormatter
@@ -410,3 +418,243 @@ fun AddIncomeButton(
         modifier = modifier
     )
 }
+
+/** Row for a recurring monthly income entry. */
+@Composable
+fun RecurringIncomeRow(
+    recurring: RecurringIncome,
+    currentMonth: String,
+    monthTitle: String,
+    currency: String,
+    exchangeRate: Double,
+    showDivider: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    val colors = ClarityTheme.colors
+    val isCommittedThisMonth = recurring.lastCommittedMonth == currentMonth
+    val formattedAmount = CurrencyFormatter.format(recurring.amount, currency, exchangeRate)
+
+    ListRow(
+        title = recurring.name,
+        subtitle = "Every month on day ${recurring.dayOfMonth}",
+        leading = { EmojiBadge(emoji = recurring.sourceIcon, tint = incomeSourceColor(recurring.sourceId)) },
+        trailing = {
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "+$formattedAmount",
+                    style = ClarityType.amountBody,
+                    color = colors.greenText,
+                    maxLines = 1
+                )
+                Text(
+                    text = if (isCommittedThisMonth) "✓ Added for $monthTitle" else "Day ${recurring.dayOfMonth}",
+                    style = ClarityType.footnote,
+                    color = if (isCommittedThisMonth) colors.greenText else colors.secondaryLabel,
+                    maxLines = 1
+                )
+            }
+        },
+        showDivider = showDivider,
+        onClick = onClick,
+        onClickLabel = "Edit recurring income",
+        modifier = modifier
+    )
+}
+
+/** Confirmation shown before a recurring income schedule is removed. */
+@Composable
+fun DeleteRecurringAlert(
+    recurring: RecurringIncome,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ClarityAlertDialog(
+        title = "Delete Recurring Income?",
+        message = "Stop auto-adding \"${recurring.name}\"? Past committed incomes will not be removed.",
+        onDismissRequest = onDismiss,
+        actions = listOf(
+            AlertAction(label = "Cancel", style = AlertActionStyle.Cancel, onClick = onDismiss),
+            AlertAction(label = "Delete", style = AlertActionStyle.Destructive, onClick = onConfirm)
+        )
+    )
+}
+
+/** Sheet to add or edit a recurring income. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddEditRecurringIncomeSheet(
+    recurring: RecurringIncome?,
+    sources: List<IncomeSourceItem>,
+    onSave: (name: String, amount: Double, sourceId: String, sourceName: String, sourceIcon: String, dayOfMonth: Int, currency: CurrencyType) -> Unit,
+    onDelete: (() -> Unit)? = null,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = ClarityTheme.colors
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+
+    var name by remember(recurring) { mutableStateOf(recurring?.name.orEmpty()) }
+    var amountText by remember(recurring) {
+        mutableStateOf(
+            if (recurring != null) {
+                if (recurring.amount % 1.0 == 0.0) recurring.amount.toLong().toString() else recurring.amount.toString()
+            } else ""
+        )
+    }
+    var dayText by remember(recurring) { mutableStateOf(recurring?.dayOfMonth?.toString() ?: "1") }
+    var selectedSource by remember(recurring, sources) {
+        mutableStateOf(
+            sources.find { it.id == recurring?.sourceId }
+                ?: sources.firstOrNull()
+                ?: IncomeSource.SALARY.toItem()
+        )
+    }
+
+    val hideThen: (() -> Unit) -> Unit = { action ->
+        scope.launch { sheetState.hide() }.invokeOnCompletion { action() }
+    }
+
+    val amount = amountText.toDoubleOrNull() ?: 0.0
+    val day = dayText.toIntOrNull() ?: 0
+    val canSubmit = name.isNotBlank() && amount > 0.0 && day in 1..31
+
+    ClaritySheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        modifier = modifier
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .padding(horizontal = 8.dp)
+        ) {
+            TextLinkButton(
+                text = "Cancel",
+                onClick = { hideThen(onDismiss) },
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 4.dp)
+            )
+            Text(
+                text = if (recurring == null) "New Recurring Income" else "Edit Recurring Income",
+                style = ClarityType.headline,
+                color = colors.label,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .semantics { heading() }
+            )
+            TextLinkButton(
+                text = if (recurring == null) "Add" else "Save",
+                enabled = canSubmit,
+                onClick = {
+                    onSave(
+                        name.trim(),
+                        amount,
+                        selectedSource.id,
+                        selectedSource.name,
+                        selectedSource.icon,
+                        day,
+                        recurring?.currency ?: CurrencyType.LKR
+                    )
+                    hideThen(onDismiss)
+                },
+                style = ClarityType.body.copy(fontWeight = FontWeight.SemiBold),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 4.dp)
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            ClarityTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = "Income Name",
+                placeholder = "e.g. Monthly Salary, Retainer"
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ClarityTextField(
+                value = amountText,
+                onValueChange = { amountText = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                label = "Amount",
+                placeholder = "0.00",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            ClarityTextField(
+                value = dayText,
+                onValueChange = { input ->
+                    val filtered = input.filter { it.isDigit() }.take(2)
+                    dayText = filtered
+                },
+                label = "Day of Month (1 - 31)",
+                placeholder = "e.g. 7",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                isError = dayText.isNotEmpty() && (day !in 1..31),
+                errorMessage = if (dayText.isNotEmpty() && day !in 1..31) "Day must be between 1 and 31" else null
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Source",
+                style = ClarityType.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                color = colors.secondaryLabel
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            sources.chunked(4).forEach { rowSources ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    rowSources.forEach { source ->
+                        SourceTile(
+                            source = source,
+                            isSelected = selectedSource.id == source.id,
+                            onClick = { selectedSource = source },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    repeat(4 - rowSources.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Every month on day ${if (day in 1..31) day else "X"}, this income will automatically be recorded as received.",
+                style = ClarityType.footnote,
+                color = colors.secondaryLabel
+            )
+
+            if (onDelete != null) {
+                Spacer(modifier = Modifier.height(24.dp))
+                TextLinkButton(
+                    text = "Delete Recurring Income",
+                    color = colors.redText,
+                    onClick = { hideThen(onDelete) },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+

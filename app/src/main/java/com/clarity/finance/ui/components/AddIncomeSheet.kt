@@ -500,7 +500,7 @@ private fun NewSourceTile(
 
 /** Source tile: emoji over a short name; selection shown by tint, border and weight. */
 @Composable
-private fun SourceTile(
+internal fun SourceTile(
     source: IncomeSourceItem,
     isSelected: Boolean,
     onClick: () -> Unit,
