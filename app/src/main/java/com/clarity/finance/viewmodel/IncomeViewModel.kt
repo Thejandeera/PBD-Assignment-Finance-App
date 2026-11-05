@@ -6,8 +6,9 @@ import com.clarity.finance.data.repository.ExchangeRateProvider
 import com.clarity.finance.data.repository.IncomeRepository
 import com.clarity.finance.model.CurrencyType
 import com.clarity.finance.model.Income
-import com.clarity.finance.model.IncomeSource
+import com.clarity.finance.model.IncomeSourceItem
 import com.clarity.finance.model.IncomeStatus
+import com.clarity.finance.model.getDefaultIncomeSources
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,11 +27,13 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Income tracking (FR-03 – FR-06, FR-12): records multi-source, multi-currency income, keeps
- * an LKR equivalent for monthly totals, and follows pending freelance payments until paid.
+ * Income tracking (FR-03 – FR-06, FR-12): records multi-source, multi-currency income from
+ * built-in or user-defined sources, keeps an LKR equivalent for monthly totals, and follows
+ * pending payments until paid. Saved entries can be edited in full.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -66,11 +69,79 @@ class IncomeViewModel @Inject constructor(
     }
 
     // =========================================================================
-    // Add Income form
+    // Income sources (built-in + user-defined)
     // =========================================================================
 
+    val sources: StateFlow<List<IncomeSourceItem>> = incomeRepository.observeIncomeSources()
+        .catch { emit(getDefaultIncomeSources()) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = getDefaultIncomeSources()
+        )
+
+    /** Validation message for a new source name, or null when it can be created. */
+    fun validateNewSourceName(name: String): String? {
+        val trimmed = name.trim()
+        return when {
+            trimmed.isEmpty() -> "Enter a name"
+            trimmed.length > MAX_SOURCE_NAME_LENGTH -> "Use $MAX_SOURCE_NAME_LENGTH characters or fewer"
+            sources.value.any { it.name.equals(trimmed, ignoreCase = true) } -> "\"$trimmed\" already exists"
+            else -> null
+        }
+    }
+
+    /**
+     * Creates a custom source and selects it in the form straight away. Returns a validation
+     * message instead when the name can't be used.
+     */
+    fun addCustomSource(name: String, defaultCurrency: CurrencyType): String? {
+        validateNewSourceName(name)?.let { return it }
+        val source = IncomeSourceItem(
+            id = UUID.randomUUID().toString(),
+            name = name.trim(),
+            defaultCurrency = defaultCurrency,
+            isCustom = true
+        )
+        onSourceSelected(source)
+        viewModelScope.launch {
+            incomeRepository.addCustomIncomeSource(source).onFailure {
+                _formState.update { it.copy(errorMessage = "Couldn't save the source \"${source.name}\". Try again.") }
+            }
+        }
+        return null
+    }
+
+    // =========================================================================
+    // Add / Edit Income form
+    // =========================================================================
+
+    /** Loads a saved entry into the form so every field can be changed. */
+    fun startEditing(income: Income) {
+        val source = sources.value.firstOrNull { it.id == income.sourceId } ?: IncomeSourceItem(
+            id = income.sourceId,
+            name = income.sourceName,
+            icon = income.sourceIcon,
+            defaultCurrency = income.currency,
+            isCustom = income.isCustomSource
+        )
+        _formState.value = IncomeFormState(
+            source = source,
+            currency = income.currency,
+            amountInput = formatInput(abs(income.amount)),
+            isLoss = income.amount < 0 && source.allowsLoss,
+            rateInput = if (income.isForeignCurrency) formatInput(income.exchangeRate) else "",
+            status = if (source.canBePending) income.status else IncomeStatus.RECEIVED,
+            date = income.date,
+            projectName = income.projectName,
+            note = income.note,
+            editingIncomeId = income.id,
+            editingCreatedAt = income.createdAt
+        )
+    }
+
     /** Picking a source applies its usual currency and clears options it doesn't support. */
-    fun onSourceSelected(source: IncomeSource) {
+    fun onSourceSelected(source: IncomeSourceItem) {
         _formState.update { state ->
             state.copy(
                 source = source,
@@ -136,8 +207,8 @@ class IncomeViewModel @Inject constructor(
         val amount = state.amountInput.toDoubleOrNull()?.takeIf { it > 0.0 }
         val rate = if (state.isForeignCurrency) state.rateInput.toDoubleOrNull()?.takeIf { it > 0.0 } else 1.0
         val date = runCatching { LocalDate.parse(state.date) }.getOrNull()
-        // The client/project field is only shown for freelance work.
-        val projectName = if (state.source == IncomeSource.FREELANCE) state.projectName.trim() else ""
+        // The client/project field is only shown for sources that can be invoiced.
+        val projectName = if (state.source.canBePending) state.projectName.trim() else ""
         val isPending = state.status == IncomeStatus.PENDING && state.source.canBePending
 
         val amountError = if (amount == null) "Enter an amount greater than 0" else null
@@ -167,8 +238,10 @@ class IncomeViewModel @Inject constructor(
 
         val signedAmount = if (state.isLoss && state.source.allowsLoss) -amount else amount
         val income = Income(
-            id = UUID.randomUUID().toString(),
-            source = state.source,
+            id = state.editingIncomeId ?: UUID.randomUUID().toString(),
+            sourceId = state.source.id,
+            sourceName = state.source.name,
+            sourceIcon = state.source.icon,
             amount = signedAmount,
             currency = state.currency,
             exchangeRate = rate,
@@ -178,13 +251,19 @@ class IncomeViewModel @Inject constructor(
             month = state.date.take(7),
             projectName = projectName,
             note = state.note.trim(),
-            createdAt = System.currentTimeMillis()
+            createdAt = state.editingCreatedAt ?: System.currentTimeMillis()
         )
 
         viewModelScope.launch {
             _formState.update { it.copy(isSubmitting = true, errorMessage = null) }
-            incomeRepository.addIncome(income)
+            val result = if (state.isEditing) {
+                incomeRepository.updateIncome(income)
+            } else {
+                incomeRepository.addIncome(income)
+            }
+            result
                 .onSuccess {
+                    if (state.isEditing) _userMessage.value = "${income.title} updated"
                     onSuccess?.invoke()
                     resetFormState()
                 }
@@ -207,6 +286,11 @@ class IncomeViewModel @Inject constructor(
 
     private fun defaultRateInput(): String =
         _liveRate.value?.let { String.format(Locale.US, "%.2f", it) }.orEmpty()
+
+    /** "1500" for whole numbers, otherwise up to two decimals without trailing zeros. */
+    private fun formatInput(value: Double): String =
+        if (value % 1.0 == 0.0) value.toLong().toString()
+        else String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
 
     private fun sanitizeDecimal(input: String): String {
         val filtered = input.filter { it.isDigit() || it == '.' }
@@ -266,13 +350,19 @@ class IncomeViewModel @Inject constructor(
             .filter { it.status == IncomeStatus.RECEIVED }
             .sortedWith(compareByDescending<Income> { it.date }.thenByDescending { it.createdAt })
 
-        val bySource = received.groupBy { it.source }
+        val bySource = received.groupBy { it.sourceId }
         val positiveTotal = bySource.values.sumOf { group -> group.sumOf { it.amountLKR }.coerceAtLeast(0.0) }
-        val sourceTotals = IncomeSource.entries.mapNotNull { source ->
-            val group = bySource[source] ?: return@mapNotNull null
+        val sourceTotals = bySource.values.map { group ->
+            val sample = group.first()
             val total = group.sumOf { it.amountLKR }
             IncomeSourceTotal(
-                source = source,
+                source = IncomeSourceItem(
+                    id = sample.sourceId,
+                    name = sample.sourceName,
+                    icon = sample.sourceIcon,
+                    defaultCurrency = sample.currency,
+                    isCustom = sample.isCustomSource
+                ),
                 amountLkr = total,
                 entryCount = group.size,
                 percentage = if (positiveTotal > 0 && total > 0) ((total / positiveTotal) * 100).roundToInt() else 0
@@ -322,5 +412,6 @@ class IncomeViewModel @Inject constructor(
     private companion object {
         val MONTH_KEY: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM")
         const val FUTURE_DATE_ERROR = "Date can't be in the future"
+        const val MAX_SOURCE_NAME_LENGTH = 40
     }
 }

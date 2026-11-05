@@ -1,7 +1,9 @@
 package com.clarity.finance.data.repository
 
 import com.clarity.finance.model.Income
+import com.clarity.finance.model.IncomeSourceItem
 import com.clarity.finance.model.IncomeStatus
+import com.clarity.finance.model.getDefaultIncomeSources
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +37,17 @@ class FakeIncomeRepository : IncomeRepository {
 
     override suspend fun deleteIncome(incomeId: String): Result<Unit> {
         _incomes.value = _incomes.value.filterNot { it.id == incomeId }
+        return Result.success(Unit)
+    }
+
+    private val _customSources = MutableStateFlow<List<IncomeSourceItem>>(emptyList())
+    val customSourcesState = _customSources.asStateFlow()
+
+    override fun observeIncomeSources(): Flow<List<IncomeSourceItem>> =
+        _customSources.map { getDefaultIncomeSources() + it }
+
+    override suspend fun addCustomIncomeSource(source: IncomeSourceItem): Result<Unit> {
+        _customSources.value = _customSources.value + source
         return Result.success(Unit)
     }
 }
