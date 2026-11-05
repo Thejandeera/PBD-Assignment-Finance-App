@@ -21,7 +21,10 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.LaptopMac
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -52,6 +55,7 @@ import com.clarity.finance.model.GoalTransactionType
 import com.clarity.finance.ui.components.ClarityBottomBar
 import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.ui.theme.ClarityTheme
+import com.clarity.finance.viewmodel.GoalMilestone
 import com.clarity.finance.viewmodel.GoalViewModel
 import java.text.NumberFormat
 import java.time.format.DateTimeFormatter
@@ -68,6 +72,9 @@ private val GoalPurpleDark =
 
 private val GoalRed =
     Color(0xFFD70015)
+
+private val GoalGreen =
+    Color(0xFF248A3D)
 
 @Composable
 fun GoalScreen(
@@ -257,6 +264,17 @@ fun GoalScreen(
                                 .monthlyDepositAverage
                     )
 
+                    GoalMilestonesSection(
+                        milestones =
+                            uiState.milestones,
+
+                        nextMilestone =
+                            uiState.nextMilestone,
+
+                        currentSavings =
+                            uiState.currentSavings
+                    )
+
                     Row(
                         modifier =
                             Modifier.fillMaxWidth(),
@@ -397,11 +415,8 @@ fun GoalScreen(
                     note ->
 
                 viewModel.deposit(
-                    amount =
-                        amount,
-
-                    note =
-                        note
+                    amount = amount,
+                    note = note
                 )
 
                 showDepositDialog =
@@ -447,11 +462,8 @@ fun GoalScreen(
 
                 val accepted =
                     viewModel.withdraw(
-                        amount =
-                            amount,
-
-                        note =
-                            note
+                        amount = amount,
+                        note = note
                     )
 
                 if (accepted) {
@@ -995,20 +1007,16 @@ private fun GoalStatusCard(
         when {
 
             progress >= 1f ->
-
                 "Goal completed! You reached your target."
 
             monthlyDepositAverage <= 0.0 ->
-
                 "Start saving to calculate your projected finish date."
 
             monthlyDepositAverage >=
                     requiredMonthlySaving ->
-
                 "You're on track. Keep up your current saving rate."
 
             else ->
-
                 "Increase your monthly savings to stay on track."
         }
 
@@ -1089,6 +1097,385 @@ private fun GoalStatusCard(
 }
 
 @Composable
+private fun GoalMilestonesSection(
+    milestones: List<GoalMilestone>,
+    nextMilestone: GoalMilestone?,
+    currentSavings: Double
+) {
+
+    val colors =
+        ClarityTheme.colors
+
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(
+                12.dp
+            )
+    ) {
+
+        Text(
+            text =
+                "Milestones",
+
+            color =
+                colors.label,
+
+            fontWeight =
+                FontWeight.SemiBold,
+
+            style =
+                androidx.compose.material3
+                    .MaterialTheme
+                    .typography
+                    .titleMedium
+        )
+
+        if (
+            nextMilestone != null
+        ) {
+
+            val amountNeeded =
+                (
+                        nextMilestone.targetAmount -
+                                currentSavings
+                        )
+                    .coerceAtLeast(
+                        0.0
+                    )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color =
+                            GoalPurpleLight,
+
+                        shape =
+                            RoundedCornerShape(
+                                14.dp
+                            )
+                    )
+                    .padding(
+                        14.dp
+                    ),
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Icon(
+                    imageVector =
+                        Icons.Rounded.Flag,
+
+                    contentDescription =
+                        null,
+
+                    tint =
+                        GoalPurple
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.size(
+                            12.dp
+                        )
+                )
+
+                Column {
+
+                    Text(
+                        text =
+                            "Next: ${nextMilestone.percentage}%",
+
+                        color =
+                            GoalPurpleDark,
+
+                        fontWeight =
+                            FontWeight.SemiBold
+                    )
+
+                    Text(
+                        text =
+                            "Save ${formatLkr(amountNeeded)} more to unlock ${nextMilestone.title}.",
+
+                        color =
+                            colors.secondaryLabel,
+
+                        style =
+                            androidx.compose.material3
+                                .MaterialTheme
+                                .typography
+                                .bodySmall
+                    )
+                }
+            }
+        } else {
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        color =
+                            Color(
+                                0xFFE8F7EC
+                            ),
+
+                        shape =
+                            RoundedCornerShape(
+                                14.dp
+                            )
+                    )
+                    .padding(
+                        14.dp
+                    ),
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+
+                Icon(
+                    imageVector =
+                        Icons.Rounded.Check,
+
+                    contentDescription =
+                        null,
+
+                    tint =
+                        GoalGreen
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.size(
+                            12.dp
+                        )
+                )
+
+                Text(
+                    text =
+                        "All milestones completed!",
+
+                    color =
+                        GoalGreen,
+
+                    fontWeight =
+                        FontWeight.SemiBold
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color =
+                        colors.card,
+
+                    shape =
+                        RoundedCornerShape(
+                            16.dp
+                        )
+                )
+        ) {
+
+            milestones
+                .forEachIndexed {
+                        index,
+                        milestone ->
+
+                    MilestoneRow(
+                        milestone =
+                            milestone
+                    )
+
+                    if (
+                        index <
+                        milestones.lastIndex
+                    ) {
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(
+                                    1.dp
+                                )
+                                .background(
+                                    Color(
+                                        0xFFE5E5EA
+                                    )
+                                )
+                        )
+                    }
+                }
+        }
+    }
+}
+
+@Composable
+private fun MilestoneRow(
+    milestone: GoalMilestone
+) {
+
+    val colors =
+        ClarityTheme.colors
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                horizontal = 16.dp,
+                vertical = 14.dp
+            ),
+
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+
+        Box(
+            modifier = Modifier
+                .size(
+                    42.dp
+                )
+                .background(
+                    color =
+                        if (
+                            milestone.isReached
+                        ) {
+                            Color(
+                                0xFFE8F7EC
+                            )
+                        } else {
+                            Color(
+                                0xFFF2F2F7
+                            )
+                        },
+
+                    shape =
+                        CircleShape
+                ),
+
+            contentAlignment =
+                Alignment.Center
+        ) {
+
+            Icon(
+                imageVector =
+                    if (
+                        milestone.isReached
+                    ) {
+                        Icons.Rounded.Check
+                    } else {
+                        Icons.Rounded.Lock
+                    },
+
+                contentDescription =
+                    null,
+
+                tint =
+                    if (
+                        milestone.isReached
+                    ) {
+                        GoalGreen
+                    } else {
+                        colors.secondaryLabel
+                    }
+            )
+        }
+
+        Spacer(
+            modifier =
+                Modifier.size(
+                    12.dp
+                )
+        )
+
+        Column(
+            modifier =
+                Modifier.weight(
+                    1f
+                )
+        ) {
+
+            Text(
+                text =
+                    "${milestone.percentage}% · ${milestone.title}",
+
+                color =
+                    colors.label,
+
+                fontWeight =
+                    FontWeight.SemiBold
+            )
+
+            Text(
+                text =
+                    milestone.description,
+
+                color =
+                    colors.secondaryLabel,
+
+                style =
+                    androidx.compose.material3
+                        .MaterialTheme
+                        .typography
+                        .bodySmall
+            )
+        }
+
+        Column(
+            horizontalAlignment =
+                Alignment.End
+        ) {
+
+            Text(
+                text =
+                    formatLkr(
+                        milestone.targetAmount
+                    ),
+
+                color =
+                    colors.label,
+
+                fontWeight =
+                    FontWeight.Medium,
+
+                style =
+                    androidx.compose.material3
+                        .MaterialTheme
+                        .typography
+                        .bodySmall
+            )
+
+            Text(
+                text =
+                    if (
+                        milestone.isReached
+                    ) {
+                        "Reached"
+                    } else {
+                        "Locked"
+                    },
+
+                color =
+                    if (
+                        milestone.isReached
+                    ) {
+                        GoalGreen
+                    } else {
+                        colors.secondaryLabel
+                    },
+
+                style =
+                    androidx.compose.material3
+                        .MaterialTheme
+                        .typography
+                        .bodySmall
+            )
+        }
+    }
+}
+
+@Composable
 private fun TransactionsSection(
     transactions: List<GoalTransaction>
 ) {
@@ -1122,7 +1509,9 @@ private fun TransactionsSection(
                 )
         )
 
-        if (transactions.isEmpty()) {
+        if (
+            transactions.isEmpty()
+        ) {
 
             Column(
                 modifier = Modifier
@@ -1191,8 +1580,7 @@ private fun TransactionsSection(
 
                         val isDeposit =
                             transaction.type ==
-                                    GoalTransactionType
-                                        .DEPOSIT
+                                    GoalTransactionType.DEPOSIT
 
                         Row(
                             modifier = Modifier
@@ -1256,9 +1644,7 @@ private fun TransactionsSection(
                                         if (
                                             isDeposit
                                         ) {
-                                            Color(
-                                                0xFF248A3D
-                                            )
+                                            GoalGreen
                                         } else {
                                             GoalRed
                                         }
@@ -1325,15 +1711,13 @@ private fun TransactionsSection(
                                     ) {
                                         "+${
                                             formatLkr(
-                                                transaction
-                                                    .amount
+                                                transaction.amount
                                             )
                                         }"
                                     } else {
                                         "-${
                                             formatLkr(
-                                                transaction
-                                                    .amount
+                                                transaction.amount
                                             )
                                         }"
                                     },
@@ -1342,9 +1726,7 @@ private fun TransactionsSection(
                                     if (
                                         isDeposit
                                     ) {
-                                        Color(
-                                            0xFF248A3D
-                                        )
+                                        GoalGreen
                                     } else {
                                         GoalRed
                                     },
@@ -1587,6 +1969,7 @@ private fun GoalTransactionDialog(
                                         GoalRed
                                 )
                             }
+
                         } else {
                             null
                         },
