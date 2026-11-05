@@ -430,6 +430,19 @@ class GoalViewModelTest {
     fun `negative deposit is rejected`() =
         runTest {
 
+            val job =
+                backgroundScope.launch(
+                    UnconfinedTestDispatcher(
+                        testScheduler
+                    )
+                ) {
+                    viewModel
+                        .uiState
+                        .collect()
+                }
+
+            advanceUntilIdle()
+
             viewModel.deposit(
                 amount =
                     -5000.0
@@ -449,6 +462,8 @@ class GoalViewModelTest {
                     .actionError
                     .value
             )
+
+            job.cancel()
         }
 
     @Test
@@ -736,7 +751,7 @@ class GoalViewModelTest {
             )
 
             assertNotNull(
-                state.projectedFinishDate
+                state.predictDeadline
             )
 
             job.cancel()
