@@ -556,6 +556,92 @@ class GoalViewModel @Inject constructor(
         }
     }
 
+    fun updateGoal(
+        name: String,
+        targetAmount: Double,
+        deadline: String,
+        onSuccess: () -> Unit = {}
+    ) {
+        val goalId =
+            uiState.value
+                .goal
+                ?.id
+
+        if (goalId.isNullOrBlank()) {
+            _actionError.value = "Select a goal first."
+            return
+        }
+
+        if (name.isBlank()) {
+            _actionError.value = "Goal name cannot be empty."
+            return
+        }
+
+        if (targetAmount <= 0.0) {
+            _actionError.value = "Target amount must be greater than 0."
+            return
+        }
+
+        val parsedDeadline =
+            runCatching {
+                LocalDate.parse(deadline)
+            }.getOrNull()
+
+        if (parsedDeadline == null) {
+            _actionError.value = "Use date format YYYY-MM-DD."
+            return
+        }
+
+        if (parsedDeadline.isBefore(LocalDate.now())) {
+            _actionError.value = "Target date must be today or later."
+            return
+        }
+
+        _actionError.value = null
+
+        viewModelScope.launch {
+            goalRepository
+                .updateGoal(
+                    goalId = goalId,
+                    name = name.trim(),
+                    targetAmount = targetAmount,
+                    deadline = deadline
+                )
+                .onSuccess {
+                    onSuccess()
+                }
+                .onFailure { error ->
+                    _actionError.value =
+                        error.message ?: "Goal could not be updated."
+                }
+        }
+    }
+
+    fun deleteGoal(
+        goalId: String? = null,
+        onSuccess: () -> Unit = {}
+    ) {
+        val targetId = goalId ?: uiState.value.goal?.id
+        if (targetId.isNullOrBlank()) {
+            _actionError.value = "Select a goal first."
+            return
+        }
+        _actionError.value = null
+        viewModelScope.launch {
+            goalRepository.deleteGoal(targetId)
+                .onSuccess {
+                    if (_selectedGoalId.value == targetId) {
+                        _selectedGoalId.value = null
+                    }
+                    onSuccess()
+                }
+                .onFailure { error ->
+                    _actionError.value =
+                        error.message ?: "Goal could not be deleted."
+                }
+        }
+    }
+
     fun deposit(
         amount: Double,
         note: String = ""

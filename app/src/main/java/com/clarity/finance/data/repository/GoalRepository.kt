@@ -91,4 +91,9 @@ interface GoalRepository {
             amount = amount,
             note = note
         )
+
+    suspend fun deleteGoal(
+        goalId: String
+    ): Result<Unit> =
+        Result.success(Unit)
 }
