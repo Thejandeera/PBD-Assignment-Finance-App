@@ -278,6 +278,7 @@ fun ClarityNavHost(
 
         composable(Screen.Goal.route) { entry ->
             GoalScreen(
+                authViewModel = authViewModel,
                 onNavigateToHome = {
                     entry.ifResumed { navController.navigateToTab(ClarityNavTab.HOME) }
                 },

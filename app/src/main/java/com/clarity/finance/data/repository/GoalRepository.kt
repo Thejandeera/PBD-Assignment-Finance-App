@@ -96,4 +96,9 @@ interface GoalRepository {
         goalId: String
     ): Result<Unit> =
         Result.success(Unit)
+
+    suspend fun setPrimaryGoal(
+        goalId: String
+    ): Result<Unit> =
+        Result.success(Unit)
 }

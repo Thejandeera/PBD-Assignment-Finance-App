@@ -107,7 +107,7 @@ class GoalViewModel @Inject constructor(
                         selectedId
 
                     else ->
-                        goals.first().id
+                        (goals.firstOrNull { it.isPrimary } ?: goals.first()).id
                 }
 
             if (
@@ -379,6 +379,23 @@ class GoalViewModel @Inject constructor(
             achievementMessage =
                 achievementMessage
         )
+    }
+
+    fun selectGoal(goalId: String) {
+        _selectedGoalId.value = goalId
+    }
+
+    fun setPrimaryGoal(goalId: String, onSuccess: () -> Unit = {}) {
+        viewModelScope.launch {
+            goalRepository.setPrimaryGoal(goalId)
+                .onSuccess {
+                    onSuccess()
+                }
+                .onFailure { error ->
+                    _actionError.value =
+                        error.message ?: "Failed to set primary goal"
+                }
+        }
     }
 
     fun selectPreviousGoal() {
