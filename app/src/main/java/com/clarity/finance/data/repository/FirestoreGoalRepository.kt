@@ -59,15 +59,17 @@ class FirestoreGoalRepository @Inject constructor(
     // ============================================================
 
     override fun observeGoal(): Flow<Goal?> =
-        observeGoals().map { it.firstOrNull() }
+        observeGoals().map { goals ->
+            goals.firstOrNull { it.isPrimary } ?: goals.firstOrNull()
+        }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeTransactions():
             Flow<List<GoalTransaction>> =
         observeGoals().flatMapLatest { goals ->
-            val firstId = goals.firstOrNull()?.id
-            if (firstId != null) {
-                observeTransactions(firstId)
+            val primaryId = (goals.firstOrNull { it.isPrimary } ?: goals.firstOrNull())?.id
+            if (primaryId != null) {
+                observeTransactions(primaryId)
             } else {
                 flowOf(emptyList())
             }
@@ -163,10 +165,8 @@ class FirestoreGoalRepository @Inject constructor(
                                     it.toGoal()
                                 }
                                 ?.sortedWith(
-                                    compareBy<Goal> {
-                                        it.id !=
-                                                FirestorePaths
-                                                    .PRIMARY_GOAL_ID
+                                    compareByDescending<Goal> {
+                                        it.isPrimary
                                     }.thenBy {
                                         it.createdAt
                                     }
@@ -280,6 +280,9 @@ class FirestoreGoalRepository @Inject constructor(
                 "Starting amount cannot exceed the target amount"
             }
 
+            val isFirstGoal =
+                goalsCollection().get().await().isEmpty
+
             val document =
                 goalsCollection()
                     .document()
@@ -298,6 +301,9 @@ class FirestoreGoalRepository @Inject constructor(
 
                         "deadline" to
                                 deadline,
+
+                        "isPrimary" to
+                                isFirstGoal,
 
                         "createdAt" to
                                 FieldValue
@@ -366,7 +372,27 @@ class FirestoreGoalRepository @Inject constructor(
     ): Result<Unit> =
         runCatching {
             require(goalId.isNotBlank()) { "Goal ID cannot be empty" }
-            goalDocument(goalId).delete().await()
+            val doc = goalDocument(goalId)
+            val wasPrimary = doc.get().await().getBoolean("isPrimary") ?: false
+            doc.delete().await()
+            if (wasPrimary) {
+                val remaining = goalsCollection().get().await().documents
+                remaining.firstOrNull()?.reference?.update("isPrimary", true)?.await()
+            }
+            Unit
+        }
+
+    override suspend fun setPrimaryGoal(
+        goalId: String
+    ): Result<Unit> =
+        runCatching {
+            require(goalId.isNotBlank()) { "Goal ID cannot be empty" }
+            val snapshot = goalsCollection().get().await()
+            val batch = firestore.batch()
+            for (doc in snapshot.documents) {
+                batch.update(doc.reference, "isPrimary", doc.id == goalId)
+            }
+            batch.commit().await()
             Unit
         }
 
@@ -496,6 +522,12 @@ class FirestoreGoalRepository @Inject constructor(
                     "deadline"
                 )
                     .orEmpty(),
+
+            isPrimary =
+                getBoolean(
+                    "isPrimary"
+                )
+                    ?: false,
 
             createdAt =
                 getTimestamp(

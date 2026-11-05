@@ -28,7 +28,7 @@ import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.ArrowDropUp
-import androidx.compose.material.icons.rounded.ArrowForwardIos
+import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
@@ -67,11 +67,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.clarity.finance.model.Goal
 import com.clarity.finance.model.GoalTransaction
 import com.clarity.finance.model.GoalTransactionType
+import com.clarity.finance.ui.components.AddExpenseSheet
 import com.clarity.finance.ui.components.ClarityBottomBar
 import com.clarity.finance.ui.components.ClarityNavTab
 import com.clarity.finance.ui.theme.ClarityTheme
+import com.clarity.finance.util.CurrencyFormatter
+import com.clarity.finance.viewmodel.AuthViewModel
+import com.clarity.finance.viewmodel.ExpenseViewModel
 import com.clarity.finance.viewmodel.GoalMilestone
 import com.clarity.finance.viewmodel.GoalViewModel
 import java.text.NumberFormat
@@ -97,6 +102,8 @@ private val GoalRed =
 fun GoalScreen(
     modifier: Modifier = Modifier,
     viewModel: GoalViewModel = hiltViewModel(),
+    expenseViewModel: ExpenseViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel(),
     onNavigateToHome: () -> Unit = {},
     onNavigateToIncome: () -> Unit = {},
     onNavigateToInsights: () -> Unit = {}
@@ -106,6 +113,12 @@ fun GoalScreen(
 
     val actionError by
     viewModel.actionError.collectAsStateWithLifecycle()
+
+    val currentCurrency by
+    authViewModel.currencyFlow.collectAsStateWithLifecycle()
+
+    val exchangeRate by
+    authViewModel.exchangeRateFlow.collectAsStateWithLifecycle()
 
     var showDepositDialog by remember {
         mutableStateOf(false)
@@ -127,8 +140,19 @@ fun GoalScreen(
         mutableStateOf(false)
     }
 
+    var showAddExpenseSheet by remember {
+        mutableStateOf(false)
+    }
+
     val colors =
         ClarityTheme.colors
+
+    if (showAddExpenseSheet) {
+        AddExpenseSheet(
+            viewModel = expenseViewModel,
+            onDismiss = { showAddExpenseSheet = false }
+        )
+    }
 
     Scaffold(
         modifier =
@@ -141,6 +165,10 @@ fun GoalScreen(
             ClarityBottomBar(
                 currentTab =
                     ClarityNavTab.GOAL,
+
+                onAddClick = {
+                    showAddExpenseSheet = true
+                },
 
                 onTabSelected = { tab ->
                     when (tab) {
@@ -211,10 +239,41 @@ fun GoalScreen(
                     val goal =
                         uiState.goal!!
 
+                    if (uiState.goals.size > 1) {
+                        item {
+                            GoalListSection(
+                                goals =
+                                    uiState.goals,
+
+                                selectedGoalId =
+                                    uiState.goal?.id,
+
+                                onSelectGoal =
+                                    viewModel::selectGoal,
+
+                                onSetPrimary =
+                                    viewModel::setPrimaryGoal,
+
+                                currency =
+                                    currentCurrency,
+
+                                exchangeRate =
+                                    exchangeRate
+                            )
+                        }
+                    }
+
                     item {
                         GoalProgressCard(
                             goalName =
                                 goal.name,
+
+                            isPrimary =
+                                goal.isPrimary,
+
+                            onSetPrimary = {
+                                viewModel.setPrimaryGoal(goal.id)
+                            },
 
                             currentSavings =
                                 uiState.currentSavings,
@@ -237,15 +296,6 @@ fun GoalScreen(
                             achievementMessage =
                                 uiState.achievementMessage,
 
-                            showSwitchButtons =
-                                uiState.goals.size > 1,
-
-                            onPrevious =
-                                viewModel::selectPreviousGoal,
-
-                            onNext =
-                                viewModel::selectNextGoal,
-
                             onEdit = {
                                 viewModel.clearActionError()
                                 showEditGoalDialog = true
@@ -254,7 +304,13 @@ fun GoalScreen(
                             onDelete = {
                                 viewModel.clearActionError()
                                 showDeleteGoalDialog = true
-                            }
+                            },
+
+                            currency =
+                                currentCurrency,
+
+                            exchangeRate =
+                                exchangeRate
                         )
                     }
 
@@ -276,7 +332,13 @@ fun GoalScreen(
                                             .ofPattern(
                                                 "dd MMM yyyy"
                                             )
-                                    )
+                                    ),
+
+                            currency =
+                                currentCurrency,
+
+                            exchangeRate =
+                                exchangeRate
                         )
                     }
 
@@ -300,7 +362,13 @@ fun GoalScreen(
                     item {
                         SavingsHistoryCard(
                             transactions =
-                                uiState.transactions
+                                uiState.transactions,
+
+                            currency =
+                                currentCurrency,
+
+                            exchangeRate =
+                                exchangeRate
                         )
                     }
                 }
@@ -310,6 +378,9 @@ fun GoalScreen(
 
     if (showAddGoalDialog) {
         AddGoalDialog(
+            currency =
+                currentCurrency,
+
             errorMessage =
                 actionError,
 
@@ -345,6 +416,7 @@ fun GoalScreen(
             initialTarget = if (currentGoal.targetAmount > 0) currentGoal.targetAmount.toLong().toString() else "",
             initialDeadline = currentGoal.deadline.ifBlank { LocalDate.now().plusYears(1).toString() },
             isEdit = true,
+            currency = currentCurrency,
             errorMessage = actionError,
             onDismiss = {
                 viewModel.clearActionError()
@@ -413,6 +485,9 @@ fun GoalScreen(
             accentColor =
                 goalAccent(),
 
+            currency =
+                currentCurrency,
+
             errorMessage =
                 actionError,
 
@@ -446,13 +521,18 @@ fun GoalScreen(
             accentColor =
                 GoalRed,
 
+            currency =
+                currentCurrency,
+
             errorMessage =
                 actionError,
 
             helperText =
                 "Available: ${
                     formatLkr(
-                        uiState.currentSavings
+                        uiState.currentSavings,
+                        currentCurrency,
+                        exchangeRate
                     )
                 }",
 
@@ -562,6 +642,107 @@ private fun GoalHeader(
 }
 
 @Composable
+private fun GoalListSection(
+    goals: List<Goal>,
+    selectedGoalId: String?,
+    onSelectGoal: (String) -> Unit,
+    onSetPrimary: (String) -> Unit,
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
+) {
+    val colors = ClarityTheme.colors
+    val accent = goalAccent()
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            text = "Your Goals (${goals.size})",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = colors.label
+        )
+
+        for (goal in goals) {
+            val isSelected = goal.id == selectedGoalId
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected) accent else colors.separator.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    .background(if (isSelected) accent.copy(alpha = 0.08f) else colors.card)
+                    .clickable { onSelectGoal(goal.id) }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = goal.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.label,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        if (goal.isPrimary) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(accent.copy(alpha = 0.15f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "★ Primary",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = accent,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Target: ${formatLkr(goal.targetAmount, currency, exchangeRate)}" +
+                            if (goal.deadline.isNotBlank()) " · Due ${goal.deadline}" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.secondaryLabel
+                    )
+                }
+
+                if (!goal.isPrimary) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onSetPrimary(goal.id) }
+                            .background(colors.secondaryLabel.copy(alpha = 0.12f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "Set Primary",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.secondaryLabel,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun GoalProgressCard(
     goalName: String,
     currentSavings: Double,
@@ -571,11 +752,12 @@ private fun GoalProgressCard(
     milestones: List<GoalMilestone>,
     nextMilestone: GoalMilestone?,
     achievementMessage: String?,
-    showSwitchButtons: Boolean,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
+    isPrimary: Boolean = false,
+    onSetPrimary: () -> Unit = {},
     onEdit: () -> Unit = {},
-    onDelete: () -> Unit = {}
+    onDelete: () -> Unit = {},
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
 ) {
     val colors =
         ClarityTheme.colors
@@ -596,62 +778,21 @@ private fun GoalProgressCard(
                 .padding(18.dp)
     ) {
 
-        // ---------------------------------------------------------
-        // CLEAN GOAL NAME + ARROWS
-        // ---------------------------------------------------------
-
         Row(
             modifier =
                 Modifier.fillMaxWidth(),
-
             verticalAlignment =
                 Alignment.CenterVertically,
-
             horizontalArrangement =
-                Arrangement.Center
+                Arrangement.SpaceBetween
         ) {
-
-            IconButton(
-                onClick =
-                    onPrevious,
-
-                enabled =
-                    showSwitchButtons,
-
-                modifier =
-                    Modifier.size(38.dp)
-            ) {
-                Icon(
-                    imageVector =
-                        Icons.Rounded.ArrowBackIosNew,
-
-                    contentDescription =
-                        "Previous goal",
-
-                    tint =
-                        if (showSwitchButtons) {
-                            accent
-                        } else {
-                            colors.secondaryLabel
-                                .copy(alpha = 0.25f)
-                        },
-
-                    modifier =
-                        Modifier.size(17.dp)
-                )
-            }
-
             Row(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .padding(
-                            horizontal = 8.dp
-                        ),
+                        .padding(end = 8.dp),
                 verticalAlignment =
-                    Alignment.CenterVertically,
-                horizontalArrangement =
-                    Arrangement.Center
+                    Alignment.CenterVertically
             ) {
                 Text(
                     text =
@@ -677,15 +818,67 @@ private fun GoalProgressCard(
 
                 Spacer(
                     modifier =
-                        Modifier.width(4.dp)
+                        Modifier.width(8.dp)
                 )
 
+                if (isPrimary) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(accent.copy(alpha = 0.15f))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text =
+                                "★ Primary",
+
+                            style =
+                                MaterialTheme.typography.labelSmall,
+
+                            color =
+                                accent,
+
+                            fontWeight =
+                                FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Box(
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(colors.secondaryLabel.copy(alpha = 0.12f))
+                                .clickable { onSetPrimary() }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text =
+                                "Set Primary",
+
+                            style =
+                                MaterialTheme.typography.labelSmall,
+
+                            color =
+                                colors.secondaryLabel,
+
+                            fontWeight =
+                                FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            Row(
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
                 IconButton(
                     onClick =
                         onEdit,
 
                     modifier =
-                        Modifier.size(30.dp)
+                        Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector =
@@ -707,7 +900,7 @@ private fun GoalProgressCard(
                         onDelete,
 
                     modifier =
-                        Modifier.size(30.dp)
+                        Modifier.size(32.dp)
                 ) {
                     Icon(
                         imageVector =
@@ -723,36 +916,6 @@ private fun GoalProgressCard(
                             Modifier.size(16.dp)
                     )
                 }
-            }
-
-            IconButton(
-                onClick =
-                    onNext,
-
-                enabled =
-                    showSwitchButtons,
-
-                modifier =
-                    Modifier.size(38.dp)
-            ) {
-                Icon(
-                    imageVector =
-                        Icons.Rounded.ArrowForwardIos,
-
-                    contentDescription =
-                        "Next goal",
-
-                    tint =
-                        if (showSwitchButtons) {
-                            accent
-                        } else {
-                            colors.secondaryLabel
-                                .copy(alpha = 0.25f)
-                        },
-
-                    modifier =
-                        Modifier.size(17.dp)
-                )
             }
         }
 
@@ -817,7 +980,9 @@ private fun GoalProgressCard(
                 Text(
                     text =
                         formatLkr(
-                            currentSavings
+                            currentSavings,
+                            currency,
+                            exchangeRate
                         ),
 
                     color =
@@ -848,7 +1013,9 @@ private fun GoalProgressCard(
                 Text(
                     text =
                         formatLkr(
-                            targetAmount
+                            targetAmount,
+                            currency,
+                            exchangeRate
                         ),
 
                     color =
@@ -1217,9 +1384,6 @@ private fun ProgressMessageCard(
     goalName: String,
     achievementMessage: String?
 ) {
-    val colors =
-        ClarityTheme.colors
-
     val percent =
         (progress * 100)
             .toInt()
@@ -1307,7 +1471,9 @@ private fun GoalMetricsSection(
     remainingAmount: Double,
     requiredMonthlySaving: Double,
     monthsRemaining: Long,
-    predictDeadline: String?
+    predictDeadline: String?,
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
 ) {
     val colors =
         ClarityTheme.colors
@@ -1340,7 +1506,9 @@ private fun GoalMetricsSection(
 
                 value =
                     formatLkr(
-                        remainingAmount
+                        remainingAmount,
+                        currency,
+                        exchangeRate
                     ),
 
                 modifier =
@@ -1353,7 +1521,9 @@ private fun GoalMetricsSection(
 
                 value =
                     formatLkr(
-                        requiredMonthlySaving
+                        requiredMonthlySaving,
+                        currency,
+                        exchangeRate
                     ),
 
                 modifier =
@@ -1569,7 +1739,9 @@ private fun GoalActionButtons(
 
 @Composable
 private fun SavingsHistoryCard(
-    transactions: List<GoalTransaction>
+    transactions: List<GoalTransaction>,
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
 ) {
     val colors =
         ClarityTheme.colors
@@ -1753,7 +1925,13 @@ private fun SavingsHistoryCard(
 
                         SavingsHistoryRow(
                             transaction =
-                                transaction
+                                transaction,
+
+                            currency =
+                                currency,
+
+                            exchangeRate =
+                                exchangeRate
                         )
 
                         if (
@@ -1802,7 +1980,9 @@ private fun SavingsHistoryCard(
 
 @Composable
 private fun SavingsHistoryRow(
-    transaction: GoalTransaction
+    transaction: GoalTransaction,
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
 ) {
     val colors =
         ClarityTheme.colors
@@ -1918,13 +2098,17 @@ private fun SavingsHistoryRow(
                 if (isDeposit) {
                     "+${
                         formatLkr(
-                            transaction.amount
+                            transaction.amount,
+                            currency,
+                            exchangeRate
                         )
                     }"
                 } else {
                     "-${
                         formatLkr(
-                            transaction.amount
+                            transaction.amount,
+                            currency,
+                            exchangeRate
                         )
                     }"
                 },
@@ -1957,6 +2141,7 @@ private fun AddGoalDialog(
     initialStarting: String = "",
     initialDeadline: String = LocalDate.now().plusYears(1).toString(),
     isEdit: Boolean = false,
+    currency: String = "LKR",
     errorMessage: String?,
     onDismiss: () -> Unit,
     onDelete: (() -> Unit)? = null,
@@ -2051,7 +2236,7 @@ private fun AddGoalDialog(
 
                     prefix = {
                         Text(
-                            "LKR "
+                            "${CurrencyFormatter.getSymbol(currency)} "
                         )
                     },
 
@@ -2086,7 +2271,7 @@ private fun AddGoalDialog(
 
                         prefix = {
                             Text(
-                                "LKR "
+                                "${CurrencyFormatter.getSymbol(currency)} "
                             )
                         },
 
@@ -2330,6 +2515,7 @@ private fun GoalTransactionDialog(
     accentColor: Color,
     errorMessage: String?,
     helperText: String? = null,
+    currency: String = "LKR",
     onDismiss: () -> Unit,
     onConfirm: (
         Double,
@@ -2395,7 +2581,7 @@ private fun GoalTransactionDialog(
 
                     prefix = {
                         Text(
-                            "LKR "
+                            "${CurrencyFormatter.getSymbol(currency)} "
                         )
                     },
 
@@ -2677,19 +2863,9 @@ private fun sanitizeAmountInput(
 }
 
 private fun formatLkr(
-    amount: Double
+    amount: Double,
+    currency: String = "LKR",
+    exchangeRate: Double = 1.0
 ): String {
-    val formatter =
-        NumberFormat.getNumberInstance(
-            Locale.US
-        )
-
-    formatter.maximumFractionDigits =
-        0
-
-    return "LKR ${
-        formatter.format(
-            amount
-        )
-    }"
+    return CurrencyFormatter.format(amount, currency, exchangeRate)
 }

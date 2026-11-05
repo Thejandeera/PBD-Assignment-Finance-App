@@ -80,6 +80,7 @@ data class Goal(
     val targetAmount: Double = 0.0,
     val startingAmount: Double = 0.0,
     val deadline: String = "",
+    val isPrimary: Boolean = false,
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 )
