@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,11 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.LaptopMac
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.rounded.TrackChanges
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -32,6 +33,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -61,20 +63,17 @@ import java.text.NumberFormat
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val GoalPurple =
+private val LightGoalPurple =
     Color(0xFF6200EE)
 
-private val GoalPurpleLight =
-    Color(0xFFF3E5F5)
-
-private val GoalPurpleDark =
-    Color(0xFF3700B3)
-
-private val GoalRed =
-    Color(0xFFD70015)
+private val DarkGoalPurple =
+    Color(0xFFB388FF)
 
 private val GoalGreen =
-    Color(0xFF248A3D)
+    Color(0xFF34C759)
+
+private val GoalRed =
+    Color(0xFFFF453A)
 
 @Composable
 fun GoalScreen(
@@ -138,15 +137,22 @@ fun GoalScreen(
         }
     ) { innerPadding ->
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(
-                    rememberScrollState()
-                )
-                .padding(
-                    horizontal = 16.dp
+        LazyColumn(
+            modifier =
+                Modifier.fillMaxSize(),
+
+            contentPadding =
+                PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top =
+                        innerPadding
+                            .calculateTopPadding() +
+                                12.dp,
+                    bottom =
+                        innerPadding
+                            .calculateBottomPadding() +
+                                32.dp
                 ),
 
             verticalArrangement =
@@ -155,57 +161,60 @@ fun GoalScreen(
                 )
         ) {
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        8.dp
-                    )
-            )
+            item {
 
-            Text(
-                text =
-                    "My Goal",
+                Text(
+                    text =
+                        "My Goal",
 
-                color =
-                    colors.label,
+                    color =
+                        colors.label,
 
-                fontWeight =
-                    FontWeight.Bold,
+                    fontWeight =
+                        FontWeight.Bold,
 
-                style =
-                    androidx.compose.material3
-                        .MaterialTheme
-                        .typography
-                        .headlineLarge
-            )
+                    style =
+                        MaterialTheme
+                            .typography
+                            .headlineLarge
+                )
+            }
 
-            Text(
-                text =
-                    "Stay focused on what you're saving for.",
+            item {
 
-                color =
-                    colors.secondaryLabel,
+                Text(
+                    text =
+                        "Stay focused on what you're saving for.",
 
-                style =
-                    androidx.compose.material3
-                        .MaterialTheme
-                        .typography
-                        .bodyMedium
-            )
+                    color =
+                        colors.secondaryLabel,
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyMedium
+                )
+            }
 
             when {
 
                 uiState.isLoading -> {
 
-                    LoadingGoalCard()
+                    item {
+
+                        LoadingGoalCard()
+                    }
                 }
 
                 uiState.goal == null -> {
 
-                    EmptyGoalCard(
-                        error =
-                            uiState.error
-                    )
+                    item {
+
+                        EmptyGoalCard(
+                            error =
+                                uiState.error
+                        )
+                    }
                 }
 
                 else -> {
@@ -213,176 +222,187 @@ fun GoalScreen(
                     val goal =
                         uiState.goal!!
 
-                    GoalProgressCard(
-                        goalName =
-                            goal.name,
+                    item {
 
-                        currentSavings =
-                            uiState.currentSavings,
+                        GoalProgressCard(
+                            goalName =
+                                goal.name,
 
-                        targetAmount =
-                            goal.targetAmount,
+                            currentSavings =
+                                uiState.currentSavings,
 
-                        progress =
-                            uiState.progress,
+                            targetAmount =
+                                goal.targetAmount,
 
-                        deadline =
-                            goal.deadline
-                    )
+                            progress =
+                                uiState.progress,
 
-                    GoalMetricsSection(
-                        remainingAmount =
-                            uiState.remainingAmount,
+                            deadline =
+                                goal.deadline
+                        )
+                    }
 
-                        requiredMonthlySaving =
-                            uiState.requiredMonthlySaving,
+                    item {
 
-                        monthsRemaining =
-                            uiState.monthsRemaining,
+                        GoalMetricsSection(
+                            remainingAmount =
+                                uiState.remainingAmount,
 
-                        projectedFinishDate =
-                            uiState
-                                .projectedFinishDate
-                                ?.format(
-                                    DateTimeFormatter
-                                        .ofPattern(
-                                            "dd MMM yyyy"
+                            requiredMonthlySaving =
+                                uiState.requiredMonthlySaving,
+
+                            monthsRemaining =
+                                uiState.monthsRemaining,
+
+                            projectedFinishDate =
+                                uiState
+                                    .projectedFinishDate
+                                    ?.format(
+                                        DateTimeFormatter
+                                            .ofPattern(
+                                                "dd MMM yyyy"
+                                            )
+                                    )
+                        )
+                    }
+
+                    item {
+
+                        GoalStatusCard(
+                            progress =
+                                uiState.progress,
+
+                            requiredMonthlySaving =
+                                uiState
+                                    .requiredMonthlySaving,
+
+                            monthlyDepositAverage =
+                                uiState
+                                    .monthlyDepositAverage
+                        )
+                    }
+
+                    item {
+
+                        GoalMilestonesSection(
+                            milestones =
+                                uiState.milestones,
+
+                            nextMilestone =
+                                uiState.nextMilestone,
+
+                            currentSavings =
+                                uiState.currentSavings
+                        )
+                    }
+
+                    item {
+
+                        Row(
+                            modifier =
+                                Modifier.fillMaxWidth(),
+
+                            horizontalArrangement =
+                                Arrangement.spacedBy(
+                                    12.dp
+                                )
+                        ) {
+
+                            Button(
+                                onClick = {
+
+                                    viewModel
+                                        .clearActionError()
+
+                                    showDepositDialog =
+                                        true
+                                },
+
+                                modifier =
+                                    Modifier.weight(
+                                        1f
+                                    ),
+
+                                colors =
+                                    ButtonDefaults
+                                        .buttonColors(
+                                            containerColor =
+                                                goalAccent()
+                                        )
+                            ) {
+
+                                Icon(
+                                    imageVector =
+                                        Icons.Rounded.Add,
+
+                                    contentDescription =
+                                        null
+                                )
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.size(
+                                            6.dp
                                         )
                                 )
-                    )
 
-                    GoalStatusCard(
-                        progress =
-                            uiState.progress,
-
-                        requiredMonthlySaving =
-                            uiState
-                                .requiredMonthlySaving,
-
-                        monthlyDepositAverage =
-                            uiState
-                                .monthlyDepositAverage
-                    )
-
-                    GoalMilestonesSection(
-                        milestones =
-                            uiState.milestones,
-
-                        nextMilestone =
-                            uiState.nextMilestone,
-
-                        currentSavings =
-                            uiState.currentSavings
-                    )
-
-                    Row(
-                        modifier =
-                            Modifier.fillMaxWidth(),
-
-                        horizontalArrangement =
-                            Arrangement.spacedBy(
-                                12.dp
-                            )
-                    ) {
-
-                        Button(
-                            onClick = {
-
-                                viewModel
-                                    .clearActionError()
-
-                                showDepositDialog =
-                                    true
-                            },
-
-                            modifier =
-                                Modifier.weight(
-                                    1f
-                                ),
-
-                            colors =
-                                ButtonDefaults
-                                    .buttonColors(
-                                        containerColor =
-                                            GoalPurple
-                                    )
-                        ) {
-
-                            Icon(
-                                imageVector =
-                                    Icons.Rounded.Add,
-
-                                contentDescription =
-                                    null
-                            )
-
-                            Spacer(
-                                modifier =
-                                    Modifier.size(
-                                        6.dp
-                                    )
-                            )
-
-                            Text(
-                                "Add Savings"
-                            )
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-
-                                viewModel
-                                    .clearActionError()
-
-                                showWithdrawDialog =
-                                    true
-                            },
-
-                            enabled =
-                                uiState.currentSavings >
-                                        0.0,
-
-                            modifier =
-                                Modifier.weight(
-                                    1f
+                                Text(
+                                    "Add Savings"
                                 )
-                        ) {
+                            }
 
-                            Icon(
-                                imageVector =
-                                    Icons.Rounded
-                                        .ArrowUpward,
+                            OutlinedButton(
+                                onClick = {
 
-                                contentDescription =
-                                    null
-                            )
+                                    viewModel
+                                        .clearActionError()
 
-                            Spacer(
+                                    showWithdrawDialog =
+                                        true
+                                },
+
+                                enabled =
+                                    uiState.currentSavings >
+                                            0.0,
+
                                 modifier =
-                                    Modifier.size(
-                                        6.dp
+                                    Modifier.weight(
+                                        1f
                                     )
-                            )
+                            ) {
 
-                            Text(
-                                "Withdraw"
-                            )
+                                Icon(
+                                    imageVector =
+                                        Icons.Rounded
+                                            .ArrowUpward,
+
+                                    contentDescription =
+                                        null
+                                )
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.size(
+                                            6.dp
+                                        )
+                                )
+
+                                Text(
+                                    "Withdraw"
+                                )
+                            }
                         }
                     }
 
-                    TransactionsSection(
-                        transactions =
-                            uiState.transactions
-                    )
+                    item {
+
+                        TransactionsSection(
+                            transactions =
+                                uiState.transactions
+                        )
+                    }
                 }
             }
-
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        24.dp
-                    )
-            )
         }
     }
 
@@ -396,7 +416,7 @@ fun GoalScreen(
                 "Add",
 
             accentColor =
-                GoalPurple,
+                goalAccent(),
 
             errorMessage =
                 actionError,
@@ -415,8 +435,11 @@ fun GoalScreen(
                     note ->
 
                 viewModel.deposit(
-                    amount = amount,
-                    note = note
+                    amount =
+                        amount,
+
+                    note =
+                        note
                 )
 
                 showDepositDialog =
@@ -462,8 +485,11 @@ fun GoalScreen(
 
                 val accepted =
                     viewModel.withdraw(
-                        amount = amount,
-                        note = note
+                        amount =
+                            amount,
+
+                        note =
+                            note
                     )
 
                 if (accepted) {
@@ -473,6 +499,66 @@ fun GoalScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun goalAccent(): Color {
+
+    return if (
+        ClarityTheme.colors.isDark
+    ) {
+        DarkGoalPurple
+    } else {
+        LightGoalPurple
+    }
+}
+
+@Composable
+private fun goalSoftBackground(): Color {
+
+    return if (
+        ClarityTheme.colors.isDark
+    ) {
+        Color(0xFF2C2235)
+    } else {
+        Color(0xFFF3E5F5)
+    }
+}
+
+@Composable
+private fun successSoftBackground(): Color {
+
+    return if (
+        ClarityTheme.colors.isDark
+    ) {
+        Color(0xFF17331F)
+    } else {
+        Color(0xFFE8F7EC)
+    }
+}
+
+@Composable
+private fun errorSoftBackground(): Color {
+
+    return if (
+        ClarityTheme.colors.isDark
+    ) {
+        Color(0xFF3A1D1D)
+    } else {
+        Color(0xFFFFECEB)
+    }
+}
+
+@Composable
+private fun lockedBackground(): Color {
+
+    return if (
+        ClarityTheme.colors.isDark
+    ) {
+        Color(0xFF303033)
+    } else {
+        Color(0xFFF2F2F7)
     }
 }
 
@@ -487,6 +573,9 @@ private fun GoalProgressCard(
 
     val colors =
         ClarityTheme.colors
+
+    val accent =
+        goalAccent()
 
     Column(
         modifier = Modifier
@@ -517,7 +606,7 @@ private fun GoalProgressCard(
                     )
                     .background(
                         color =
-                            GoalPurpleLight,
+                            goalSoftBackground(),
 
                         shape =
                             RoundedCornerShape(
@@ -538,7 +627,7 @@ private fun GoalProgressCard(
                         null,
 
                     tint =
-                        GoalPurple,
+                        accent,
 
                     modifier =
                         Modifier.size(
@@ -572,8 +661,7 @@ private fun GoalProgressCard(
                         FontWeight.SemiBold,
 
                     style =
-                        androidx.compose.material3
-                            .MaterialTheme
+                        MaterialTheme
                             .typography
                             .titleMedium
                 )
@@ -586,8 +674,7 @@ private fun GoalProgressCard(
                         colors.secondaryLabel,
 
                     style =
-                        androidx.compose.material3
-                            .MaterialTheme
+                        MaterialTheme
                             .typography
                             .bodySmall
                 )
@@ -598,14 +685,13 @@ private fun GoalProgressCard(
                     "${(progress * 100).toInt()}%",
 
                 color =
-                    GoalPurpleDark,
+                    accent,
 
                 fontWeight =
                     FontWeight.Bold,
 
                 style =
-                    androidx.compose.material3
-                        .MaterialTheme
+                    MaterialTheme
                         .typography
                         .titleLarge
             )
@@ -637,12 +723,20 @@ private fun GoalProgressCard(
                     ),
 
                 color =
-                    GoalPurple,
+                    accent,
 
                 trackColor =
-                    Color(
-                        0xFFE5E5EA
-                    ),
+                    if (
+                        colors.isDark
+                    ) {
+                        Color(
+                            0xFF3A3A3C
+                        )
+                    } else {
+                        Color(
+                            0xFFE5E5EA
+                        )
+                    },
 
                 strokeWidth =
                     12.dp
@@ -664,8 +758,7 @@ private fun GoalProgressCard(
                         FontWeight.Bold,
 
                     style =
-                        androidx.compose.material3
-                            .MaterialTheme
+                        MaterialTheme
                             .typography
                             .headlineMedium
                 )
@@ -678,8 +771,7 @@ private fun GoalProgressCard(
                         colors.secondaryLabel,
 
                     style =
-                        androidx.compose.material3
-                            .MaterialTheme
+                        MaterialTheme
                             .typography
                             .bodySmall
                 )
@@ -711,8 +803,7 @@ private fun GoalProgressCard(
                         colors.secondaryLabel,
 
                     style =
-                        androidx.compose.material3
-                            .MaterialTheme
+                        MaterialTheme
                             .typography
                             .bodySmall
                 )
@@ -744,8 +835,7 @@ private fun GoalProgressCard(
                         colors.secondaryLabel,
 
                     style =
-                        androidx.compose.material3
-                            .MaterialTheme
+                        MaterialTheme
                             .typography
                             .bodySmall
                 )
@@ -786,7 +876,7 @@ private fun GoalProgressCard(
                     null,
 
                 tint =
-                    GoalPurple,
+                    accent,
 
                 modifier =
                     Modifier.size(
@@ -809,8 +899,7 @@ private fun GoalProgressCard(
                     colors.secondaryLabel,
 
                 style =
-                    androidx.compose.material3
-                        .MaterialTheme
+                    MaterialTheme
                         .typography
                         .bodyMedium
             )
@@ -826,6 +915,9 @@ private fun GoalMetricsSection(
     projectedFinishDate: String?
 ) {
 
+    val colors =
+        ClarityTheme.colors
+
     Column(
         verticalArrangement =
             Arrangement.spacedBy(
@@ -837,12 +929,14 @@ private fun GoalMetricsSection(
             text =
                 "Goal Summary",
 
+            color =
+                colors.label,
+
             fontWeight =
                 FontWeight.SemiBold,
 
             style =
-                androidx.compose.material3
-                    .MaterialTheme
+                MaterialTheme
                     .typography
                     .titleMedium
         )
@@ -914,7 +1008,7 @@ private fun GoalMetricsSection(
 
             GoalMetricCard(
                 title =
-                    "Projected Finish",
+                    "Goal Horizon",
 
                 value =
                     projectedFinishDate
@@ -926,6 +1020,19 @@ private fun GoalMetricsSection(
                     )
             )
         }
+
+        Text(
+            text =
+                "Goal Horizon estimates when you may reach the goal if your recent average saving rate continues.",
+
+            color =
+                colors.secondaryLabel,
+
+            style =
+                MaterialTheme
+                    .typography
+                    .bodySmall
+        )
     }
 }
 
@@ -961,8 +1068,7 @@ private fun GoalMetricCard(
                 colors.secondaryLabel,
 
             style =
-                androidx.compose.material3
-                    .MaterialTheme
+                MaterialTheme
                     .typography
                     .bodySmall
         )
@@ -985,8 +1091,7 @@ private fun GoalMetricCard(
                 FontWeight.SemiBold,
 
             style =
-                androidx.compose.material3
-                    .MaterialTheme
+                MaterialTheme
                     .typography
                     .bodyLarge
         )
@@ -1003,20 +1108,27 @@ private fun GoalStatusCard(
     val colors =
         ClarityTheme.colors
 
+    val accent =
+        goalAccent()
+
     val message =
         when {
 
             progress >= 1f ->
+
                 "Goal completed! You reached your target."
 
             monthlyDepositAverage <= 0.0 ->
+
                 "Start saving to calculate your projected finish date."
 
             monthlyDepositAverage >=
                     requiredMonthlySaving ->
+
                 "You're on track. Keep up your current saving rate."
 
             else ->
+
                 "Increase your monthly savings to stay on track."
         }
 
@@ -1025,7 +1137,7 @@ private fun GoalStatusCard(
             .fillMaxWidth()
             .background(
                 color =
-                    GoalPurpleLight,
+                    goalSoftBackground(),
 
                 shape =
                     RoundedCornerShape(
@@ -1049,7 +1161,7 @@ private fun GoalStatusCard(
                 null,
 
             tint =
-                GoalPurple
+                accent
         )
 
         Spacer(
@@ -1066,7 +1178,7 @@ private fun GoalStatusCard(
                     "Goal Status",
 
                 color =
-                    GoalPurpleDark,
+                    accent,
 
                 fontWeight =
                     FontWeight.SemiBold
@@ -1087,8 +1199,7 @@ private fun GoalStatusCard(
                     colors.secondaryLabel,
 
                 style =
-                    androidx.compose.material3
-                        .MaterialTheme
+                    MaterialTheme
                         .typography
                         .bodySmall
             )
@@ -1105,6 +1216,9 @@ private fun GoalMilestonesSection(
 
     val colors =
         ClarityTheme.colors
+
+    val accent =
+        goalAccent()
 
     Column(
         verticalArrangement =
@@ -1124,15 +1238,12 @@ private fun GoalMilestonesSection(
                 FontWeight.SemiBold,
 
             style =
-                androidx.compose.material3
-                    .MaterialTheme
+                MaterialTheme
                     .typography
                     .titleMedium
         )
 
-        if (
-            nextMilestone != null
-        ) {
+        if (nextMilestone != null) {
 
             val amountNeeded =
                 (
@@ -1148,7 +1259,7 @@ private fun GoalMilestonesSection(
                     .fillMaxWidth()
                     .background(
                         color =
-                            GoalPurpleLight,
+                            goalSoftBackground(),
 
                         shape =
                             RoundedCornerShape(
@@ -1171,7 +1282,7 @@ private fun GoalMilestonesSection(
                         null,
 
                     tint =
-                        GoalPurple
+                        accent
                 )
 
                 Spacer(
@@ -1188,7 +1299,7 @@ private fun GoalMilestonesSection(
                             "Next: ${nextMilestone.percentage}%",
 
                         color =
-                            GoalPurpleDark,
+                            accent,
 
                         fontWeight =
                             FontWeight.SemiBold
@@ -1196,19 +1307,23 @@ private fun GoalMilestonesSection(
 
                     Text(
                         text =
-                            "Save ${formatLkr(amountNeeded)} more to unlock ${nextMilestone.title}.",
+                            "Save ${
+                                formatLkr(
+                                    amountNeeded
+                                )
+                            } more to unlock ${nextMilestone.title}.",
 
                         color =
                             colors.secondaryLabel,
 
                         style =
-                            androidx.compose.material3
-                                .MaterialTheme
+                            MaterialTheme
                                 .typography
                                 .bodySmall
                     )
                 }
             }
+
         } else {
 
             Row(
@@ -1216,9 +1331,7 @@ private fun GoalMilestonesSection(
                     .fillMaxWidth()
                     .background(
                         color =
-                            Color(
-                                0xFFE8F7EC
-                            ),
+                            successSoftBackground(),
 
                         shape =
                             RoundedCornerShape(
@@ -1300,9 +1413,7 @@ private fun GoalMilestonesSection(
                                     1.dp
                                 )
                                 .background(
-                                    Color(
-                                        0xFFE5E5EA
-                                    )
+                                    colors.separator
                                 )
                         )
                     }
@@ -1323,8 +1434,11 @@ private fun MilestoneRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
-                horizontal = 16.dp,
-                vertical = 14.dp
+                horizontal =
+                    16.dp,
+
+                vertical =
+                    14.dp
             ),
 
         verticalAlignment =
@@ -1341,13 +1455,9 @@ private fun MilestoneRow(
                         if (
                             milestone.isReached
                         ) {
-                            Color(
-                                0xFFE8F7EC
-                            )
+                            successSoftBackground()
                         } else {
-                            Color(
-                                0xFFF2F2F7
-                            )
+                            lockedBackground()
                         },
 
                     shape =
@@ -1415,8 +1525,7 @@ private fun MilestoneRow(
                     colors.secondaryLabel,
 
                 style =
-                    androidx.compose.material3
-                        .MaterialTheme
+                    MaterialTheme
                         .typography
                         .bodySmall
             )
@@ -1440,8 +1549,7 @@ private fun MilestoneRow(
                     FontWeight.Medium,
 
                 style =
-                    androidx.compose.material3
-                        .MaterialTheme
+                    MaterialTheme
                         .typography
                         .bodySmall
             )
@@ -1466,8 +1574,7 @@ private fun MilestoneRow(
                     },
 
                 style =
-                    androidx.compose.material3
-                        .MaterialTheme
+                    MaterialTheme
                         .typography
                         .bodySmall
             )
@@ -1496,8 +1603,7 @@ private fun TransactionsSection(
                 FontWeight.SemiBold,
 
             style =
-                androidx.compose.material3
-                    .MaterialTheme
+                MaterialTheme
                     .typography
                     .titleMedium
         )
@@ -1509,9 +1615,7 @@ private fun TransactionsSection(
                 )
         )
 
-        if (
-            transactions.isEmpty()
-        ) {
+        if (transactions.isEmpty()) {
 
             Column(
                 modifier = Modifier
@@ -1523,9 +1627,45 @@ private fun TransactionsSection(
                         )
                     )
                     .padding(
-                        18.dp
-                    )
+                        24.dp
+                    ),
+
+                horizontalAlignment =
+                    Alignment.CenterHorizontally
             ) {
+
+                Box(
+                    modifier = Modifier
+                        .size(
+                            48.dp
+                        )
+                        .background(
+                            goalSoftBackground(),
+                            CircleShape
+                        ),
+
+                    contentAlignment =
+                        Alignment.Center
+                ) {
+
+                    Icon(
+                        imageVector =
+                            Icons.Rounded.Savings,
+
+                        contentDescription =
+                            null,
+
+                        tint =
+                            goalAccent()
+                    )
+                }
+
+                Spacer(
+                    modifier =
+                        Modifier.height(
+                            12.dp
+                        )
+                )
 
                 Text(
                     text =
@@ -1535,7 +1675,7 @@ private fun TransactionsSection(
                         colors.label,
 
                     fontWeight =
-                        FontWeight.Medium
+                        FontWeight.SemiBold
                 )
 
                 Spacer(
@@ -1547,14 +1687,13 @@ private fun TransactionsSection(
 
                 Text(
                     text =
-                        "Your deposits and withdrawals will appear here.",
+                        "Add your first savings deposit and it will appear here.",
 
                     color =
                         colors.secondaryLabel,
 
                     style =
-                        androidx.compose.material3
-                            .MaterialTheme
+                        MaterialTheme
                             .typography
                             .bodySmall
                 )
@@ -1574,13 +1713,17 @@ private fun TransactionsSection(
             ) {
 
                 transactions
-                    .take(5)
-                    .forEach {
+                    .take(
+                        10
+                    )
+                    .forEachIndexed {
+                            index,
                             transaction ->
 
                         val isDeposit =
                             transaction.type ==
-                                    GoalTransactionType.DEPOSIT
+                                    GoalTransactionType
+                                        .DEPOSIT
 
                         Row(
                             modifier = Modifier
@@ -1608,13 +1751,9 @@ private fun TransactionsSection(
                                                 if (
                                                     isDeposit
                                                 ) {
-                                                    Color(
-                                                        0xFFE8F7EC
-                                                    )
+                                                    successSoftBackground()
                                                 } else {
-                                                    Color(
-                                                        0xFFFFECEB
-                                                    )
+                                                    errorSoftBackground()
                                                 },
 
                                             shape =
@@ -1696,8 +1835,7 @@ private fun TransactionsSection(
                                             colors.secondaryLabel,
 
                                         style =
-                                            androidx.compose.material3
-                                                .MaterialTheme
+                                            MaterialTheme
                                                 .typography
                                                 .bodySmall
                                     )
@@ -1735,6 +1873,25 @@ private fun TransactionsSection(
                                     FontWeight.SemiBold
                             )
                         }
+
+                        if (
+                            index <
+                            transactions
+                                .take(10)
+                                .lastIndex
+                        ) {
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(
+                                        1.dp
+                                    )
+                                    .background(
+                                        colors.separator
+                                    )
+                            )
+                        }
                     }
             }
         }
@@ -1766,7 +1923,7 @@ private fun LoadingGoalCard() {
 
         CircularProgressIndicator(
             color =
-                GoalPurple
+                goalAccent()
         )
     }
 }
@@ -1805,7 +1962,7 @@ private fun EmptyGoalCard(
                 null,
 
             tint =
-                GoalPurple,
+                goalAccent(),
 
             modifier =
                 Modifier.size(
@@ -1913,8 +2070,7 @@ private fun GoalTransactionDialog(
                                 .secondaryLabel,
 
                         style =
-                            androidx.compose.material3
-                                .MaterialTheme
+                            MaterialTheme
                                 .typography
                                 .bodySmall
                     )
@@ -1959,6 +2115,7 @@ private fun GoalTransactionDialog(
                         if (
                             errorMessage != null
                         ) {
+
                             {
 
                                 Text(
