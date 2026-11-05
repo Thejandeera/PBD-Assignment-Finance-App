@@ -2,6 +2,7 @@ package com.clarity.finance.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -404,7 +405,7 @@ fun DashboardScreen(
                         dashboardState
                             .goal
                             ?.name
-                            ?: "MacBook Pro M4",
+                            ?: "No Goal Set",
 
                     savedInLkr =
                         dashboardState
@@ -437,10 +438,14 @@ fun DashboardScreen(
                         exchangeRate,
 
                     modifier =
-                        Modifier.padding(
-                            horizontal =
-                                16.dp
-                        )
+                        Modifier
+                            .padding(
+                                horizontal =
+                                    16.dp
+                            )
+                            .clickable {
+                                onNavigateToGoal()
+                            }
                 )
 
                 Spacer(

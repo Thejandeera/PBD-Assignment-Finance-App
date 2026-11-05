@@ -75,11 +75,11 @@ data class Income(
 }
 
 data class Goal(
-    val id: String = "primary_goal",
-    val name: String = "MacBook Pro M4",
-    val targetAmount: Double = 490000.0,
-    val startingAmount: Double = 11200.0,
-    val deadline: String = "2027-10-01",
+    val id: String = "",
+    val name: String = "",
+    val targetAmount: Double = 0.0,
+    val startingAmount: Double = 0.0,
+    val deadline: String = "",
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 )
